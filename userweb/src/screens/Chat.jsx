@@ -470,7 +470,19 @@ export default function Chat({ token, openProfile, meId }) {
               ))}
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, 1fr)', gridAutoFlow: 'column', gap: '8px', height: '100%', gridAutoColumns: 'max-content' }}>
+            /* ⚠️ این گرید باید اسکرولِ افقی داشته باشد — آینهٔ اندروید.
+               ریشهٔ باگِ «تب‌های ناقص» که مالک گزارش کرد همین‌جا هم بود:
+               `gridAutoFlow: column` + `gridAutoColumns: max-content` یعنی
+               ‏۱۴ پیامِ آماده در ۷ ستون کنار هم می‌نشینند (~۸۸۰px) و عرضِ
+               قابِ چت ۵۱۶px است. چون `.tabPane` هم `content-visibility:auto`
+               دارد (که paint containment می‌سازد)، سرریز **بریده** می‌شد و
+               کاربر فقط ~۴ دکمهٔ اول را می‌دید و بقیه عملاً ناپدید بودند.
+               قبلاً کسی متوجه نمی‌شد چون کارتِ چت خودش تا ۸۹۵px پف می‌کرد و
+               تصادفاً این ۸۸۰px را جا می‌داد؛ با مهارِ ستون، خودِ سرریز
+               رو شد. در اندروید همین فهرست `GridView(scrollDirection:
+               Axis.horizontal, crossAxisCount: 2)` است، یعنی قابل‌اسکرول —
+               پس وب هم همان می‌شود، نه بریده. */
+            <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, 1fr)', gridAutoFlow: 'column', gap: '8px', height: '100%', gridAutoColumns: 'max-content', overflowX: 'auto', overflowY: 'hidden', paddingBottom: '4px', WebkitOverflowScrolling: 'touch' }}>
               {(categories[tab]?.items || []).map((txt, idx) => (
                 <button
                   key={idx}

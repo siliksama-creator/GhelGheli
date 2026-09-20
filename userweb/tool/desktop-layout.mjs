@@ -119,6 +119,70 @@ check('هیچ min-width دیگری در growth.css باقی نمانده', () =>
   assert.ok(!/@media[^{]*min-width/.test(growth), 'growth.css هنوز بلاک min-width دارد');
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  مهارِ «پف‌کردنِ» ستون — ریشهٔ واقعیِ «تب‌های ناقص» (۱۴۰۵/۰۶/۲۹)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// گزارش مالک: «یک سری از تب‌ها هنوز ناقص نشون داده می‌شه» — با عکسِ نوارِ
+// تبِ باشگاه که فقط سه تب داشت.
+//
+// اندازه‌گیریِ واقعی روی خروجیِ build (نمای ۱۶۷۸px، پورتال ۵۱۶px):
+//   clubWrap ستونِ گریدش ۸۹۵px  →  clubTabs عرضش ۶۸۰px  →  دو تبِ آخر
+//   («ماموریت» و «گذر نبرد») بیرونِ ستونِ ۵۴۰px.
+// و چون `.tabPane` هم `content-visibility:auto` دارد (paint containment)،
+// همان سرریز **بریده** می‌شد و تبِ چهارم عملاً ناپدید بود.
+//
+// دو ریشه داشت و هر دو این‌جا قفل می‌شوند:
+//   ۱. عرضِ نوارِ تب با `min(680px, 96vw)` از **نما** می‌آمد، نه از قاب.
+//   ۲. ستونِ `auto`/`1fr` سقف ندارد؛ max-contentِ محتوا آن را بزرگ می‌کند.
+// پس: عرضِ نسبتی با قاب + مهارِ ستونِ گریدها.
+// چرا «استاتیک» و نه Playwright: این دو تابعِ CSS‌اند، نه رفتارِ مرورگر؛
+// و CIِ وب فقط صفحهٔ ورود را می‌بیند (بدونِ توکن به پورتال نمی‌رسد).
+
+const gamesCss = fs.readFileSync(path.join(root, 'userweb/src/styles/games.css'), 'utf8');
+const appbarCss = fs.readFileSync(path.join(root, 'userweb/src/styles/appbar.css'), 'utf8');
+const growthCss = fs.readFileSync(path.join(root, 'userweb/src/growth.css'), 'utf8');
+
+check('عرضِ نوارِ تبِ باشگاه نسبتی با قاب است، نه با نما (بدونِ vw)', () => {
+  const rule = gamesCss.slice(gamesCss.indexOf('.socialTripleTabs'), gamesCss.indexOf('.socialTripleTabs') + 200);
+  assert.ok(/\.socialTripleTabs\s*\{[^}]*width:\s*100%/.test(gamesCss),
+    'قاعدهٔ `.socialTripleTabs{width:100%}` در styles/games.css نیست');
+  assert.ok(!/\d+vw/.test(rule),
+    'نوارِ تبِ باشگاه دوباره عرضش را از `vw` می‌گیرد — از ستونِ ۵۴۰px بیرون می‌زند');
+});
+
+check('قاعدهٔ عرضِ نوارِ تب در فایلِ همیشه‌بارگذاری‌شده هست (نه فقط چونکِ تنبلِ بازی‌ها)', () => {
+  assert.ok(/\.socialTripleTabs\s*\{[^}]*width:/.test(gamesCss),
+    'قاعدهٔ عرض فقط در growth.css است؛ در تبِ «چت» آن فایل بارگذاری نمی‌شود و نوار بی‌عرض می‌ماند');
+});
+
+check('نسخهٔ growth.css هم همان عرضِ نسبتی را می‌گوید (نه مقدارِ واگرا)', () => {
+  assert.ok(/\.socialTripleTabs\{width:100%/.test(growthCss),
+    'growth.css مقدارِ دیگری برای عرضِ نوار دارد — اگر دیرتر بارگذاری شود، اصلاح را باطل می‌کند');
+});
+
+check('ستونِ گریدِ `.tabPane` مهار شده است (minmax(0,1fr))', () => {
+  // بلوکِ قاعده را با «آکولاد بسته» پیدا می‌کنیم نه با طولِ ثابت — کامنتِ
+  // توضیحیِ بالای همین قاعده قبلاً پنجرهٔ ثابت را رد کرده بود.
+  const tabPaneBlock = appbarCss.match(/^\.tabPane\s*\{[\s\S]*?\}/m)?.[0] || '';
+  assert.ok(/grid-template-columns:\s*minmax\(0,\s*1fr\)/.test(tabPaneBlock),
+    'بدونِ مهارِ ستون، محتوای عریض کلِ ستون را پف می‌کند و تب‌ها بیرون می‌زنند');
+});
+
+check('ستونِ گریدِ `.clubWrap` مهار شده است (minmax(0,1fr))', () => {
+  assert.ok(/\.clubWrap\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/.test(gamesCss),
+    'clubWrap بدونِ مهارِ ستون، با max-contentِ چت تا ۸۹۵px پف می‌کند و نوار را با خودش می‌برد');
+});
+
+check('گریدِ پیام‌های آمادهٔ چت اسکرولِ افقی دارد (آینهٔ GridView اندروید)', () => {
+  const chat = fs.readFileSync(path.join(root, 'userweb/src/screens/Chat.jsx'), 'utf8');
+  const gridAt = chat.indexOf("gridAutoColumns: 'max-content'");
+  assert.ok(gridAt > -1, 'گریدِ پیام‌های آماده پیدا نشد');
+  const after = chat.slice(gridAt, gridAt + 260);
+  assert.ok(/overflowX:\s*'auto'/.test(after),
+    'گریدِ پیام‌های آماده در قابِ ۵۱۶px جا نمی‌شود؛ بدونِ اسکرول، سرریزش توسطِ paint containment بریده می‌شود');
+});
+
 check('theme.css (تولیدشده) بلاک min-width ندارد', () => {
   const theme = fs.readFileSync(path.join(root, 'userweb/src/theme.css'), 'utf8');
   assert.ok(!/@media[^{]*min-width/.test(theme), 'theme.css هنوز بلاک min-width دارد');
