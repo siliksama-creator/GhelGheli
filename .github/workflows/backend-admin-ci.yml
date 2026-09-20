@@ -165,6 +165,17 @@ jobs:
           CONCURRENCY: '40'
           DURATION: '12'
         run: node scripts/loadTest.js
+      # تستِ سرتاسریِ «چند ماموریتِ اختصاصی» — همان کاری که ادمین و کاربر
+      # می‌کنند، از روی HTTP: ساختِ چند کارت از پنل، دیدنشان توسط کاربرِ
+      # تازه، دریافتِ امتیازِ یک ماموریتِ مشخص، ثبت در دفترِ امتیاز، و
+      # «دورهٔ تازه». مسیرِ پول است، پس با سرورِ واقعی سنجیده می‌شود
+      # (نسخهٔ جعلی‌اش در `npm test` هست: testMultiCustomMission.js).
+      - name: E2E multi custom mission (admin panel → user claim → ledger)
+        env:
+          BASE: http://127.0.0.1:4999
+          GG_ADMIN_USER: Admin
+          GG_ADMIN_PASS: CiTestOnly@2026
+        run: node scripts/e2eMultiMission.mjs
       - name: Stop API
         if: always()
         run: kill "$(cat /tmp/api.pid)" 2>/dev/null || true
