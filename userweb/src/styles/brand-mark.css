@@ -467,14 +467,16 @@
    ویژگی‌های مربوطه صریحاً اینجا هم بازنویسی شوند. */
 .mobileNav {
   position: fixed;
-  bottom: 0; left: 0; right: 0;
+  bottom: 0; left: 50%; right: auto;
+  transform: translateX(-50%);
   top: auto;
   height: auto;
   z-index: 40;
   display: flex;
   justify-content: space-around;
   gap: 2px;
-  max-width: none;
+  width: 100%;
+  max-width: 540px;
   margin: 0;
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
   border-radius: 22px 22px 0 0;
@@ -4045,24 +4047,27 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
    یک «پیل»ِ شناورِ وسط‌چین تبدیل می‌شود (همان ۵ تب، بدون تغییر).
    ───────────────────────────────────────────────────────────────── */
 @media (min-width: 900px) {
-  /* جای پیلِ شناور + فاصلهٔ نفس‌کشیدن. */
-  .portal { padding-bottom: 108px; }
-  .portal > .mobileNav { width: auto; max-width: none; }
+  /* پوستهٔ دسکتاپ = موبایل: پرتال و نوار ناوبری ۵۴۰px وسط‌چین */
+  .portal { padding-bottom: 88px; }
+  .portal > .mobileNav { width: 100%; max-width: 540px; }
   .mobileNav {
     left: 50%; right: auto;
     transform: translateX(-50%);
-    bottom: 20px;
-    border-radius: 22px;
-    border: 1px solid #ffffff1f;
-    padding: 8px 10px;
-    gap: 6px;
-    box-shadow: 0 20px 55px #000b;
+    bottom: 0;
+    width: 100%;
+    max-width: 540px;
+    border-radius: 22px 22px 0 0;
+    border: 1px solid #ffffff18;
+    border-bottom: 0;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px));
+    gap: 2px;
+    box-shadow: 0 -12px 35px #0009;
   }
   .mobileNav button {
-    flex: 0 0 auto;
-    min-width: 108px;
-    padding: 9px 16px;
-    border-radius: 15px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 4px;
+    border-radius: 14px;
   }
   /* روی موس، بازخوردِ hover معنا دارد (روی لمس نداشت). */
   .mobileNav button:not(.on):hover { background: #ffffff12; color: #e8f4ff; }

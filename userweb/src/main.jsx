@@ -113,7 +113,6 @@ import './style.css';
 import './typography.css';
 // LAST: the theme layer overrides style.css surface colours.
 import './theme.css';
-import { ScrollHint } from './components/ScrollHint.jsx';
 
 // ── ناوبری ────────────────────────────────────────────────────────────────
 //
@@ -726,7 +725,7 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
               display: 'block', textAlign: 'center', padding: '9px 14px',
               fontSize: 12.5, fontWeight: 800, color: '#1a0f02',
               background: 'linear-gradient(90deg,#FFD166,#F97316)',
-              textDecoration: 'none', cursor: 'pointer', width: 'min(1080px, 96vw)',
+              textDecoration: 'none', cursor: 'pointer', width: '100%',
             }}
           >
             {cfg.announcement.text}
@@ -831,26 +830,6 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
           برای تبِ‌های داخلِ شیتِ «بیشتر» هم `aria-current` کافی نیست چون
           شیت پس از کلیک بسته می‌شود. این یک قلابِ خواندنی و بی‌اثر روی
           ظاهر است، نه تضعیفِ محصول برای آسان‌شدنِ تست. */}
-            <ScrollHint
-        key={`hint-${tab}`}
-        target="window"
-        label={({
-          home: 'میان‌برها و کارت‌ها پایین‌ترند',
-          rewards: 'جوایز بیشتری پایین‌تر هست',
-          wallet: 'تاریخچهٔ تراکنش‌ها پایین‌تر است',
-          league: 'ادامهٔ جدول پایین‌تر است',
-          club: 'بازی‌های بیشتری پایین‌تر است',
-          wheel: 'جایزه‌ها و شرایط پایین‌تر است',
-          invite: 'راهنمای دعوت پایین‌تر است',
-          shop: 'محصولات بیشتری پایین‌تر است',
-          inventory: 'کارت‌های بیشتری پایین‌تر است',
-          apps: 'برنامه‌های بیشتری پایین‌تر است',
-          profile: 'تنظیمات پایین‌تر است',
-          support: 'تیکت‌ها پایین‌ترند',
-          pass: 'پله‌های بیشتری پایین‌تر است',
-        })[tab] || 'پایین‌تر هم هست'}
-        padBottom={72}
-      >
       <main className="tabPane" key={tab} data-tab={tab}>
         <UserErrorBoundary key={tab} onReset={() => window.location.reload()}>
         <Suspense fallback={<div className="tabLoading" aria-busy="true" />}>
@@ -913,7 +892,6 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
         </Suspense>
         </UserErrorBoundary>
       </main>
-      </ScrollHint>
 
       {publicUser && (
         <UserErrorBoundary>
