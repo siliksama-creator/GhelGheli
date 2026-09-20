@@ -143,7 +143,13 @@ void main() {
       final scaffold = File('lib/screens/user/games/game_scaffold.dart').readAsStringSync();
       expect(scaffold.contains('SingleChildScrollView(\n          child: Column'), isFalse,
           reason: 'حالت playing/over نباید کل بازی را اسکرول‌دار کند');
-      expect(scaffold.contains('_ResultStrip(session: session'), isTrue,
+      // قالب‌بندی‌مقاوم شد (۲۹ شهریور): نسخهٔ قبلی فقط شکلِ تک‌خطیِ
+      // `_ResultStrip(session: session` را می‌پذیرفت و به‌محضِ اینکه دو
+      // پارامترِ تازه (`showText`/`soft`) به فراخوانی اضافه شد، بی‌جهت
+      // شکست — در حالی که قصدِ گارد این است که نوارِ نتیجه **در کرومِ
+      // ثابت** بماند، نه اینکه دقیقاً یک‌خطی نوشته شود. حالا خودِ فراخوانی
+      // با فاصلهٔ آزاد سنجیده می‌شود.
+      expect(RegExp(r'_ResultStrip\(\s*session: session\b').hasMatch(scaffold), isTrue,
           reason: 'نتیجه باید بالای زمین و همیشه در دید باشد');
     });
   });

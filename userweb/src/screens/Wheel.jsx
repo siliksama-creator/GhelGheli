@@ -319,25 +319,30 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
         </div>
       )}
 
-      {result && (
+      {/* ── نوارِ «برنده شدی!/گرفتی!» حذف شد (۲۹ شهریور) ──────────────────
+          خواستهٔ مالک: «دیگه یه گوشه ننویسه "شما بازی رو بردید" یا "شما ۱۰۰۰
+          امتیاز دریافت کردید"؛ به‌جاش یه لحظه اون چیزی که گرفته رو نشون بده.»
+          این نوار دقیقاً همان پیامِ موازی بود: همان جایزه را هم این‌جا
+          می‌نوشت و هم «لحظهٔ جایزه» نشان می‌داد. حالا فقط یک روایت داریم.
+
+          ⚠️ استثنا: برشِ «صندوق کارت» همان‌جا می‌ماند — باز کردنِ صندوق صحنهٔ
+          خودش را دارد (`GrantChestOpener`) و مالک صندوقِ کارت را از این
+          سیستم مستثنا کرده بود. */}
+      {result && result.kind === 'card_box' && (
         <div className={`wheelResult ${result.kind}`}>
-          <b>{result.kind === 'cash' || result.kind === 'card_box' ? ' برنده شدی!' : ' گرفتی!'}</b>
+          <b>صندوق کارت گرفتی</b>
           <span>{result.label}</span>
-          {result.kind === 'card_box' && (
-            <>
-              <p className="hint" style={{ marginTop: 8 }}>
-                صندوق کارت به کلکسیونت اضافه شد. همین‌جا یا از کلکسیون بازش کن.
-              </p>
-              {result.grantId && (
-                <div style={{ marginTop: 8 }}>
-                  <GrantChestOpener
-                    token={token}
-                    grantId={result.grantId}
-                    onOpened={() => reloadProfile?.()}
-                  />
-                </div>
-              )}
-            </>
+          <p className="hint" style={{ marginTop: 8 }}>
+            صندوق کارت به کلکسیونت اضافه شد. همین‌جا یا از کلکسیون بازش کن.
+          </p>
+          {result.grantId && (
+            <div style={{ marginTop: 8 }}>
+              <GrantChestOpener
+                token={token}
+                grantId={result.grantId}
+                onOpened={() => reloadProfile?.()}
+              />
+            </div>
           )}
         </div>
       )}

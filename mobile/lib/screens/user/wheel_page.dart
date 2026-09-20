@@ -544,7 +544,11 @@ class _WheelPageState extends State<WheelPage>
               ),
             ),
           ],
-          if (_result != null) ...[
+          // ⚠️ استثنا: برشِ «صندوق کارت» صحنهٔ خودش را دارد (دکمهٔ باز کردن
+          // صندوق) و مالک صندوقِ کارت را از «لحظهٔ جایزه» مستثنا کرده بود.
+          // بقیهٔ جایزه‌ها دیگر این‌جا نوشته نمی‌شوند؛ «لحظهٔ جایزه» بالای صفحه
+          // می‌آید و می‌رود، پس دو روایتِ هم‌زمان نداریم.
+          if (_result != null && _result!.kind == 'card_box') ...[
             Gaps.vLg,
             // ValueKey روی برچسب: اگر دو چرخش پیاپی یک جایزه بدهند، کلید
             // عوض نمی‌شود و didUpdateWidget انیمیشن را دوباره اجرا می‌کند.
@@ -927,11 +931,9 @@ class _ResultCardState extends State<_ResultCard>
   Widget _buildCard(BuildContext context) {
     final theme = Theme.of(context);
     final prize = widget.prize;
-    final isCash = prize.kind == 'cash';
-    final isBox = prize.kind == 'card_box';
-    final tint = isCash || isBox
-        ? const Color(0xFFFCD34D)
-        : const Color(0xFF67E8F9);
+    // این کارت فقط برای «صندوق کارت» ساخته می‌شود؛ بقیهٔ جایزه‌ها روایتشان
+    // «لحظهٔ جایزه» است. پس رنگ و متن این‌جا ثابت است.
+    const tint = Color(0xFFFCD34D);
     return Container(
       padding: const EdgeInsets.symmetric(
           horizontal: Gaps.lg, vertical: Gaps.md),
@@ -941,7 +943,7 @@ class _ResultCardState extends State<_ResultCard>
         border: Border.all(color: tint.withValues(alpha: 0.35)),
         boxShadow: [
           BoxShadow(
-            color: tint.withValues(alpha: isCash ? 0.28 : 0.16),
+            color: tint.withValues(alpha: 0.28),
             blurRadius: 28,
             spreadRadius: -6,
           ),
@@ -949,47 +951,44 @@ class _ResultCardState extends State<_ResultCard>
       ),
       child: Column(
         children: [
-          Text(isCash || isBox ? ' برنده شدی!' : ' گرفتی!',
+          Text('صندوق کارت گرفتی',
               style: theme.textTheme.titleMedium
                   ?.copyWith(color: tint, fontWeight: FontWeight.w800)),
           Gaps.vXxs,
           Text(prize.label,
               style: theme.textTheme.headlineSmall
                   ?.copyWith(color: tint, fontWeight: FontWeight.w900)),
-          if (isBox) ...[
-            Gaps.vXxs,
-            Text('صندوق به کلکسیونت اضافه شد — همین‌جا بازش کن',
-                style: theme.textTheme.bodySmall?.copyWith(color: tint)),
-            if (prize.grantId != null && widget.api != null) ...[
-              Gaps.vXs,
-              FilledButton(
-                onPressed: () async {
-                  try {
-                    final r = await widget.api!
-                        .post('/api/grants/${prize.grantId}/open', const {});
-                    if (!context.mounted) return;
-                    final cards =
-                        (r is Map ? r['cards'] as List? : null) ?? const [];
-                    final names = cards
-                        .whereType<Map>()
-                        .map((c) => '${c['name'] ?? 'کارت'}')
-                        .join('، ');
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(names.isEmpty
-                          ? 'صندوق باز شد'
-                          : 'صندوق باز شد: $names'),
-                    ));
-                    widget.onOpened?.call();
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(apiError(e))));
-                    }
+          Gaps.vXxs,
+          Text('صندوق به کلکسیونت اضافه شد — همین‌جا بازش کن',
+              style: theme.textTheme.bodySmall?.copyWith(color: tint)),
+          if (prize.grantId != null && widget.api != null) ...[
+            Gaps.vXs,
+            FilledButton(
+              onPressed: () async {
+                try {
+                  final r = await widget.api!
+                      .post('/api/grants/${prize.grantId}/open', const {});
+                  if (!context.mounted) return;
+                  final cards =
+                      (r is Map ? r['cards'] as List? : null) ?? const [];
+                  final names = cards
+                      .whereType<Map>()
+                      .map((c) => '${c['name'] ?? 'کارت'}')
+                      .join('، ');
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(
+                        names.isEmpty ? 'صندوق باز شد' : 'صندوق باز شد: $names'),
+                  ));
+                  widget.onOpened?.call();
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(apiError(e))));
                   }
-                },
-                child: const Text('باز کردن صندوق'),
-              ),
-            ],
+                }
+              },
+              child: const Text('باز کردن صندوق'),
+            ),
           ],
         ],
       ),
