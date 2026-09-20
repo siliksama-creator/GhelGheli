@@ -134,7 +134,9 @@ class _GrowthPanelState extends State<GrowthPanel> {
           RewardBurstData(
             source: key == 'daily-bonus'
                 ? RewardSource.daily
-                : key == 'custom-mission'
+                // ماموریت‌های اختصاصی کلیدِ `custom:<id>` دارند (هر کارت
+                // مستقل) — پس با `startsWith` شناخته می‌شوند، نه تساوی.
+                : key.startsWith('custom')
                     ? RewardSource.custom
                     : RewardSource.mission,
             points: gained,
@@ -233,13 +235,25 @@ class _GrowthPanelState extends State<GrowthPanel> {
       ..sort((a, b) => (a['claimed'] == true ? 1 : 0).compareTo(b['claimed'] == true ? 1 : 0));
     final weekly = ((_data?['weekly'] as List?) ?? const []).whereType<Map>().toList();
     final bonus = _data?['dailyBonus'] is Map ? _data!['dailyBonus'] as Map : const {};
-    // ── ماموریتِ اختصاصیِ ادمین (خواستهٔ مالک) ──────────────────────────
-    // از همان `/api/growth/overview` می‌آید که بقیهٔ ماموریت‌ها؛ سرور آن را
-    // داخلِ `missions.status` می‌گذارد، پس هیچ درخواستِ اضافه‌ای لازم نیست.
-    // اگر ادمین فعالش نکرده باشد `null` است و هیچ کارتی رندر نمی‌شود.
-    final custom = _data?['custom'] is Map
-        ? Map<String, dynamic>.from(_data!['custom'] as Map)
-        : const <String, dynamic>{};
+    // ── ماموریت‌های اختصاصیِ ادمین — چندتایی (خواستهٔ مالک) ─────────────
+    // از همان `/api/growth/overview` می‌آید که بقیهٔ ماموریت‌ها؛ سرور فهرست
+    // را داخلِ `missions.status` می‌گذارد، پس هیچ درخواستِ اضافه‌ای لازم
+    // نیست. سرور کارت‌هایی را می‌دهد که **همین کاربر نگرفته** است؛ یعنی
+    // بعد از دریافت، کارت خودش از فهرست می‌رود (خواستهٔ صریح مالک).
+    //
+    // ⚠️ کلیدِ قدیمیِ `custom` (تک‌ماموریتی) نگه داشته شده: اگر سرورِ
+    //    ناهم‌زمان با اپ جواب بدهد، کاربر به‌جای «هیچ‌چیز» همان یک کارت را
+    //    می‌بیند.
+    final customRaw = _data?['customMissions'];
+    final customs = customRaw is List
+        ? customRaw
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList()
+        : <Map<String, dynamic>>[
+            if (_data?['custom'] is Map)
+              Map<String, dynamic>.from(_data!['custom'] as Map),
+          ];
     final friends = ((_data?['friends'] as List?) ?? const []).whereType<Map>().toList();
     final incoming = ((_data?['incoming'] as List?) ?? const []).whereType<Map>().toList();
     return Container(
@@ -272,15 +286,21 @@ class _GrowthPanelState extends State<GrowthPanel> {
         //    «قبلِ ماموریتِ امروز یک قسمت به‌عنوانِ ماموریتِ اختصاصی قرار
         //    بگیرد.» اعلانِ ادمین باید اولین چیزِ این کارت باشد، نه چیزی
         //    که کاربر بعد از خواندنِ آمارِ روزانه ببیند.
-        if (custom.isNotEmpty && '${custom['title'] ?? ''}'.trim().isNotEmpty) ...[
-          _CustomMissionCard(
-            mission: custom,
-            busy: _busy == 'custom-mission',
-            onClaim: () => _run('custom-mission',
-                () => widget.api.post('/api/missions/custom/claim', {})),
-          ),
-          Gaps.vSm,
-        ],
+        for (final mission in customs)
+          if ('${mission['title'] ?? ''}'.trim().isNotEmpty) ...[
+            _CustomMissionCard(
+              // `key` بر پایهٔ شناسهٔ ماموریت: با آمدنِ فهرستِ تازه، ویجتِ
+              // همان کارت بازنشانی نمی‌شود و ثانیه‌شمارِ ۱۵ثانیه‌ای‌اش
+              // الکی از صفر شروع نمی‌کند.
+              key: ValueKey('custom-${mission['id']}'),
+              mission: mission,
+              busy: _busy == 'custom:${mission['id']}',
+              onClaim: () => _run('custom:${mission['id']}',
+                  () => widget.api.post(
+                      '/api/missions/custom/${mission['id']}/claim', {})),
+            ),
+            Gaps.vSm,
+          ],
         _DailyMissionSummary(
           completed: (bonus['completed'] as num?)?.toInt() ?? 0,
           goal: (bonus['goal'] as num?)?.toInt() ?? 5,

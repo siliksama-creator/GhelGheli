@@ -3022,15 +3022,16 @@ app.use('/api', require('./routes/adminMissions')({
   missions: require('./services/missionService'), opsConfig,
 }));
 
-// ── ماموریتِ اختصاصی (همگانی) — یک تنظیمِ یگانه که ادمین می‌نویسد ──────
+// ── ماموریت‌های اختصاصی (همگانی) — فهرستی که ادمین می‌نویسد ────────────
 // بالای «ماموریت‌های امروز» به همهٔ کاربران نشان داده می‌شود و لینکِ رنگی
 // پشتِ «اینجا کلیک کنید» می‌گیرد. بدونِ آپدیتِ اپ.
+//
+// ⚠️ این رجیستر یک‌بار است. قبلاً دو بار پشتِ سرِ هم آمده بود (نسخهٔ
+//    یگانه + نسخهٔ چندتایی)؛ Express مسیرِ تکراری را دوباره اجرا نمی‌کرد
+//    پس باگی نمی‌ساخت، ولی هر کسی که بعداً فقط یکی را ویرایش می‌کرد،
+//    فکر می‌کرد تغییرش اثر کرده در حالی که نسخهٔ اول پاسخ می‌داد.
 app.use('/api', require('./routes/adminCustomMission')({
-  adminAuth, requireRole, asyncHandler, audit,
-  customMission: require('./services/customMission'),
-}));
-app.use('/api', require('./routes/adminCustomMission')({
-  adminAuth, requireRole, asyncHandler, audit,
+  adminAuth, requireRole, asyncHandler, audit, validateUuid,
   customMission: require('./services/customMission'),
 }));
 

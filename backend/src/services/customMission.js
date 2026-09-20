@@ -1,7 +1,7 @@
 'use strict';
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- *  ماموریتِ اختصاصی (همگانی) — اهرمِ ادمین بدونِ آپدیتِ اپ
+ *  ماموریت‌های اختصاصی (چندتایی) — اهرمِ ادمین بدونِ آپدیتِ اپ
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * ── خواستهٔ مالک (۱۷ شهریور) ──────────────────────────────────────────────
@@ -12,19 +12,43 @@
  * حتی می‌تواند لینک را پشتِ کلمهٔ «اینجا کلیک کنید» بگذارد، به رنگِ مثلاً
  * آبی یا سبز.»
  *
+ * ── خواستهٔ بعدی (۲۹ شهریور) ─────────────────────────────────────────────
+ *
+ * «باید یه کاری کنی که اگه ادمین خواست چند تا ماموریتِ اختصاصی بتونه قرار
+ * بده.» → همین فایل از «ماموریتِ یگانه» به «فهرستی از ماموریت‌ها» رفت.
+ *
  * ── طراحی ────────────────────────────────────────────────────────────────
  *
- * یک ماموریتِ **یگانه** (نه فهرست) در `app_settings` نشسته است، نه جدولِ
- * تازه: تعدادش یکی است، ویرایشش اتمیک است و از همان کشِ همگامِ `opsConfig`
- * خوانده می‌شود که بقیهٔ اهرم‌های ادمین. کلید: `custom_mission`.
+ * یک **فهرست** در `app_settings` نشسته است، نه جدولِ تازه: تعدادش حداکثر
+ * `MAX_ITEMS` است، ویرایشش اتمیک است (کلِ فهرست با یک `PUT`) و از همان کشِ
+ * همگامِ `opsConfig` خوانده می‌شود که بقیهٔ اهرم‌های ادمین. کلید:
+ * `custom_mission`.
  *
- *   { id, enabled, title, body, points,
- *     link: { url, text, color }, updatedAt, updatedBy }
+ *   { items: [ { id, enabled, title, body, points,
+ *                link: { url, text, color }, updatedAt, updatedBy } ],
+ *     updatedAt, updatedBy }
  *
- * `id` با هر ذخیرهٔ ادمین **عوض می‌شود** (UUID تازه) و همین، «دوره»ی
- * ماموریت را مشخص می‌کند: کاربر برای هر ماموریت یک‌بار می‌تواند امتیاز
- * بگیرد. پس ادمین با ساختنِ کمپینِ تازه، همان کاربران را دوباره درگیر
- * می‌کند؛ و با روشن‌وخاموش‌کردنِ ساده، امتیازِ دو بار نمی‌دهیم.
+ * ── سازگاری با داده و کلاینتِ قدیمی (مهم) ───────────────────────────────
+ *
+ * ۱) شکلِ **قدیمی** (`{ id, enabled, title, ... }` بدونِ `items`) هنوز خوانده
+ *    می‌شود و مثلِ فهرستِ تک‌عضوی دیده می‌شود؛ پس دیپلوی بدونِ مایگریشن و
+ *    بدونِ لحظهٔ خالی‌شدنِ کارتِ کاربران انجام می‌شود.
+ * ۲) `current`/`publicView`/`status`/`claim(userId)` هنوز دقیقاً شکلِ قبلی را
+ *    برمی‌گردانند و روی «اولین ماموریتِ فعال» کار می‌کنند. اپلیکیشنِ
+ *    اندرویدی که همین حالا روی گوشیِ کاربران است فقط `custom` را می‌شناسد؛
+ *    اگر این‌ها را می‌شکستیم، آن کاربران یا کارت را از دست می‌دادند یا
+ *    دکمهٔ دریافتشان ۴۰۴ می‌گرفت.
+ *
+ * ── «دوره» یعنی چه ───────────────────────────────────────────────────────
+ *
+ * هر ماموریت شناسهٔ خودش را دارد و `mission_key` در دفترِ پیشرفت
+ * (`custom:<id>`) از همین شناسه ساخته می‌شود: کاربر برای هر ماموریت یک‌بار
+ * می‌تواند امتیاز بگیرد. پس:
+ *   • افزودنِ ماموریتِ تازه → همه (حتی کسانی که قبلی را گرفته‌اند) این یکی
+ *     را می‌بینند؛
+ *   • ویرایشِ متنِ یک ماموریت → شناسه دست‌نخورده می‌ماند و دریافت‌های قبلی
+ *     معتبر می‌مانند (اصلاحِ غلطِ تایپی برای همه امتیازِ تازه پخش نمی‌کند)؛
+ *   • `resetPeriod` → همان ماموریت با شناسهٔ تازه: کمپینِ دوباره با همان متن.
  *
  * ── چرا «دریافت امتیاز» و نه واریزِ خودکار ────────────────────────────────
  *
@@ -42,6 +66,7 @@
  * منبعی که ماموریت‌های روزانه دارند. پس در دفترِ امتیازِ کاربر، ردیفِ
  * «ماموریت اختصاصی: <عنوان>» با توضیحِ خودش دیده می‌شود.
  */
+const crypto = require('crypto');
 const { pool } = require('../config/db');
 const opsConfig = require('./opsConfig');
 const points = require('./pointService');
@@ -49,11 +74,25 @@ const logger = require('../lib/logger');
 
 const KEY = 'custom_mission';
 
+/**
+ * سقفِ تعدادِ ماموریت‌های اختصاصی.
+ *
+ * چرا سقف دارد: هر ماموریت یک کارتِ تمام‌عرض در بالای «ماموریت‌های امروز»
+ * است. بدونِ سقف، ادمینِ خوش‌ذوق می‌تواند صفحهٔ کاربر را با ۳۰ کارت پر کند و
+ * خودِ ماموریت‌های روزانه از دید بیرون برود — همان چیزی که مالک بارها از
+ * شلوغیِ صفحه شکایت کرده. پنج، عددِ متعادل است و بالا بردنش یک خط تغییر
+ * است (هر دو کلاینت فهرست را حلقه می‌زنند، پس چیز دیگری لازم نیست).
+ */
+const MAX_ITEMS = 5;
+
 /** پروژهٔ کلیدِ کاربر که «این کاربر این ماموریت را گرفته» را نگه می‌دارد. */
 const PERIOD = 'custom';
 const missionKey = (id) => `custom:${String(id || '').slice(0, 48)}`;
 
 const COLORS = Object.freeze(['blue', 'green']);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (v) => UUID_RE.test(String(v || ''));
 
 /** محافظِ لینک: فقط http/https. `javascript:`/`data:` هرگز به کلاینت نمی‌رود. */
 function safeLinkUrl(raw) {
@@ -78,7 +117,8 @@ const EMPTY = Object.freeze({
   updatedBy: null,
 });
 
-function normalize(raw) {
+/** نرمال‌سازیِ یک ماموریت (بدونِ شناسهٔ تازه). */
+function normalizeItem(raw) {
   const v = raw && typeof raw === 'object' ? raw : {};
   const link = v.link && typeof v.link === 'object' ? v.link : {};
   const color = COLORS.includes(String(link.color)) ? String(link.color) : 'blue';
@@ -99,89 +139,89 @@ function normalize(raw) {
 }
 
 /**
- * خواندنِ زندهٔ ماموریت.
+ * نرمال‌سازیِ چیزی که در `app_settings` نشسته.
  *
- * ⚠️ `syncGet` و نه `get`: این تابع در مسیرِ داغِ `GET /api/missions` و در
- *    ساختِ همان پاسخ صدا زده می‌شود؛ `get` پرامیسه است و اگر کش سرد باشد
- *    یک کوئریِ اضافه به هر درخواست می‌چسباند. `custom_mission` در بوت
- *    `preload` می‌شود (server.js)، پس کش همیشه گرم است و `set` هم بعد از
- *    هر ذخیرهٔ ادمین همان کلید را تازه می‌کند.
+ * دو شکلِ مجاز: فهرستِ تازه (`{items:[...]}`) و شکلِ قدیمیِ تک‌ماموریتی
+ * (خودِ شیء با `title`/`enabled`). دومی به فهرستِ یک‌عضوی تبدیل می‌شود تا
+ * داده‌های روی سرورِ زنده بدونِ مایگریشن زنده بمانند.
  */
-function current() {
+function normalizeStored(raw) {
+  const v = raw && typeof raw === 'object' ? raw : {};
+  if (Array.isArray(v.items)) {
+    return { items: v.items.map(normalizeItem), updatedAt: v.updatedAt || null, updatedBy: v.updatedBy || null };
+  }
+  // شکلِ قدیمی: فقط اگر واقعاً چیزی در آن باشد به فهرست تبدیل می‌شود.
+  const single = normalizeItem(v);
+  const hasContent = Boolean(single.id || single.title || single.enabled || single.points);
+  return {
+    items: hasContent ? [single] : [],
+    updatedAt: v.updatedAt || null,
+    updatedBy: v.updatedBy || null,
+  };
+}
+
+/** فهرستِ کاملِ ماموریت‌ها (خاموش و روشن، با همان ترتیبِ ادمین). */
+function list() {
   try {
-    const raw = opsConfig.syncGet(KEY);
-    return normalize(raw || EMPTY);
+    return normalizeStored(opsConfig.syncGet(KEY)).items;
   } catch {
-    return { ...EMPTY, link: { ...EMPTY.link } };
+    return [];
   }
 }
 
-/**
- * متنی که کاربر می‌بیند. اگر ادمین لینک گذاشته ولی متنِ لینک خالی است،
- * «اینجا کلیک کنید» — همان جمله‌ای که مالک خواست.
- */
-function publicView() {
-  const m = current();
-  if (!m.enabled || !m.title) return null;
-  const link = m.link.url
-    ? {
-      url: m.link.url,
-      text: m.link.text || 'اینجا کلیک کنید',
-      color: m.link.color,
-    }
-    : null;
+/** ماموریت‌هایی که کاربر باید ببیند: روشن + دارای عنوان. */
+function activeItems() {
+  return list().filter((m) => m.enabled && m.title);
+}
+
+/** شکلِ کارت برای کاربر (بدونِ وضعیتِ دریافت). */
+function viewOf(item) {
   return {
-    id: m.id,
-    title: m.title,
-    body: m.body,
-    points: m.points,
-    link,
+    id: item.id,
+    title: item.title,
+    body: item.body,
+    points: item.points,
+    link: item.link.url
+      ? { url: item.link.url, text: item.link.text || 'اینجا کلیک کنید', color: item.link.color }
+      : null,
   };
 }
 
 /**
- * ساخت/ویرایشِ ماموریت. هر ذخیره یک `id` تازه می‌گیرد تا «دورهٔ» تازه باشد.
- * @returns {Promise<object>} نسخهٔ ذخیره‌شده (شکلِ خام)
+ * اولین ماموریتِ فعال، با شکلِ دقیقاً قدیمی — برای مسیرهای ادمین و برای
+ * کلاینت‌هایی که فقط یک ماموریت می‌شناسند.
  */
-async function save(adminId, payload) {
-  const next = normalize({ ...(payload || {}), id: require('crypto').randomUUID(),
-    updatedAt: new Date().toISOString(), updatedBy: adminId || null });
+function current() {
+  const first = activeItems()[0];
+  if (!first) return { ...EMPTY, link: { ...EMPTY.link } };
+  return { ...first, enabled: true, link: { ...first.link } };
+}
 
-  if (next.enabled && !next.title) {
-    const e = new Error('برای فعال‌کردن، عنوانِ ماموریت لازم است');
-    e.status = 400;
-    throw e;
-  }
-  if (next.points > 0 && !next.title) {
-    const e = new Error('برای امتیازدهی، عنوانِ ماموریت لازم است');
-    e.status = 400;
-    throw e;
-  }
-  const rawLink = payload?.link?.url;
-  if (rawLink && !next.link.url) {
-    const e = new Error('لینک باید با http:// یا https:// شروع شود');
-    e.status = 400;
-    throw e;
-  }
-
-  await opsConfig.set(KEY, next, adminId || null);
-  logger.info(`[customMission] ذخیره شد — enabled=${next.enabled} points=${next.points} admin=${adminId || '-'}`);
-  return next;
+/** پیش‌نمایشِ اولین ماموریتِ فعال (شکلِ کاربر). `null` اگر ادمین نساخته. */
+function publicView() {
+  const first = activeItems()[0];
+  return first ? viewOf(first) : null;
 }
 
 /**
- * وضعیتِ ماموریت برای یک کاربر: متن + گرفته/نگرفته.
+ * وضعیتِ **یک** ماموریت برای یک کاربر: متن + گرفته/نگرفته.
+ *
  * خواستهٔ صریح مالک: «وقتی دکمه دریافت رو زد باید امتیاز رو بگیره و
  * دیگه اون ماموریت اختصاصی قبلی به اون کاربر نمایش داده نشه تا زمانی که
  * ماموریت اختصاصی دیگه ای قرار بگیره».
- * پس اگر ماموریت توسط این کاربر دریافت شده باشد (claimed_at)، مقدارِ null
- * برمی‌گردانیم تا کارتی به کاربر نشان داده نشود.
+ * پس اگر این کاربر ماموریت را گرفته باشد (claimed_at)، مقدارِ null
+ * برمی‌گردانیم تا کارتی نشان داده نشود.
+ *
+ * ⚠️ کوئریِ این تابع عمداً همان متنِ قبلی است: `testPointsCoinsNickname.js`
+ *    آن را با یک استابِ رشته‌ای می‌شکند و اگر متن عوض شود، تستِ «پس از
+ *    دریافت کارت پنهان می‌شود» بی‌صدا از کار می‌افتد.
  *
  * @returns {Promise<object|null>}
  */
 async function status(userId) {
-  const view = publicView();
-  if (!view) return null;
+  const first = activeItems()[0];
+  if (!first) return null;
+  const view = viewOf(first);
   let claimed = false;
   if (userId) {
     try {
@@ -196,25 +236,162 @@ async function status(userId) {
       logger.warn(`[customMission] خواندنِ وضعیت ناموفق: ${e.message}`);
     }
   }
-  // اگر کاربر قبلاً امتیازِ این دوره را گرفته، دیگر به او نشان داده نمی‌شود
-  // تا زمانی که ادمین با ذخیرهٔ ماموریتِ جدید، شناسهٔ تازه‌ای بسازد.
   if (claimed) return null;
-
   return { ...view, claimed: false, claimable: view.points > 0 };
 }
 
 /**
- * دریافتِ امتیازِ ماموریتِ اختصاصی — برای هر کاربر و هر دوره یک‌بار.
+ * وضعیتِ **همهٔ** ماموریت‌های فعال برای یک کاربر — همان قاعده، ولی برای
+ * فهرست: هر ماموریتی که کاربر گرفته باشد از فهرست حذف می‌شود.
  *
- * @returns {Promise<{ok:boolean, message:string, points?:number, balance?:number}>}
+ * یک کوئری برای همه (نه یکی-یکی) تا افزودنِ ماموریتِ بیشتر به تعدادِ
+ * کوئری‌های هر بازدیدِ کاربر اضافه نکند.
+ *
+ * @returns {Promise<Array<object>>}
  */
-async function claim(userId) {
-  const view = publicView();
-  if (!view) {
-    const e = new Error('الان ماموریتِ اختصاصی فعالی وجود ندارد');
+async function statuses(userId) {
+  const active = activeItems();
+  if (!active.length) return [];
+  let claimed = new Set();
+  if (userId) {
+    try {
+      const { rows } = await pool.query(
+        `SELECT mission_key FROM user_mission_progress
+          WHERE user_id=$1 AND period_key=$2 AND claimed_at IS NOT NULL
+            AND mission_key = ANY($3::varchar[])`,
+        [userId, PERIOD, active.map((m) => missionKey(m.id))]);
+      claimed = new Set(rows.map((r) => String(r.mission_key)));
+    } catch (e) {
+      // همان قاعدهٔ `status`: خطای گذرا نباید کارتِ کاربر را بترکاند.
+      logger.warn(`[customMission] خواندنِ فهرستِ وضعیت ناموفق: ${e.message}`);
+    }
+  }
+  return active
+    .filter((m) => !claimed.has(missionKey(m.id)))
+    .map((m) => ({ ...viewOf(m), claimed: false, claimable: m.points > 0 }));
+}
+
+/** اعتبارسنجیِ یک ماموریت پیش از ذخیره — خطای ۴۰۰ با پیامِ روشن. */
+function assertValid(item, rawLinkUrl) {
+  if ((item.enabled || item.points > 0) && !item.title) {
+    const e = new Error(item.enabled
+      ? 'برای فعال‌کردن، عنوانِ ماموریت لازم است'
+      : 'برای امتیازدهی، عنوانِ ماموریت لازم است');
+    e.status = 400;
+    throw e;
+  }
+  if (rawLinkUrl && !item.link.url) {
+    const e = new Error('لینک باید با http:// یا https:// شروع شود');
+    e.status = 400;
+    throw e;
+  }
+}
+
+const stamp = (adminId) => ({ updatedAt: new Date().toISOString(), updatedBy: adminId || null });
+
+/**
+ * ذخیرهٔ **فهرستِ** ماموریت‌ها (مسیر تازهٔ پنل).
+ *
+ * شناسه‌ها حفظ می‌شوند: ماموریتی که ادمین ویرایش می‌کند همان دوره می‌ماند و
+ * امتیازِ گرفته‌شدهٔ کاربران دوباره قابلِ دریافت نمی‌شود. شناسهٔ تازه فقط
+ * برای ماموریتی ساخته می‌شود که ادمین تازه اضافه کرده.
+ *
+ * @returns {Promise<Array<object>>} فهرستِ ذخیره‌شده
+ */
+async function saveMany(adminId, payload) {
+  const items = Array.isArray(payload?.items) ? payload.items : null;
+  if (!items) return [await save(adminId, payload)]; // سازگاری با پنلِ قدیمی
+  if (items.length > MAX_ITEMS) {
+    const e = new Error(`حداکثر ${MAX_ITEMS} ماموریت اختصاصی می‌شود ساخت`);
+    e.status = 400;
+    throw e;
+  }
+
+  const next = [];
+  const seen = new Set();
+  for (const raw of items) {
+    const item = normalizeItem({
+      ...raw,
+      // شناسه: اگر معتبر و تکراری‌نباشد همان می‌ماند، وگرنه تازه ساخته می‌شود
+      // (ماموریتِ تازه یا شناسهٔ خرابِ دستکاری‌شده).
+      id: isUuid(raw?.id) && !seen.has(String(raw.id)) ? String(raw.id) : crypto.randomUUID(),
+      ...stamp(adminId),
+    });
+    seen.add(item.id);
+    assertValid(item, raw?.link?.url);
+    next.push(item);
+  }
+
+  await opsConfig.set(KEY, { items: next, ...stamp(adminId) }, adminId || null);
+  logger.info(`[customMission] فهرست ذخیره شد — ${next.length} ماموریت (فعال: ${next.filter((m) => m.enabled).length}) admin=${adminId || '-'}`);
+  return next;
+}
+
+/**
+ * ذخیرهٔ **تک‌ماموریتی** — شکلِ قدیمیِ همان API.
+ *
+ * هر ذخیره یک `id` تازه می‌گیرد (رفتارِ قبلی: «دورهٔ تازه») و کلِ فهرست را با
+ * یک عضو جای‌گزین می‌کند. کلاینتِ تازه دقیقاً همین کار را با «حذفِ بقیه و
+ * ساختنِ یکی» انجام می‌دهد؛ این تابع برای سازگاری و برای تست‌ها می‌ماند.
+ *
+ * @returns {Promise<object>} نسخهٔ ذخیره‌شده (شکلِ خام)
+ */
+async function save(adminId, payload) {
+  const next = normalizeItem({
+    ...(payload || {}),
+    id: crypto.randomUUID(),
+    ...stamp(adminId),
+  });
+  assertValid(next, payload?.link?.url);
+  await opsConfig.set(KEY, { items: [next], ...stamp(adminId) }, adminId || null);
+  logger.info(`[customMission] ذخیره شد — enabled=${next.enabled} points=${next.points} admin=${adminId || '-'}`);
+  return next;
+}
+
+/**
+ * «دورهٔ تازه» برای یک ماموریت: شناسهٔ تازه، همان متن.
+ *
+ * با این کار همهٔ کاربران (حتی کسانی که این ماموریت را گرفته بودند) می‌توانند
+ * دوباره امتیاز بگیرند — بدونِ اینکه ادمین مجبور شود متن را از نو بنویسد.
+ * ردیف‌های دفترِ دورهٔ قبل پاک نمی‌شوند: تاریخِ دریافت‌ها می‌ماند و فقط دیگر
+ * با شناسهٔ جاری مطابقت نمی‌کند.
+ *
+ * @returns {Promise<Array<object>>} فهرستِ تازه
+ */
+async function resetPeriod(adminId, id) {
+  const wanted = String(id || '');
+  const items = list();
+  const index = items.findIndex((m) => m.id === wanted);
+  if (index === -1) {
+    const e = new Error('این ماموریت پیدا نشد — شاید هم‌زمانِ شما پنل دیگری آن را پاک کرده');
     e.status = 404;
     throw e;
   }
+  items[index] = { ...items[index], id: crypto.randomUUID(), ...stamp(adminId) };
+  await opsConfig.set(KEY, { items, ...stamp(adminId) }, adminId || null);
+  logger.info(`[customMission] دورهٔ تازه — «${items[index].title}» admin=${adminId || '-'}`);
+  return items;
+}
+
+/**
+ * دریافتِ امتیازِ ماموریتِ اختصاصی — برای هر کاربر و هر ماموریت یک‌بار.
+ *
+ * @param {string} userId
+ * @param {string} [missionId] شناسهٔ ماموریت. اگر نیامد (کلاینتِ قدیمی)،
+ *   اولین ماموریتِ فعال گرفته می‌شود — همان رفتارِ قبل از چندتایی‌شدن.
+ * @returns {Promise<{ok:boolean, message:string, points?:number, balance?:number}>}
+ */
+async function claim(userId, missionId) {
+  const active = activeItems();
+  const wanted = missionId ? active.find((m) => m.id === String(missionId)) : active[0];
+  if (!wanted) {
+    const e = new Error(missionId
+      ? 'این ماموریت اختصاصی دیگر فعال نیست'
+      : 'الان ماموریتِ اختصاصی فعالی وجود ندارد');
+    e.status = 404;
+    throw e;
+  }
+  const view = viewOf(wanted);
   if (view.points <= 0) {
     const e = new Error('این ماموریت امتیازِ نقدی ندارد');
     e.status = 400;
@@ -273,4 +450,40 @@ async function claim(userId) {
   }
 }
 
-module.exports = { KEY, COLORS, current, publicView, status, save, claim, missionKey, safeLinkUrl };
+/**
+ * آمارِ دریافتِ هر ماموریت برای پنل ادمین: «چند نفر این یکی را گرفته‌اند؟»
+ *
+ * بدونِ این، ادمینِ چند ماموریت نمی‌داند کدام کمپین جواب داده. اگر
+ * دیتابیس در دسترس نباشد، `{}` برمی‌گردد (پنل نباید به‌خاطرِ آمار ۵۰۰ بدهد).
+ *
+ * @returns {Promise<Record<string, {claims:number, lastClaim:string|null}>>}
+ */
+async function stats() {
+  try {
+    const { rows } = await pool.query(
+      `SELECT mission_key, COUNT(*)::int AS claims, MAX(claimed_at) AS last_claim
+         FROM user_mission_progress
+        WHERE period_key=$1 AND claimed_at IS NOT NULL
+        GROUP BY mission_key`, [PERIOD]);
+    const out = {};
+    for (const row of rows) {
+      const key = String(row.mission_key || '');
+      if (!key.startsWith('custom:')) continue;
+      out[key.slice('custom:'.length)] = {
+        claims: Number(row.claims) || 0,
+        lastClaim: row.last_claim || null,
+      };
+    }
+    return out;
+  } catch (e) {
+    logger.warn(`[customMission] خواندنِ آمارِ دریافت ناموفق: ${e.message}`);
+    return {};
+  }
+}
+
+module.exports = {
+  KEY, PERIOD, MAX_ITEMS, COLORS,
+  list, activeItems, current, publicView, status, statuses,
+  save, saveMany, resetPeriod, claim, stats,
+  missionKey, safeLinkUrl,
+};

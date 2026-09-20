@@ -87,6 +87,17 @@ module.exports = function growthRoutes({
   router.post('/missions/custom/claim', auth, writeLimiter, asyncHandler(async (req, res) => {
     res.json(await customMission.claim(req.user.id));
   }));
+  // دریافتِ امتیازِ **یک ماموریتِ مشخص** از میانِ چند ماموریتِ ادمین.
+  //
+  // چرا مسیرِ جدا و نه پارامتر روی همان بالایی: کلاینتِ قدیمی قراردادِ
+  // قبلی را حفظ می‌کند و مسیرِ تازه صریح می‌گوید کدام ماموریت. این مسیر
+  // سه‌بخشی است (`custom/:id/claim`) پس با `/missions/:key/claim` که
+  // دوبخشی است تداخل ندارد — حتی اگر ترتیبش روزی جابه‌جا شود.
+  router.post('/missions/custom/:id/claim', auth, validateUuid('id'), writeLimiter,
+    asyncHandler(async (req, res) => {
+      res.json(await customMission.claim(req.user.id, req.params.id));
+    }));
+
   router.post('/missions/:key/claim', auth, writeLimiter, asyncHandler(async (req, res) => {
     res.json(await missions.claim(req.user.id, String(req.params.key || '').slice(0, 64)));
   }));

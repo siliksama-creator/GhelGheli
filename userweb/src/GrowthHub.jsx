@@ -62,7 +62,9 @@ export default function GrowthHub({ api, token, onSocketGame }) {
       // شد») جشن نمایش داده نمی‌شود؛ `celebrateReward` خودش هم همین را
       // چک می‌کند تا این‌جا شرطِ تکراری نگذاریم.
       celebrateReward({
-        source: key === 'daily-bonus' ? 'daily' : key === 'custom-mission' ? 'custom' : 'mission',
+        // ماموریت‌های اختصاصی کلیدِ `custom:<id>` دارند (هر کارت مستقل،
+        // پس دو کارت هم‌زمان هر دو «در حال دریافت» نشان نمی‌دهند).
+        source: key === 'daily-bonus' ? 'daily' : key.startsWith('custom') ? 'custom' : 'mission',
         points: Number(response?.reward ?? response?.points ?? 0),
       });
       await load();
@@ -106,8 +108,11 @@ export default function GrowthHub({ api, token, onSocketGame }) {
   // ماموریتِ اختصاصیِ ادمین — همان مسیرِ اپ. مسیرِ `custom` **قبل** از
   // `/api/missions/:key/claim` روی سرور تعریف شده؛ وگرنه «custom» به‌عنوان
   // کلیدِ ماموریت خوانده می‌شد.
-  const claimCustom = () => run('custom-mission',
-    () => req('/api/missions/custom/claim', 'POST', {}, token));
+  //
+  // ⚠️ این‌جا شناسهٔ ماموریت هم می‌رود (`custom/:id/claim`): ادمین می‌تواند
+  //    چند ماموریت بگذارد و هر کارت باید امتیازِ خودش را بگیرد.
+  const claimCustom = mission => run(`custom:${mission.id}`,
+    () => req(`/api/missions/custom/${mission.id}/claim`, 'POST', {}, token));
   const inviteFriend = async () => {
     const code = data?.referral?.code;
     if (!code) return;
@@ -121,7 +126,14 @@ export default function GrowthHub({ api, token, onSocketGame }) {
   };
   const daily = [...(data?.daily || [])].sort((a, b) => Number(a.claimed) - Number(b.claimed));
   const weekly = [...(data?.weekly || [])].sort((a, b) => Number(a.claimed) - Number(b.claimed));
-  const custom = data?.custom || null;   // ماموریت اختصاصی ادمین (یا null)
+  // ── ماموریت‌های اختصاصی: فهرست، نه یکی ─────────────────────────────────
+  // سرورِ تازه `customMissions` می‌دهد: ماموریت‌های فعالی که **همین کاربر
+  // نگرفته** (گرفته‌شده‌ها پنهان می‌شوند — خواستهٔ صریح مالک). کلیدِ قدیمیِ
+  // `custom` فقط برای لحظه‌ای نگه داشته شده که کلاینت تازه با سرورِ قدیمی
+  // حرف بزند (یا برعکس، وسطِ دیپلوی).
+  const customs = Array.isArray(data?.customMissions)
+    ? data.customMissions
+    : (data?.custom ? [data.custom] : []);
   const friends = data?.friends || [];
   const incoming = data?.incoming || [];
   const online = (data?.friends || []).filter(friend => friend.online).length;
@@ -139,11 +151,21 @@ export default function GrowthHub({ api, token, onSocketGame }) {
         فعالش کند به همهٔ کاربران نشان داده شود؛ لینکِ قابلِ کلیک با رنگِ
         مثلاً آبی یا سبز هم داشته باشد.»
 
-        این کارت **هیچ متنِ هاردکدی ندارد** — عنوان/توضیح/امتیاز/متنِ لینک
-        و رنگش همه از پنل می‌آیند، پس ادمین بدون آپدیتِ اپ کمپین را عوض
-        می‌کند. اگر ادمین فعالش نکرده باشد `data.custom` تهی است و هیچ‌چیز
+        و بعد (۲۹ شهریور): «اگه ادمین خواست چند تا ماموریتِ اختصاصی بتونه
+        قرار بده» — پس به‌جای یک کارت، فهرستِ کارت‌ها با همین ترتیبِ پنل.
+
+        این کارت‌ها **هیچ متنِ هاردکدی ندارند** — عنوان/توضیح/امتیاز/متنِ
+        لینک و رنگش همه از پنل می‌آیند، پس ادمین بدون آپدیتِ اپ کمپین را
+        عوض می‌کند. اگر ادمین چیزی نساخته باشد فهرست خالی است و هیچ‌چیز
         رندر نمی‌شود (رفتارِ امروزِ محصول دست‌نخورده می‌ماند). */}
-    {custom && <CustomMissionCard mission={custom} busy={busy === 'custom-mission'} onClaim={claimCustom} />}
+    {customs.map(mission => (
+      <CustomMissionCard
+        key={mission.id}
+        mission={mission}
+        busy={busy === `custom:${mission.id}`}
+        onClaim={() => claimCustom(mission)}
+      />
+    ))}
 
     <div className="growthSummary">
       <div className="dailyQuestMeter" style={{'--daily-progress':(data?.dailyBonus?.completed || 0)/Math.max(1, data?.dailyBonus?.goal || 5)}}><strong>{data?.dailyBonus?.completed || 0}<i>/{fa(data?.dailyBonus?.goal || 5)}</i></strong><span>ماموریت امروز</span></div>
