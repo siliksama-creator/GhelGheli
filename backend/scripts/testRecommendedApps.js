@@ -288,8 +288,17 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
     const sheetFile = read('userweb/src/styles/brand-mark.css');
     const sheetAt = sheetFile.indexOf('.moreSheet {');
     const sheetCss = sheetAt < 0 ? '' : sheetFile.slice(sheetAt, sheetFile.indexOf('\n}', sheetAt) + 2);
+    // ── ۲۹ شهریور: اسکرول از خودِ شیت به ناحیهٔ درونی‌اش منتقل شد ──────────
+    // هدف همان است («ردیفِ تازه نباید بریده شود») ولی شکلِ درستش عوض شد:
+    // سرصفحهٔ ثابتِ «همهٔ بخش‌ها» + شمارِ بخش‌ها بالای شیت می‌ماند و
+    // `.sheetScroll` تنها ظرفِ اسکرول است، با محوشدگیِ شرطیِ بالا/پایین.
+    // پس «اسکرول‌پذیری» یعنی: سقفِ ارتفاع روی شیت **و** یک ظرفِ
+    // `overflow-y:auto` — یا در خودِ شیت، یا در ناحیهٔ درونی‌اش.
+    const scrollAt = sheetFile.indexOf('.sheetScroll {');
+    const scrollCss = scrollAt < 0 ? '' : sheetFile.slice(scrollAt, sheetFile.indexOf('\n}', scrollAt) + 2);
     ok('شیتِ «بیشتر» در وب سقفِ ارتفاع و اسکرول دارد (ردیفِ تازه بریده نشود)',
-      /max-height/.test(sheetCss) && /overflow-y:\s*auto/.test(sheetCss));
+      /max-height/.test(sheetCss)
+      && (/overflow-y:\s*auto/.test(sheetCss) || /overflow-y:\s*auto/.test(scrollCss)));
     ok('وب: برای «برنامه‌ای نیست» حالتِ خالی دارد (کادرِ سفیدِ بی‌توضیح نه)',
       /برنامه/.test(read('userweb/src/screens/RecommendedApps.jsx')));
     ok('اندروید: برای «برنامه‌ای نیست» حالتِ خالی دارد',
