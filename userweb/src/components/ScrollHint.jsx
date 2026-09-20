@@ -1,8 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * راهنمای اسکرول تعاملی و حرفه‌ای — آینهٔ mobile/lib/widgets/scroll_hint.dart
- * کلیک‌پذیر با اسکرول نرم، انیمیشن چورون، ظاهر گلس‌مورفیسم تیره، و بهینه‌سازی رندر
+ * راهنمای اسکرول تعاملی — آینهٔ mobile/lib/widgets/scroll_hint.dart
+ * کلیک‌پذیر با اسکرول نرم، انیمیشن چورون، ظاهر گلس‌مورفیسم تیره.
+ *
+ * ⚠️ دسکتاپ: در نمایشگرهای دسکتاپ (عرض >= 900px)، کاربر دارای ماوس، اسکرول‌بار
+ * مرورگر و تاچ‌پد است. المان‌های راهنمای اسکرول موبایلی (قرص، ریل، فید) هرگز در دسکتاپ
+ * نباید رندر شوند تا چیدمان دسکتاپ کاملاً تمیز و بدون هیچ لایهٔ مزاحمی باشد.
  */
 export function ScrollHint({
   children,
@@ -12,6 +16,19 @@ export function ScrollHint({
   padBottom = 0,
   showPill = true,
 }) {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 900;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 900);
+    };
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const wrapRef = useRef(null);
   const [state, setState] = useState({
     scrollable: false,
@@ -31,6 +48,7 @@ export function ScrollHint({
   }, [target]);
 
   const measure = useCallback(() => {
+    if (!isMobile) return;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
       const el = resolveEl();
@@ -64,7 +82,7 @@ export function ScrollHint({
         return { scrollable, fraction, viewport, atBottom, touched };
       });
     });
-  }, [resolveEl, target]);
+  }, [isMobile, resolveEl, target]);
 
   const handleScrollDown = useCallback((e) => {
     if (e) {
@@ -80,6 +98,7 @@ export function ScrollHint({
   }, [resolveEl, target]);
 
   useEffect(() => {
+    if (!isMobile) return;
     const el = resolveEl();
     const onScroll = () => {
       const st = target === 'window' || !el
@@ -124,14 +143,20 @@ export function ScrollHint({
       if (el) el.removeEventListener('scroll', onScroll);
       if (ro) ro.disconnect();
     };
-  }, [measure, resolveEl, target]);
+  }, [isMobile, measure, resolveEl, target]);
 
   useEffect(() => {
+    if (!isMobile) return;
     touchedRef.current = false;
     setState((s) => ({ ...s, touched: false }));
     const t = setTimeout(measure, 80);
     return () => clearTimeout(t);
-  }, [label, measure]);
+  }, [isMobile, label, measure]);
+
+  // در دسکتاپ، کودکان بدون هیچ wrapper یا المان اضافه‌ای مستقیماً رندر می‌شوند
+  if (!isMobile) {
+    return <>{children}</>;
+  }
 
   const pillVisible =
     showPill && state.scrollable && !state.atBottom && !state.touched;

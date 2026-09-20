@@ -240,8 +240,8 @@ async function claim(userId) {
 
     await client.query(
       `INSERT INTO user_mission_progress
-         (user_id, mission_key, period_key, progress, target, claimed_at, updated_at)
-       VALUES ($1,$2,$3,1,1,NOW(),NOW())
+         (user_id, mission_key, period_key, progress, claimed_at, updated_at)
+       VALUES ($1,$2,$3,1,NOW(),NOW())
        ON CONFLICT (user_id, mission_key, period_key)
        DO UPDATE SET claimed_at = COALESCE(user_mission_progress.claimed_at, NOW()),
                      progress = 1, updated_at = NOW()`,
