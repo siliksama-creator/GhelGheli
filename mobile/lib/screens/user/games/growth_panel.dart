@@ -667,6 +667,10 @@ String _inviteHint(Map referral) {
 ///   • اگر لینکی نباشد، فقط متن و دکمهٔ دریافت نشان داده می‌شود.
 class _CustomMissionCard extends StatefulWidget {
   const _CustomMissionCard({
+    // `key` لازم است: ادمین می‌تواند چند ماموریت بگذارد و هر کارت با
+    // شناسهٔ خودش کلید می‌خورد تا با تازه‌شدنِ فهرست، ثانیه‌شمارِ
+    // ۱۵ثانیه‌ایِ کارتِ دیگر از صفر شروع نکند.
+    super.key,
     required this.mission,
     required this.busy,
     required this.onClaim,
