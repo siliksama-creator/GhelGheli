@@ -114,12 +114,21 @@ class RewardMoment {
     if (_queue.length >= _queueLimit) return;
     _queue.add(data);
     if (_busy) return;
-    _show(context);
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) {
+      _queue.clear();
+      return;
+    }
+    _showIn(overlay);
   }
 
-  static void _show(BuildContext context) {
-    final overlay = Overlay.maybeOf(context, rootOverlay: true);
-    if (overlay == null) return;
+  /// نمایشِ سرِ صف روی همان `Overlay`ی که **یک بار** گرفته شده.
+  ///
+  /// ⚠️ `BuildContext` را به تایمر نمی‌دهیم: استفاده از context بعد از یک
+  /// فاصلهٔ async، الگوی خطاداری است که همین تحلیل‌گر گرفته بود
+  /// (`use_build_context_synchronously`). `OverlayState` خودش وضعیتِ
+  /// mount‌بودن را می‌گوید.
+  static void _showIn(OverlayState overlay) {
     _busy = true;
     final data = _queue.removeAt(0);
     _entry = OverlayEntry(builder: (_) => _RewardMomentOverlay(data: data));
@@ -137,11 +146,12 @@ class RewardMoment {
         if (entry != null && entry.mounted) entry.remove();
         _entry = null;
         _exit = null;
-        if (_queue.isEmpty) {
-          _busy = false;
-        } else if (overlay.mounted) {
-          _show(context);
+        if (_queue.isNotEmpty && overlay.mounted) {
+          _showIn(overlay);
         } else {
+          // صف را پاک می‌کنیم: اگر درخت رفته باشد، لحظهٔ کهنه نباید روزی
+          // روی صحنهٔ تازه ظاهر شود.
+          _queue.clear();
           _busy = false;
         }
       });

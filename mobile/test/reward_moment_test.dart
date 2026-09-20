@@ -25,24 +25,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
   }
 
-  Future<void> host(WidgetTester tester, VoidCallback onTap) async {
-    await tester.pumpWidget(MaterialApp(
-      home: Builder(
-        builder: (context) => Scaffold(
-          body: Center(
-            child: ElevatedButton(
-              onPressed: () => onTap(),
-              child: const Text('go'),
-            ),
-          ),
-        ),
-      ),
-    ));
-  }
-
   testWidgets('جایزهٔ ماموریت با رقمِ فارسی و «+» دیده می‌شود', (tester) async {
     late BuildContext ctx;
-    await host(tester, () {});
     await tester.pumpWidget(MaterialApp(
       home: Builder(builder: (context) {
         ctx = context;

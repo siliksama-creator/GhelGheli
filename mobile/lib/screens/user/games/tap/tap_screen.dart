@@ -23,7 +23,7 @@ import 'tap_engine.dart';
 import 'tap_storage.dart';
 import 'tap_sync.dart';
 import '../../../../core/app_config.dart';
-import '../../../widgets/reward_moment.dart';
+import '../../../../widgets/reward_moment.dart';
 
 class TapGameScreen extends StatefulWidget {
   const TapGameScreen({

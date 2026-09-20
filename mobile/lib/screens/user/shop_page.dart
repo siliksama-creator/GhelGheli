@@ -245,7 +245,6 @@ class _ShopPageState extends State<ShopPage> {
     // می‌کند، چون موجودی ممکن است بینِ باز شدنِ دیالوگ و زدنِ دکمه عوض
     // شده باشد.
     var wantWallet = _useWallet && _walletBalance > 0;
-    final fromWallet = wantWallet ? math.min(_walletBalance, price) : 0;
 
     final ok = await showDialog<bool>(
       context: context,
