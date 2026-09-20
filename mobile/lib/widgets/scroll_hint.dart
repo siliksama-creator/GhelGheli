@@ -1,25 +1,36 @@
 // نوار اسکرول همیشه‌دیده + راهنمای «پایین‌تر هم چیز هست».
 //
 // ═══════════════════════════════════════════════════════════════════════════
-// چرا این ویجت ساخته شد و چگونه بهبود یافت
+// قراردادِ واحد (این فایل آینهٔ وب و پنل است)
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// درخواست مالک: «یه اسکرول بار برای صفحاتی که بیشتر از صفحه نمایش دیده
-// میشن باید درست کنی که کاربر متوجه بشه که برای دیدن آیتم هایی که مشخص
-// نیستن باید تاچ کنه بره سمت پایین».
+// خواستهٔ مالک (۲۹ شهریور): «هر تبی که کاربرا نیاز دارن به اسکرول کنن،
+// راهنمایی نشون داده بشه؛ یکپارچه و برای همیشه درستش کن.»
 //
-// در بازبینی جدید، تجربهٔ کاربری از یک نشانِ ایستای صرف به یک المان
-// تعاملی و حرفه‌ای ارتقا پیدا کرد:
+// نسخهٔ مرجعِ وب: `userweb/src/components/ScrollHint.jsx` و پنل:
+// `admin/src/components/ScrollHint.jsx`. هر سه یک قرارداد دارند:
 //
-//   ۱. **قرص تعاملی با تاچ و بازخورد هپتیک:** کاربر با لمس قرص راهنما،
-//      به‌صورت نرم و هوشمند به سمت پایین هدایت می‌شود (animateTo).
-//   ۲. **طراحی گلس‌مورفیسم تیره و هماهنگ با تم:** پس‌زمینهٔ سرمه‌ای تیره با
-//      کنتراست بالا، حاشیهٔ ظریف لایم نئونی و آیکون انیمیشن‌دار چورون رو به پایین.
-//   ۳. **ریل و دستگیرهٔ ظریف (۳.۵px):** نمایش نسبت دیده شده بدون اشغال دید کاربر.
-//   ۴. **محوشدگیِ پیوسته و لطیفِ لبهٔ پایین:** استفاده از گرادیان چندپله‌ای
-//      بدون قفل کردن رویدادهای لمسی پایین صفحه (IgnorePointer).
-//   ۵. **عدم نشت منابع و بهینه‌سازی Ticker:** کنترلر انیمیشن فقط در زمان
-//      نمایش فعال است و در dispose به شکل کامل تمیز می‌شود.
+//   • سه نشانه، **فقط** وقتی سرریزِ واقعی هست: محوشدگیِ لبهٔ پایین، ریلِ
+//     باریک با دستگیره، و قرصِ راهنما با جملهٔ همان صفحه + چورونِ متحرک.
+//   • قرص **تعاملی** است: یک لمس = حدود یک صفحه پایین (۶۲٪ ارتفاعِ نما) —
+//     همان ضریبی که در وب/پنل هست، نه یک عددِ دلخواهِ سومی.
+//   • «دیده شد» فقط با اسکرولِ **کاربر** ثبت می‌شود. تفکیکِ نسخهٔ قبلی
+//     اشتباه بود: هر `ScrollUpdateNotification` — از جمله اسکرولِ
+//     برنامه‌ای (`animateTo` خودِ همین قرص، پرش‌های صفحه) — «کاربر رفت»
+//     شمرده می‌شد؛ نتیجه: قرص پیش از آنکه کاربر ببیندش بی‌صدا می‌رفت.
+//     حالا ملاک `dragDetails != null` (لمس/کشیدنِ کاربر) است.
+//   • `resetToken`: با برگشت به یک تب، راهنما یک بار دیگر آموزش می‌دهد
+//     (آینهٔ `resetKey` در وب/پنل). بدون این، کاربری که یک بار در «خانه»
+//     اسکرول کرده بود، تا پایانِ عمرِ اپ هیچ‌جا راهنما نمی‌دید — چون
+//     ویجت‌ها زنده می‌مانند (`Offstage` + کشِ صفحه‌ها).
+//   • آستانه‌ها با وب یکی است: سرریزِ واقعی > ۲۴px، «تهِ صفحه» = ≤ ۲۸px
+//     فاصله از انتها.
+//
+// ریزِ زیبایی‌شناسی (خواستهٔ «اندروید درست و زیبا»): قرص پهن‌تر از قبل است
+// و **متنِ خودِ صفحه** را نشان می‌دهد. نسخهٔ قبلی هر جملهٔ بلندتر از ۱۶
+// نویسه را با «ادامه پایین‌تر» عوض می‌کرد — یعنی دقیقاً همان چیزی که قرار
+// بود پیام بدهد («چه چیزی را دارم از دست می‌دهم») به یک متنِ بی‌خاصیت بدل
+// می‌شد و عملاً هیچ صفحه‌ای جملهٔ خودش را نمی‌دید.
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -33,12 +44,13 @@ class ScrollHint extends StatefulWidget {
     this.showHint = true,
     this.railColor,
     this.padBottom = 0,
+    this.resetToken,
   });
 
   /// هر ویجتِ اسکرول‌شونده — ListView، GridView، SingleChildScrollView...
   final Widget child;
 
-  /// متن قرصِ راهنما.
+  /// متن قرصِ راهنما (جملهٔ همان صفحه).
   final String hintLabel;
 
   /// خاموش کردن قرص برای صفحه‌هایی که خودشان دکمهٔ شناور دارند و قرص
@@ -50,6 +62,9 @@ class ScrollHint extends StatefulWidget {
   /// اگر صفحه نوار پایینِ خودش را دارد، قرص باید بالاتر بنشیند.
   final double padBottom;
 
+  /// عوض شدنِ این مقدار = «این تب تازه باز شد»؛ قرص دوباره فعال می‌شود.
+  final Object? resetToken;
+
   @override
   State<ScrollHint> createState() => _ScrollHintState();
 }
@@ -60,7 +75,7 @@ class _ScrollHintState extends State<ScrollHint>
   double _viewport = 1; // چه کسری از کل محتوا در یک صفحه جا می‌شود
   bool _scrollable = false;
   bool _atBottom = true;
-  bool _touched = false; // آیا کاربر یک بار اسکرول کرده
+  bool _touched = false; // آیا کاربر یک بار خودش اسکرول کرده
   BuildContext? _scrollableContext;
 
   /// نوسانِ فلشِ راهنما. یک کنترلر برای هر صفحه — نه یکی برای هر عنصر.
@@ -81,10 +96,37 @@ class _ScrollHintState extends State<ScrollHint>
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant ScrollHint oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.resetToken != widget.resetToken) {
+      _resetVisit();
+    } else if (oldWidget.showHint != widget.showHint) {
+      _syncBob();
+    }
+  }
+
+  /// تبِ تازه: «دیده شد» صفر می‌شود تا راهنما یک بار دیگر نشان داده شود.
+  void _resetVisit() {
+    if (!mounted) return;
+    _touched = false;
+    setState(() {});
+    _remeasure();
+    _syncBob();
+  }
+
+  /// سنجشِ دوباره از روی موقعیتِ فعلی (بدونِ انتظار برای نوتیفیکیشن بعدی).
+  void _remeasure() {
+    final ctx = _scrollableContext;
+    if (ctx == null) return;
+    final scrollable = Scrollable.maybeOf(ctx);
+    final pos = scrollable?.position;
+    if (pos != null && pos.hasPixels) _apply(pos);
+  }
+
   /// انیمیشن فقط وقتی می‌چرخد که قرص واقعاً دیده می‌شود.
   void _syncBob() {
-    final visible =
-        widget.showHint && _scrollable && !_atBottom && !_touched;
+    final visible = widget.showHint && _scrollable && !_atBottom && !_touched;
     if (visible && !_bob.isAnimating) {
       _bob.repeat(reverse: true);
     } else if (!visible && _bob.isAnimating) {
@@ -95,12 +137,13 @@ class _ScrollHintState extends State<ScrollHint>
   void _apply(ScrollMetrics m, {bool userScrolled = false}) {
     if (!mounted) return;
     if (m.axis != Axis.vertical) return;
-    final total = m.maxScrollExtent;
-    final scrollable = total > 8; // آستانه سرریز
-    final frac = total <= 0 ? 0.0 : (m.pixels / total).clamp(0.0, 1.0);
-    final vp = (m.viewportDimension) /
-        math.max(1.0, m.viewportDimension + total);
-    final bottom = m.extentAfter <= 24;
+    // آستانه‌ها هم‌اندازهٔ وب/پنل: سرریزِ واقعی، نه چند پیکسل.
+    final scrollable = m.maxScrollExtent > 24;
+    final frac =
+        m.maxScrollExtent <= 0 ? 0.0 : (m.pixels / m.maxScrollExtent).clamp(0.0, 1.0);
+    final vp = m.viewportDimension /
+        math.max(1.0, m.viewportDimension + m.maxScrollExtent);
+    final bottom = m.extentAfter <= 28;
 
     final touched = _touched || userScrolled;
     if (scrollable == _scrollable &&
@@ -120,29 +163,28 @@ class _ScrollHintState extends State<ScrollHint>
     _syncBob();
   }
 
+  /// یک لمس روی قرص = ~۰٫۶۲ صفحه پایین (همان ضریبِ وب و پنل).
   void _handleTapScroll() {
     HapticFeedback.lightImpact();
     final ctx = _scrollableContext;
-    if (ctx != null) {
-      final scrollable = Scrollable.maybeOf(ctx);
-      if (scrollable != null && scrollable.position.hasPixels) {
-        final pos = scrollable.position;
-        final target = math.min(pos.pixels + 340.0, pos.maxScrollExtent);
-        pos.animateTo(
-          target,
-          duration: const Duration(milliseconds: 420),
-          curve: Curves.easeOutCubic,
-        );
-      }
-    }
+    if (ctx == null) return;
+    final scrollable = Scrollable.maybeOf(ctx);
+    final pos = scrollable?.position;
+    if (pos == null || !pos.hasPixels) return;
+    final step = pos.viewportDimension * 0.62;
+    final target = math.min(pos.pixels + step, pos.maxScrollExtent);
+    pos.animateTo(
+      target,
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final rail = widget.railColor ?? scheme.primary;
-    final showPill =
-        widget.showHint && _scrollable && !_atBottom && !_touched;
+    final showPill = widget.showHint && _scrollable && !_atBottom && !_touched;
 
     return NotificationListener<ScrollMetricsNotification>(
       onNotification: (n) {
@@ -156,7 +198,12 @@ class _ScrollHintState extends State<ScrollHint>
         onNotification: (n) {
           if (n.depth != 0) return false;
           _scrollableContext = n.context;
-          _apply(n.metrics, userScrolled: n is ScrollUpdateNotification);
+          // ⚠️ فقط کشیدنِ کاربر «دیده شد» است. `animateTo` هم
+          //    `ScrollUpdateNotification` می‌فرستد ولی `dragDetails` ندارد.
+          final byUser = (n is ScrollStartNotification && n.dragDetails != null) ||
+              (n is ScrollUpdateNotification && n.dragDetails != null) ||
+              n is UserScrollNotification && n.direction != ScrollDirection.idle;
+          _apply(n.metrics, userScrolled: byUser);
           return false;
         },
         child: Stack(
@@ -169,7 +216,7 @@ class _ScrollHintState extends State<ScrollHint>
                 left: 0,
                 right: 0,
                 bottom: 0,
-                height: 52 + widget.padBottom,
+                height: 64 + widget.padBottom,
                 child: IgnorePointer(
                   child: DecoratedBox(
                     decoration: BoxDecoration(
@@ -178,10 +225,10 @@ class _ScrollHintState extends State<ScrollHint>
                         end: Alignment.bottomCenter,
                         colors: [
                           scheme.surface.withValues(alpha: 0),
-                          scheme.surface.withValues(alpha: 0.35),
-                          scheme.surface.withValues(alpha: 0.88),
+                          scheme.surface.withValues(alpha: 0.5),
+                          scheme.surface.withValues(alpha: 0.92),
                         ],
-                        stops: const [0.0, 0.45, 1.0],
+                        stops: const [0.0, 0.55, 1.0],
                       ),
                     ),
                   ),
@@ -193,7 +240,7 @@ class _ScrollHintState extends State<ScrollHint>
               Positioned(
                 top: 8,
                 bottom: 8 + widget.padBottom,
-                right: 3,
+                right: 5,
                 child: RepaintBoundary(
                   child: _Rail(
                     fraction: _fraction,
@@ -232,7 +279,7 @@ class _ScrollHintState extends State<ScrollHint>
   }
 }
 
-/// ریلِ باریکِ سمت راست (۳.۵px) با تم تیره و هایلایت لایم.
+/// ریلِ باریکِ سمت راست (۴px — هم‌اندازهٔ وب) با تم تیره و هایلایت لایم.
 class _Rail extends StatelessWidget {
   const _Rail({
     required this.fraction,
@@ -247,10 +294,10 @@ class _Rail extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
       final h = c.maxHeight;
-      final thumb = math.max(28.0, h * viewport);
+      final thumb = math.max(30.0, h * viewport);
       final top = (h - thumb) * fraction;
       return SizedBox(
-        width: 3.5,
+        width: 4,
         height: h,
         child: Stack(
           children: [
@@ -258,7 +305,7 @@ class _Rail extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(999),
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: Colors.white.withValues(alpha: 0.09),
                 ),
               ),
             ),
@@ -281,7 +328,7 @@ class _Rail extends StatelessWidget {
                   boxShadow: const [
                     BoxShadow(
                       color: Color(0x55B5EF58),
-                      blurRadius: 6,
+                      blurRadius: 8,
                     ),
                   ],
                 ),
@@ -295,6 +342,9 @@ class _Rail extends StatelessWidget {
 }
 
 /// قرص راهنما با استایل گلس‌مورفیسم تیره، حاشیه لایم، نقطه راهنما و چورون تعاملی.
+///
+/// پهنای بیشینه ۲۳۲px است (هم‌اندازهٔ وب) تا جملهٔ واقعیِ صفحه جا شود؛
+/// فقط اگر جمله از این هم بلندتر بود، با «…» کوتاه می‌شود.
 class _HintPill extends StatelessWidget {
   const _HintPill({
     required this.label,
@@ -311,77 +361,81 @@ class _HintPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 148),
-          child: Ink(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xF20F243E),
-                  Color(0xF6071424),
+      child: Semantics(
+        button: true,
+        label: '$label — پایین‌تر برو',
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 232),
+            child: Ink(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xF20F243E),
+                    Color(0xF6071424),
+                  ],
+                ),
+                border: Border.all(
+                  color: const Color(0x66B5EF58),
+                  width: 1.1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                  const BoxShadow(
+                    color: Color(0x24B5EF58),
+                    blurRadius: 10,
+                  ),
                 ],
               ),
-              border: Border.all(
-                color: const Color(0x66B5EF58),
-                width: 1.1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
-                ),
-                const BoxShadow(
-                  color: Color(0x24B5EF58),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 5,
-                  height: 5,
-                  margin: const EdgeInsets.only(left: 4),
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xFFB5EF58),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x80B5EF58),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: Text(
-                    label.length > 16 ? 'ادامه پایین‌تر' : label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFFEEF8FF),
-                      height: 1.15,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 5,
+                    height: 5,
+                    margin: const EdgeInsets.only(left: 5),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFB5EF58),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0x80B5EF58),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 16,
-                  color: Color(0xFFB5EF58),
-                ),
-              ],
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFEEF8FF),
+                        height: 1.15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: Color(0xFFB5EF58),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

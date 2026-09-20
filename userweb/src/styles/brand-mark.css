@@ -547,9 +547,17 @@
      رسید و روی گوشیِ کوتاه از بالا بیرون می‌زد — بدونِ اسکرول، ردیف‌های
      اول دست‌نیافتنی بودند. همان باگی که در شیتِ اندروید رفع شده بود.
      خطِ دوم برای مرورگرهای قدیمی‌ای است که `dvh` را نمی‌فهمند. */
-  max-height: 72vh;
-  max-height: min(72vh, calc(100dvh - 150px));
-  overflow-y: auto;
+  /* ── سقفِ ارتفاع (۲۹ شهریور: «همه‌چیز رو کامل نشون نمی‌ده») ─────────────
+     نسخهٔ قبلی `72vh` بود؛ روی گوشیِ کوتاه (۶۴۰px) می‌شد ۴۶۰px و ردیفِ
+     «خروج از حساب» زیرِ نوارِ ناوبری می‌رفت. حالا سقف را از **فضای
+     واقعیِ بالای داک** می‌گیریم: ارتفاعِ نما منهای داک (۷۲) منهای ناحیهٔ
+     ایمنِ پایین منهای نوارِ وضعیت، و کفِ ۲۴۰px تا روی هیچ دستگاهی
+     بی‌استفاده نشود. اسکرول هم به ناحیهٔ درونی (`.sheetScroll`) منتقل شد
+     تا سرصفحه ثابت بماند و محوشدگیِ بالا/پایین درست بنشیند. */
+  max-height: min(74vh, calc(100dvh - 168px));
+  max-height: min(74dvh, calc(100dvh - 168px - env(safe-area-inset-bottom, 0px)));
+  min-height: 240px;
+  overflow: hidden;
   overscroll-behavior: contain;
   /* ═══ عرضِ شیت = عرضِ ستونِ اپ (تصمیمِ «دسکتاپ = موبایل») ═══════════════
      اندازه‌گیریِ واقعی روی نمای ۱۶۷۸px: شیت ۱۶۵۸px درمی‌آمد (تمامِ عرضِ
@@ -568,7 +576,7 @@
   left: 0; right: 0;
   margin-inline: auto;
   width: min(540px, calc(100% - 20px));
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 6px);
   display: flex; flex-direction: column; gap: 4px;
   padding: 8px;
   border-radius: 24px;
@@ -586,6 +594,50 @@
   width: 38px; height: 4px; border-radius: 99px;
   background: #ffffff28; margin: 2px auto 6px;
 }
+/* سرصفحهٔ شیت — «چند مقصد داریم». */
+.sheetHead {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 0 14px 8px;
+}
+.sheetHead b { font-size: 13.5px; font-weight: 800; color: #eaf6ff; }
+.sheetHead span { font-size: 11.5px; font-weight: 700; color: #9fb6cc; }
+/* ناحیهٔ اسکرولِ شیت: تنها بخشی که اسکرول می‌شود. */
+.sheetScroll {
+  display: flex; flex-direction: column; gap: 4px;
+  overflow-y: auto; overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(181, 239, 88, .38) transparent;
+  padding-bottom: 2px;
+}
+.sheetScroll::-webkit-scrollbar { width: 6px }
+.sheetScroll::-webkit-scrollbar-thumb {
+  background: rgba(181, 239, 88, .34); border-radius: 99px;
+}
+/* محوشدگیِ شرطیِ لبه‌ها — «بالا/پایین هم ردیف هست» بدونِ نوشتنِ یک کلمه. */
+.sheetFade {
+  position: absolute; left: 8px; right: 8px; height: 34px;
+  pointer-events: none; z-index: 2;
+  border-radius: 18px;
+}
+.sheetFade.top {
+  top: 44px;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--surface, #0e2036) 96%, transparent), transparent);
+}
+.sheetFade.bottom {
+  bottom: 8px;
+  background: linear-gradient(to top,
+    color-mix(in srgb, var(--surface, #0e2036) 96%, transparent), transparent);
+}
+/* جداکنندهٔ بخش‌ها («حساب») — تا «خروج» با مقصدها قاطی نشود. */
+.sheetDivider {
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 8px 2px; font-size: 11px; font-weight: 700; color: #8ba4bd;
+}
+.sheetDivider::before, .sheetDivider::after {
+  content: ""; flex: 1; height: 1px; background: #ffffff14;
+}
 .moreSheet button {
   display: flex; align-items: center; gap: 12px;
   min-height: 50px; padding: 12px 16px;
@@ -596,6 +648,11 @@
 .moreSheet button span { font-size: 19px; width: 24px; text-align: center; }
 .moreSheet button:hover { background: #ffffff10; transform: none; }
 .moreSheet .on { background: #b5ef5818; color: var(--brand, #b5ef58); }
+/* ردیفِ فعال نشانِ لبهٔ روشن می‌گیرد — «کجای منو هستم» بدونِ خواندن. */
+.moreSheet .on::before {
+  content: ""; position: absolute; inset-inline-start: 6px; top: 12px; bottom: 12px;
+  width: 3px; border-radius: 99px; background: var(--brand, #b5ef58);
+}
 .sheetDanger { color: #ff8095 !important; }
 .sheetDanger:hover { background: #ff507018 !important; }
 
@@ -4287,64 +4344,106 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   100% { transform: translateY(560px) rotate(calc(var(--rot) + 300deg)); opacity: 0; }
 }
 
-/* ── ScrollHint: راهنمای «پایین هم ادامه دارد» (مخصوص نمای موبایل) ── */
-.scrollHintRoot{position:relative;width:100%}
-.scrollHintFade,
-.scrollHintRail,
-.scrollHintPill{display:none!important}
+/* ══════════════════════════════════════════════════════════════════════════
+   راهنمای اسکرول — یک پیاده‌سازیِ واحد (وب / پنل ادمین / آینهٔ اندروید)
+   ══════════════════════════════════════════════════════════════════════════
+   خواستهٔ مالک (۲۹ شهریور): «هر تبی که کاربرا نیاز دارن به اسکرول کنن
+   راهنمایی نشون داده بشه؛ ولی هیچ‌کدوم درست کار نکردن، یا اسکرول‌Help
+   دسکتاپ صفحه رو به‌هم ریخته. یکپارچه و برای همیشه درستش کن.»
 
-@media (max-width: 899px){
-  .scrollHintFade{
-    display:block!important;position:fixed;left:0;right:0;height:54px;z-index:28;pointer-events:none;
-    background:linear-gradient(to bottom, transparent 0%, rgba(6,16,29,.35) 40%, rgba(6,16,29,.92) 100%);
-  }
-  .scrollHintRail{
-    display:block!important;position:fixed;top:74px;right:4px;width:3.5px;z-index:29;pointer-events:none;
-    border-radius:99px;background:rgba(255,255,255,.08);
-  }
-  .scrollHintThumb{
-    position:absolute;left:0;right:0;border-radius:99px;
-    background:linear-gradient(180deg,#b5ef58,#00d49a);
-    box-shadow:0 0 8px rgba(181,239,88,.45);
-    min-height:28px;
-  }
-  .scrollHintPill{
-    display:inline-flex!important;position:fixed;right:18px;z-index:30;pointer-events:auto;cursor:pointer;
-    align-items:center;gap:6px;
-    padding:7px 12px;border-radius:999px;
-    background:linear-gradient(135deg,rgba(13,26,44,.94),rgba(6,16,29,.96));
-    backdrop-filter:blur(16px) saturate(1.4);
-    -webkit-backdrop-filter:blur(16px) saturate(1.4);
-    color:#eef8ff;
-    font-size:12px;font-weight:800;
-    border:1px solid rgba(181,239,88,.42);
-    box-shadow:0 8px 26px rgba(0,0,0,.5), 0 0 14px rgba(181,239,88,.18), inset 0 1px 0 rgba(255,255,255,.12);
-    transition:transform .2s cubic-bezier(0.16,1,0.3,1), opacity .25s ease, border-color .2s, box-shadow .2s;
-    max-width:min(180px,52vw);
-    user-select:none;
-  }
-  .scrollHintPill:hover{
-    transform:translateY(-2px);
-    border-color:rgba(181,239,88,.75);
-    box-shadow:0 12px 32px rgba(0,0,0,.6), 0 0 20px rgba(181,239,88,.26);
-  }
-  .scrollHintPill:active{
-    transform:translateY(1px) scale(.96);
-  }
-  .scrollHintDot{
-    width:5px;height:5px;border-radius:50%;background:#b5ef58;
-    box-shadow:0 0 6px #b5ef58;flex-shrink:0;
-  }
-  .scrollHintText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .scrollHintChevron{
-    display:inline-flex;align-items:center;justify-content:center;
-    color:#b5ef58;flex-shrink:0;
-    animation:scrollHintChevronBounce 1.4s ease-in-out infinite;
-  }
+   ⚠️ درسِ نسخهٔ قبلی (که همین چند خط را خراب کرده بود):
+   نسخهٔ قدیمی با `position:fixed; right:18px` به **نمای صفحه** چسبیده بود و
+   با `@media (max-width: 899px)` روی دسکتاپ خاموش می‌شد. یعنی: روی موبایل
+   قرص کنارِ لبهٔ نما (نه ستونِ اپ) می‌نشست و روی دسکتاپ اصلاً نبود.
+
+   قراردادِ تازه — لنگر = **ستونِ اپ**، نه نما:
+     • یک لایهٔ `fixed` با عرضِ ستون (`max-width` از پراپس) و `margin-inline:auto`
+      ؛ پس روی هر عرضی، همه‌چیز داخل همان ستونِ ۵۴۰px می‌ماند.
+     • `pointer-events:none` روی لایه و `auto` فقط روی قرص → هیچ دکمه‌ای
+       زیرِ نشانه‌ها گم نمی‌شود و کلیک‌ها می‌رسند.
+     • هیچ `min-width` و هیچ `vw` (گاردهای `desktop-layout.mjs` و
+       `scroll-hint.mjs` همین را قفل می‌کنند).
+   ────────────────────────────────────────────────────────────────────────── */
+.scrollHintLayer {
+  position: fixed; left: 0; right: 0; margin-inline: auto;
+  top: 0; bottom: 0; width: 100%;
+  z-index: 30;                 /* بالای محتوا، زیرِ نوارِ ناوبری (۴۰) */
+  pointer-events: none;
+  overflow: hidden;            /* لایه هرگز اسکرول/سرریز نمی‌سازد */
+  contain: layout paint;
 }
-@keyframes scrollHintChevronBounce{
-  0%,100%{transform:translateY(0)}
-  50%{transform:translateY(2.5px)}
+/* محوشدگیِ لبهٔ پایین: «ادامه دارد». فقط وقتی سرریز واقعی هست رندر می‌شود. */
+.scrollHintFade {
+  position: absolute; left: 0; right: 0;
+  bottom: var(--scrollHint-pad, 86px);
+  height: 68px;
+  background: linear-gradient(to bottom,
+    rgba(6, 13, 24, 0) 0%,
+    rgba(6, 13, 24, .55) 52%,
+    rgba(6, 13, 24, .96) 100%);
+}
+/* ریل: «کجای مسیر هستم». لبهٔ ستون، زیرِ نوارِ بالای چسبان. */
+.scrollHintRail {
+  position: absolute; width: 4px; right: 5px;
+  top: var(--scrollHint-top, 74px);
+  bottom: calc(var(--scrollHint-pad, 86px) + 6px);
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .09);
+}
+.scrollHintThumb {
+  position: absolute; left: 0; right: 0; min-height: 30px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, #b5ef58, #00d49a);
+  box-shadow: 0 0 8px rgba(181, 239, 88, .45);
+  transition: top .12s linear, height .12s linear;
+}
+/* قرصِ راهنما — کلیک/لمس = یک صفحه پایین. */
+.scrollHintPill {
+  position: absolute; right: 14px;
+  bottom: calc(var(--scrollHint-pad, 86px) + 12px);
+  display: inline-flex; align-items: center; gap: 7px;
+  pointer-events: auto; cursor: pointer;
+  max-width: min(230px, calc(100% - 28px));
+  padding: 8px 13px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(13, 26, 44, .95), rgba(6, 16, 29, .97));
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  color: #eef8ff; font-size: 12px; font-weight: 800; line-height: 1.2;
+  border: 1px solid rgba(181, 239, 88, .42);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .5), 0 0 14px rgba(181, 239, 88, .18),
+    inset 0 1px 0 rgba(255, 255, 255, .12);
+  transition: transform .2s cubic-bezier(.16, 1, .3, 1), border-color .2s, box-shadow .2s;
+  animation: scrollHintIn .26s cubic-bezier(.2, 1, .3, 1);
+  user-select: none;
+}
+.scrollHintPill:not(:disabled):hover {
+  transform: translateY(-2px);
+  border-color: rgba(181, 239, 88, .75);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .6), 0 0 20px rgba(181, 239, 88, .26);
+}
+.scrollHintPill:not(:disabled):active { transform: translateY(1px) scale(.97); }
+.scrollHintDot {
+  width: 5px; height: 5px; border-radius: 50%; flex: 0 0 auto;
+  background: #b5ef58; box-shadow: 0 0 6px #b5ef58;
+}
+.scrollHintText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scrollHintChevron {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #b5ef58; flex: 0 0 auto;
+  animation: scrollHintChevronBounce 1.4s ease-in-out infinite;
+}
+@keyframes scrollHintIn {
+  from { opacity: 0; transform: translateY(10px) }
+  to { opacity: 1; transform: none }
+}
+@keyframes scrollHintChevronBounce {
+  0%, 100% { transform: translateY(0) }
+  50% { transform: translateY(2.5px) }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scrollHintPill, .scrollHintThumb { animation: none; transition: none }
+  .scrollHintChevron { animation: none }
 }
 @media (prefers-reduced-motion:reduce){
   .scrollHintChevron{animation:none}

@@ -1,12 +1,65 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { LogOut, Menu, X } from 'lucide-react';
 import { ScrollHint } from './ScrollHint.jsx';
+
+// ── جملهٔ راهنمای اسکرول برای صفحه‌های پنل ──────────────────────────────────
+//
+// چرا یک جملهٔ اختصاصی برای هر صفحه و نه «پایین‌تر هم هست»ِ عمومی: مدیر با
+// این جمله می‌فهمد **چه چیزی** را دارد از دست می‌دهد (همان استدلالِ
+// `SCROLL_HINTS` در وب‌کاربر و `_scrollHints` در اندروید). هر صفحهٔ دیگری
+// که در نقشه نباشد، جملهٔ پیش‌فرض را می‌گیرد — پس هیچ صفحه‌ای بی‌راهنما
+// نمی‌ماند، فقط کم‌دقیق‌تر می‌شود و افزودنِ یک صفحهٔ تازه لازم نیست این
+// نقشه را هم آپدیت کند.
+const ADMIN_SCROLL_HINTS = {
+  dashboard: 'بخش‌های بعدی داشبورد پایین‌ترند',
+  analytics: 'نمودارها و صندوق خطا پایین‌ترند',
+  metrics: 'سرویس‌ها و لاگ‌ها پایین‌ترند',
+  cloudflare: 'تنظیمات سپر پایین‌تر است',
+  'photo-cards': 'کارت‌های در انتظار پایین‌ترند',
+  shop: 'آیتم‌های بیشتر پایین‌ترند',
+  'card-box': 'تاریخچهٔ خریدها پایین‌تر است',
+  'battle-pass': 'پله‌های گذر پایین‌ترند',
+  'custom-mission': 'ماموریت‌های دیگر پایین‌ترند',
+  missions: 'ماموریت‌ها و جزئیات پایین‌ترند',
+  rewards: 'جوایز بیشتر پایین‌ترند',
+  wallet: 'تراکنش‌ها و درخواست‌ها پایین‌ترند',
+  'league-countdown': 'شمارش و تنظیمات پایین‌ترند',
+  league: 'ادامهٔ جدول پایین‌تر است',
+  'game-rewards': 'سقف‌ها و ردیف‌های بازی پایین‌ترند',
+  'game-economy': 'پارامترهای اقتصادی پایین‌ترند',
+  wheel: 'شرط‌ها و تاریخچه پایین‌ترند',
+  users: 'ادامهٔ فهرست کاربران پایین‌تر است',
+  points: 'ادامهٔ ریز امتیازات پایین‌تر است',
+  chat: 'پیام‌های قدیمی‌تر پایین‌ترند',
+  support: 'تیکت‌های قدیمی‌تر پایین‌ترند',
+  notifications: 'اطلاعیه‌های دیگر پایین‌ترند',
+  settings: 'تنظیمات بیشتر پایین‌ترند',
+  'recommended-apps': 'برنامه‌های دیگر پایین‌ترند',
+  'live-copy': 'کلیدهای دیگر پایین‌ترند',
+  engine: 'پارامترهای موتور پایین‌ترند',
+  admins: 'حساب‌های دیگر پایین‌ترند',
+};
+const DEFAULT_HINT = 'ادامهٔ این صفحه پایین‌تر است';
 
 // Responsive app shell: permanent sidebar on desktop, slide-in drawer +
 // hamburger on mobile — same principle as the Flutter admin shell
 // (side-rail vs. Drawer) so the whole product family behaves consistently.
 export function AppShell({ nav, navGroups = {}, activePage, onNavigate, onLogout, title, subtitle, children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  // ظرفِ اسکرولِ پنل. راهنمای اسکرول باید بداند **کدام** عنصر اسکرول می‌شود؛
+  // در پنل این `window` نیست، `.content-area` است. (باگِ نسخهٔ قبلی: به
+  // `window` تکیه می‌کرد و روی دسکتاپ هیچ‌وقت سرریز نمی‌دید.)
+  const contentRef = useRef(null);
+  // ── عوض‌کردنِ صفحه = برگشت به بالای صفحه ──────────────────────────────
+  //
+  // بدونِ این، `scrollTop` از صفحهٔ قبلی می‌ماند: مدیر صفحهٔ تازه را باز
+  // می‌کند و وسطِ جدول فرود می‌آید (سرِ صفحه و فیلترها دیده نمی‌شود) و
+  // راهنمای اسکرول هم بی‌گناه می‌ماند، چون واقعاً پایینِ صفحه است. در
+  // وب‌کاربر همان کار با `window.scrollTo` انجام می‌شود.
+  useEffect(() => {
+    const el = contentRef.current;
+    if (el && el.scrollTop > 0) el.scrollTop = 0;
+  }, [activePage]);
   // گروه‌ها (۳.۲): یک سرتیترِ کوچک قبلِ اولین آیتمِ هر دسته. «دومین
   // آیتم» معیار است، نه «تغییرِ گروهِ قبلی»، تا گروهِ اول هم سرتیتر
   // بگیرد — بیِ این، مدیرِ تازه‌کار اولین دسته را بی‌نام می‌بیند.
@@ -78,11 +131,21 @@ export function AppShell({ nav, navGroups = {}, activePage, onNavigate, onLogout
           <div className="topbar-actions">
           </div>
         </header>
-        <main className="content-area">
-          <ScrollHint key={activePage} label="پایین‌تر هم هست" padBottom={8}>
-            {children}
-          </ScrollHint>
+        <main className="content-area" ref={contentRef}>
+          {/* ⚠️ این wrapper **هیچ `key`ی ندارد**: قبلاً همین‌جا
+              `<ScrollHint key={activePage}>` بود و کلیدش با کلیدهای
+              هم‌سطحش تکرار می‌شد؛ React دو فرزندِ هم‌کلید را تکراری
+              می‌بیند و لایه‌های راهنما را بدونِ حذفِ قبلی می‌سازد. */}
+          <div className="contentPane">{children}</div>
         </main>
+        {/* لایهٔ راهنما **بیرونِ** ظرفِ اسکرول است (وگرنه با محتوا اسکرول
+            می‌شد و از دید می‌رفت) و داخلِ `.main-area` که `position:relative`
+            است — پس لنگرش قابِ محتواست، نه لبهٔ نمایشگر. */}
+        <ScrollHint
+          targetRef={contentRef}
+          resetKey={activePage}
+          hintLabel={ADMIN_SCROLL_HINTS[activePage] || DEFAULT_HINT}
+        />
       </div>
     </div>
   );

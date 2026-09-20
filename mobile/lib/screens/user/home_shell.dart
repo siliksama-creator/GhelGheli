@@ -154,6 +154,17 @@ class _HomeShellState extends State<HomeShell>
   bool _appsReady = true;
   DateTime? _appsProbedAt;
 
+  /// شمارندهٔ «بازدیدِ تب» — با هر جابه‌جاییِ تب یکی بالا می‌رود و به
+  /// `ScrollHint.resetToken` می‌رود. نتیجه: با برگشتن به یک تب، راهنمای
+  /// اسکرول یک بار دیگر آموزش می‌دهد (آینهٔ `resetKey` در وب/پنل).
+  int _visitTick = 0;
+
+  /// هر بار فهرستِ شیتِ «بیشتر» عوض می‌شود (مثلاً ردیفِ «برنامه‌های
+  /// پیشنهادی» روشن/خاموش می‌شود) یکی بالا می‌رود؛ شیتِ باز هم از آن
+  /// خبردار می‌شود و فهرست و شمارش را تازه می‌کند. بدون این، شیت با
+  /// فهرستِ لحظهٔ بازشدن قفل می‌شد. آینهٔ `visibleMore` در وب.
+  final ValueNotifier<int> _moreRevision = ValueNotifier<int>(0);
+
   /// آیا بخشِ «برنامه‌های پیشنهادی» روشن است و چیزی برای نشان دادن دارد؟
   ///
   /// یک درخواستِ کوچک (۱۰ مورد) — همان چیزی که خودِ صفحه می‌گیرد. همین
@@ -180,7 +191,10 @@ class _HomeShellState extends State<HomeShell>
           : const <String, dynamic>{};
       final total = (info['total'] as num?)?.toInt() ?? items.length;
       final ready = enabled && total > 0;
-      if (ready != _appsReady && mounted) setState(() => _appsReady = ready);
+      if (ready != _appsReady && mounted) {
+        setState(() => _appsReady = ready);
+        _moreRevision.value++;
+      }
     } catch (_) {
       // عمداً بی‌صدا: پیش‌کاوشِ منو هرگز نباید چیزی را بشکند یا پیام بدهد.
     }
@@ -750,6 +764,7 @@ class _HomeShellState extends State<HomeShell>
   void dispose() {
     _fcmRefreshSubscription?.cancel();
     _entrance.dispose();
+    _moreRevision.dispose();
     super.dispose();
   }
 
@@ -863,19 +878,28 @@ class _HomeShellState extends State<HomeShell>
   /// کاربر می‌گوید **چه چیزی** را دارد از دست می‌دهد و همان است که
   /// انگشتش را حرکت می‌دهد. صفحه‌هایی که اینجا نیستند متن پیش‌فرض
   /// می‌گیرند.
+  /// ⚠️ متن‌ها **حرف‌به‌حرف** با `SCROLL_HINTS` در `userweb/src/main.jsx`
+  /// یکسان‌اند؛ گاردِ `userweb/tool/scroll-hint.mjs` همین را قفل می‌کند
+  /// (کلید ↔ ایندکسِ زیر نگاشت می‌شود). دو کلاینت نباید برای یک صفحه دو
+  /// جملهٔ متفاوت بگویند — کاربری که هم وب دارد هم اپ، تفاوت را «باگ»
+  /// می‌بیند.
+  ///
+  /// ردیفِ «دفتر امتیازات» (۱۲) از قلم افتاده بود: صفحه‌اش در شیت بود ولی
+  /// راهنمای خودش را نداشت و متنِ عمومی می‌گرفت.
   static const Map<int, String> _scrollHints = {
     0: 'میان‌برها و کارت‌ها پایین‌ترند',
     1: 'جوایز بیشتری پایین‌تر هست',
     2: 'تاریخچهٔ تراکنش‌ها پایین‌تر است',
     3: 'ادامهٔ جدول پایین‌تر است',
     4: 'بازی‌ها و ماموریت‌ها پایین‌ترند',
-    5: 'تیکت‌ها پایین‌ترند',
+    5: 'تیکت‌ها و راهنما پایین‌ترند',
     6: 'تنظیمات پروفایل پایین‌تر است',
-    7: 'جایزه‌ها و شرایط پایین‌تر است',
+    7: 'جوایز و شرایط پایین‌تر است',
     8: 'راهنمای دعوت پایین‌تر است',
     9: 'محصولات بیشتری پایین‌تر است',
     10: 'پله‌های گذر نبرد پایین‌تر است',
     11: 'کارت‌های بیشتری پایین‌تر است',
+    12: 'ادامهٔ دفتر پایین‌تر است',
     13: 'برنامه‌های بیشتری پایین‌تر است',
   };
 
@@ -894,7 +918,10 @@ class _HomeShellState extends State<HomeShell>
     // (config کوچک است و `refresh()` خودش ۲۰ ثانیه خفه‌کن دارد).
     unawaited(AppConfig.instance.refresh());
     if (slot < _navIndexes.length) {
-      setState(() => _index = _navIndexes[slot]);
+      setState(() {
+        _index = _navIndexes[slot];
+        _visitTick++; // تبِ تازه = راهنمای تازه
+      });
     } else {
       _openMore();
     }
@@ -911,35 +938,28 @@ class _HomeShellState extends State<HomeShell>
     final picked = await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,
-      // اسکرول‌پذیر: با اضافه شدن «دعوت دوستان»، شیت روی گوشی کوتاه
-      // ۳۹ پیکسل سرریز می‌کرد (نوار زرد-مشکی) و آخرین گزینه بریده
-      // می‌شد. تستِ navigation_test.dart همین را گرفت. SingleChild
-      // ScrollView + shrinkWrap یعنی هر تعداد گزینه‌ای که بعداً اضافه
-      // شود هم جا می‌شود.
-      builder: (sheetContext) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final i in _moreIndexes)
-                ListTile(
-                  leading: Icon(
-                    _index == i
-                        ? (_destinations[i].selectedIcon as Icon).icon
-                        : (_destinations[i].icon as Icon).icon,
-                  ),
-                  title: Text(_titles[i]),
-                  selected: _index == i,
-                  onTap: () => Navigator.pop(sheetContext, i),
-                ),
-              // ردیفِ «حالت روشن/تیره» حذف شد — اپ تک‌تم است.
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
+      // `isScrollControlled`: بدون آن، Material ارتفاعِ شیت را به ~۵۶٪
+      // صفحه محدود می‌کند و روی گوشیِ کوتاه آخرین ردیف زیرِ لبه می‌ماند.
+      // با آن، خودمان سقف می‌گذاریم (۷۲٪) تا شیت تمامِ صفحه را هم نگیرد.
+      isScrollControlled: true,
+      builder: (sheetContext) => _MoreSheet(
+        revision: _moreRevision,
+        // فهرستِ زنده از پوسته — نه یک کپیِ لحظهٔ بازشدن.
+        indexes: () => _moreIndexes,
+        titles: _titles,
+        selected: _index,
+        iconOf: (i, selected) => selected
+            ? (_destinations[i].selectedIcon as Icon).icon
+            : (_destinations[i].icon as Icon).icon,
+        onPick: (i) => Navigator.pop(sheetContext, i),
       ),
     );
-    if (picked != null && mounted) setState(() => _index = picked);
+    if (picked != null && mounted) {
+      setState(() {
+        _index = picked;
+        _visitTick++; // مقصدِ تازه از شیت هم «تبِ تازه» است
+      });
+    }
   }
 
   /// تب‌های دیده‌شده را در درخت نگه می‌دارد؛ تب ندیده اصلاً ساخته نمی‌شود.
@@ -963,6 +983,9 @@ class _HomeShellState extends State<HomeShell>
                 hintLabel: _scrollHints[entry.key] ?? 'پایین‌تر هم هست',
                 // padBottom برای نوار پایین تا قرص روی تب‌ها ننشیند
                 padBottom: 8,
+                // تبِ فعال با هر بازدید «تازه» می‌شود. تب‌های پنهان `null`
+                // می‌گیرند تا بی‌دلیل reset نخورند.
+                resetToken: entry.key == _index ? _visitTick : null,
                 child: entry.value,
               ),
             ),
@@ -1541,6 +1564,196 @@ class _AnnouncementBanner extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// ══ شیتِ «بیشتر» ═══════════════════════════════════════════════════════════
+///
+/// خواستهٔ مالک (۲۹ شهریور): «این دکمهٔ بیشتر همه‌چیز رو کامل نشون نمی‌ده؛
+/// یه سری چیزا خوب نشون داده نمی‌شن.» نسخهٔ قبلی یک `SingleChildScrollView`
+/// برهنه بود: نه سرصفحه داشت (کاربر نمی‌دانست چند مقصد وجود دارد)، نه
+/// نشانه‌ای که «پایین‌تر هم ردیف هست» (با ۸ ردیف روی گوشیِ کوتاه، ردیفِ
+/// آخر بیرونِ قاب می‌ماند و بی‌نشانه به نظر می‌رسد «فهرست تمام شده»)، و
+/// سقفِ ارتفاعش را Material تعیین می‌کرد.
+///
+/// قراردادِ تازه — همان سه چیزی که وب گرفت (`main.jsx`، شیتِ `moreSheet`):
+///   ۱. سرصفحهٔ ثابت «همهٔ بخش‌ها» + شمارِ بخش‌ها (عددِ فارسی)،
+///   ۲. ناحیهٔ اسکرولِ جدا با محوشدگیِ **شرطیِ** بالا/پایین،
+///   ۳. سقفِ ۷۲٪ صفحه + فاصلهٔ ایمنِ پایین تا ردیفِ آخر زیرِ نوارِ سیستم
+///      گم نشود.
+///
+/// ردیف‌ها همچنان `ListTile` هستند (تست‌های `navigation_test.dart` روی
+/// همان نوع ویجت می‌گردند) و فهرست زنده است: با روشن/خاموش شدنِ
+/// «برنامه‌های پیشنهادی» در پنل، شیتِ باز هم ردیفش را اضافه/حذف می‌کند.
+class _MoreSheet extends StatefulWidget {
+  const _MoreSheet({
+    required this.revision,
+    required this.indexes,
+    required this.titles,
+    required this.selected,
+    required this.iconOf,
+    required this.onPick,
+  });
+
+  /// با هر تغییرِ فهرست (مثلاً آماده شدنِ ردیفِ برنامه‌ها) بالا می‌رود.
+  final ValueListenable<int> revision;
+  final List<int> Function() indexes;
+  final List<String> titles;
+  final int selected;
+  final IconData Function(int index, bool selected) iconOf;
+  final ValueChanged<int> onPick;
+
+  @override
+  State<_MoreSheet> createState() => _MoreSheetState();
+}
+
+class _MoreSheetState extends State<_MoreSheet> {
+  final ScrollController _ctrl = ScrollController();
+  bool _above = false;
+  bool _below = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(_syncFades);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncFades());
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  /// محوشدگی فقط وقتی که واقعاً سرریزِ آن سمت وجود دارد.
+  void _syncFades() {
+    if (!mounted) return;
+    if (!_ctrl.hasClients) return;
+    final off = _ctrl.offset;
+    final max = _ctrl.position.maxScrollExtent;
+    final above = off > 6;
+    final below = off < max - 6;
+    if (above != _above || below != _below) {
+      setState(() {
+        _above = above;
+        _below = below;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final maxH = MediaQuery.sizeOf(context).height * 0.72;
+    final safeBottom = MediaQuery.viewPaddingOf(context).bottom;
+
+    return ValueListenableBuilder<int>(
+      valueListenable: widget.revision,
+      builder: (context, _, __) {
+        final items = widget.indexes();
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxH),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── سرصفحهٔ ثابت ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+                child: Row(
+                  children: [
+                    const Text(
+                      'همهٔ بخش‌ها',
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w900),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${faNum(items.length)} بخش',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface.withValues(alpha: 0.62),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: scheme.onSurface.withValues(alpha: 0.08),
+              ),
+              // ── ناحیهٔ اسکرول + محوشدگیِ شرطی ──
+              Flexible(
+                child: Stack(
+                  children: [
+                    ListView.builder(
+                      controller: _ctrl,
+                      shrinkWrap: true,
+                      padding: EdgeInsets.only(
+                          top: 4, bottom: safeBottom + 12),
+                      itemCount: items.length,
+                      itemBuilder: (context, i) {
+                        final page = items[i];
+                        final isOn = widget.selected == page;
+                        return ListTile(
+                          leading: Icon(widget.iconOf(page, isOn)),
+                          title: Text(widget.titles[page]),
+                          selected: isOn,
+                          onTap: () => widget.onPick(page),
+                        );
+                      },
+                    ),
+                    if (_above)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        height: 22,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  scheme.surface.withValues(alpha: 0),
+                                  scheme.surface.withValues(alpha: 0.9),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (_below)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 34,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  scheme.surface.withValues(alpha: 0),
+                                  scheme.surface.withValues(alpha: 0.92),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

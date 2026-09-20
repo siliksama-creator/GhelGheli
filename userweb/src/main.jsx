@@ -27,6 +27,10 @@ import { LoadingView, ErrorView } from './components/states.jsx';
 import SplashScreen, { SPLASH_STAGES, SPLASH_MIN_MS } from './components/SplashScreen.jsx';
 import { UiIcon } from './components/IconAsset.jsx';
 import RewardMomentHost from './components/RewardMoment.jsx';
+// راهنمای اسکرول — یک پیاده‌سازیِ واحد در وب/ادمین و آینهٔ آن در اندروید.
+// خواستهٔ مالک (۲۹ شهریور): «هر تبی که کاربرا نیاز دارن به اسکرول کنن،
+// راهنمایی نشون داده بشه؛ یکپارچه و برای همیشه درستش کن.»
+import ScrollHint from './components/ScrollHint.jsx';
 
 // ── چرا این‌ها تنبل بارگذاری می‌شوند ──────────────────────────────────────
 //
@@ -131,6 +135,40 @@ const NAV_TABS = [
   ['league', 'لیگ', 'trophy'],
   ['club', 'چت و بازی', 'game'],
 ];
+
+// ── جملهٔ راهنمای اسکرول، برای هر تب ──────────────────────────────────────
+//
+// چرا متن‌ها فرق دارند (همان استدلالِ اندروید در `_scrollHints`): یک
+// «پایین‌تر هم هست» عمومی بعد از دو بار دیده‌شدن نامرئی می‌شود؛ ولی «جوایز
+// بیشتری پایین‌تر هست» به کاربر می‌گوید **چه چیزی** را دارد از دست می‌دهد و
+// همین است که انگشتش را حرکت می‌دهد.
+//
+// ⚠️ گاردِ `tool/scroll-hint.mjs` این نقشه را با نسخهٔ Dart مقایسه می‌کند؛
+//    اضافه‌کردنِ تبی در یک کلاینت و نه در کلاینتِ دیگر، CI را قرمز می‌کند.
+// تب‌هایی که صفحهٔ خودشان تمام‌صفحه است و راهنمای عمومی رویشان معنی ندارد
+// (بازی‌ها قواعد و صحنهٔ خودشان را دارند و در `gameShell` می‌نشینند).
+const GAME_TABS = new Set(['games', 'penalty', 'duel']);
+
+// فاصلهٔ امن از پایین برای نشانه‌های شناور: ارتفاعِ نوارِ ناوبری (۷۲px) +
+// ناحیهٔ ایمنِ آیفون. یک عدد، یک‌جا — نه سه جا با سه مقدار.
+const NAV_SAFE_PAD = 84;
+
+const SCROLL_HINTS = {
+  home: 'میان‌برها و کارت‌ها پایین‌ترند',
+  rewards: 'جوایز بیشتری پایین‌تر هست',
+  league: 'ادامهٔ جدول پایین‌تر است',
+  club: 'بازی‌ها و ماموریت‌ها پایین‌ترند',
+  wheel: 'جوایز و شرایط پایین‌تر است',
+  inventory: 'کارت‌های بیشتری پایین‌تر است',
+  wallet: 'تاریخچهٔ تراکنش‌ها پایین‌تر است',
+  ledger: 'ادامهٔ دفتر پایین‌تر است',
+  pass: 'پله‌های گذر نبرد پایین‌تر است',
+  shop: 'محصولات بیشتری پایین‌تر است',
+  invite: 'راهنمای دعوت پایین‌تر است',
+  apps: 'برنامه‌های بیشتری پایین‌تر است',
+  support: 'تیکت‌ها و راهنما پایین‌ترند',
+  profile: 'تنظیمات پروفایل پایین‌تر است',
+};
 
 // چیدمانِ سرور-درایوِ تب‌ها: GET /api/config یک آرایهٔ `tabOrder` از
 // idهای قراردادی می‌فرستد (home, rewards, league, social, shop, …).
@@ -597,6 +635,27 @@ function App() {
   );
 }
 
+/** آیا «لحظهٔ جایزه» همین حالا روی صفحه است؟ */
+function useMomentVisible() {
+  const [up, setUp] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      // `.momentCard` فقط وقتی هست که کارتی در حال نمایش باشد؛ خودِ میزبان
+      // (`.momentHost`) هم فقط در همان لحظه در DOM می‌آید.
+      const now = Boolean(document.querySelector('.momentCard'));
+      setUp((prev) => (prev === now ? prev : now));
+    };
+    check();
+    let mo;
+    try {
+      mo = new MutationObserver(check);
+      mo.observe(document.body, { childList: true, subtree: true });
+    } catch { /* بدون observer هم مقدارِ اولیه درست است */ }
+    return () => { if (mo) mo.disconnect(); };
+  }, []);
+  return up;
+}
+
 function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   const sharedRoom = new URLSearchParams(window.location.search).get('room');
   const [tab, setTab] = useState(sharedRoom ? 'club' : 'home');
@@ -612,6 +671,22 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   // پس هیچ رفت‌وبرگشت اضافه‌ای ندارد.
   const [passBrief, setPassBrief] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  // ── عوض‌کردنِ تب = برگشت به بالای تب ────────────────────────────────────
+  //
+  // بدونِ این، جای اسکرول از تبِ قبلی می‌ماند: کاربر تبی را باز می‌کند و
+  // **وسطِ صفحه** فرود می‌آید؛ بالای تب (عنوان، خلاصه، دکمهٔ اصلی) دیده
+  // نمی‌شود و راهنمای اسکرول هم درست است که چیزی نشان نمی‌دهد (چون پایینِ
+  // صفحه است). خواستهٔ مالک دقیقاً همین بود: «بعضی چیزها در چشم نیستند.»
+  // `behavior:auto` عمدی است: پرشِ نرمِ تبِ تازه، حرکتِ خودکار را با
+  // اسکرولِ کاربر قاطی می‌کند و حسِ «پرید» می‌دهد.
+  useEffect(() => {
+    if ((window.scrollY || 0) > 0) window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [tab]);
+  // اسکرولِ شیتِ «بیشتر»: محوشدگیِ بالا/پایین فقط وقتی لازم است نشان داده
+  // شود — همان زبانی که راهنمای تب‌ها دارد.
+  const [sheetScroll, setSheetScroll] = useState({ above: false, below: false });
+  const momentUp = useMomentVisible();
+  const sheetScrollRef = useRef(null);
   // ── برنامه‌های پیشنهادی ────────────────────────────────────────────────
   //
   // `probe` همان صفحهٔ اولِ فهرست است؛ هم برای تصمیمِ «ردیفِ منو را نشان
@@ -620,6 +695,20 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   const [appsProbe, setAppsProbe] = useState(null);
   const [appsReady, setAppsReady] = useState(false);
   const appsProbedAt = useRef(0);
+  // ⚠️ ترتیب مهم است: این دو خط **بعد** از `appsReady` می‌آیند. وقتی
+  //    `visibleMore` بالای حالتِ `appsReady` بود، تابعِ filter در همان
+  //    رندر به متغیری می‌رسید که هنوز ساخته نشده بود و کلِ اپ با
+  //    «Cannot access … before initialization» سفید می‌شد — دقیقاً همان
+  //    بالای صفحه‌ای که کاربر پشتش می‌ماند.
+  const visibleMore = orderByServer(MORE_TABS, t => t[0]).filter(([id]) => id !== 'apps' || appsReady);
+  // هر بار که شیت باز می‌شود، وضعیتِ محوشدگی از صفر سنجیده می‌شود (شیت
+  // بین بازشدن‌ها از DOM می‌رود و برمی‌گردد، پس اسکرولش هم صفر است).
+  useEffect(() => {
+    if (!moreOpen) return;
+    const el = sheetScrollRef.current;
+    if (!el) return;
+    setSheetScroll({ above: false, below: el.scrollHeight > el.clientHeight + 6 });
+  }, [moreOpen, visibleMore.length]);
 
   // یک‌بار در شروع، و هر بار که کاربر شیتِ «بیشتر» را باز می‌کند اگر بیش از
   // یک دقیقه گذشته باشد. این «بدونِ آپدیت» بودن را واقعی می‌کند: ادمین
@@ -801,23 +890,50 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
           {/* پشتِ شفاف: کلیک بیرون می‌بندد. بدون آن، تنها راه بستن، زدن
               دوبارهٔ خودِ دکمه است که کاربر حدس نمی‌زند. */}
           <div className="sheetShade" onClick={() => setMoreOpen(false)} />
-          <div className="moreSheet" role="menu">
+          {/* ══ شیتِ «بیشتر» ══════════════════════════════════════════════
+              خواستهٔ مالک (۲۹ شهریور): «این دکمهٔ بیشتر همه‌چیز رو کامل نشون
+              نمی‌ده؛ یه سری چیزا خوب نشون داده نمی‌شن.»
+
+              سه چیز عوض شد تا «کامل و در چشم» باشد:
+               ۱. سرصفحهٔ ثابت («همهٔ بخش‌ها» + شمارِ بخش‌ها) تا کاربر بداند
+                  چند مقصد وجود دارد، نه اینکه فکر کند همین چند ردیف است؛
+               ۲. ناحیهٔ اسکرولِ جدا با محوشدگیِ بالا/پایینِ شرطی — بدونِ
+                  این، ردیف‌های بیرونِ قاب هیچ نشانه‌ای نداشتند؛
+               ۳. فاصلهٔ امن از نوارِ ناوبری و ناحیهٔ ایمنِ آیفون، تا ردیفِ
+                  آخر (خروج از حساب) هرگز پشتِ داک گم نشود. */}
+          <div className="moreSheet" role="menu" aria-label="همهٔ بخش‌ها">
             <div className="sheetGrip" />
-            {orderByServer(MORE_TABS, t => t[0])
-              // ردیفِ «برنامه‌های پیشنهادی» فقط وقتی می‌آید که واقعاً چیزی
-              // برای نشان دادن باشد — وگرنه کاربر صفحهٔ خالی باز می‌کند.
-              .filter(([id]) => id !== 'apps' || appsReady)
-              .map(([id, label, icon]) => (
-              <button key={id} role="menuitem"
-                className={tab === id ? 'on' : ''}
-                onClick={() => { setTab(id); setMoreOpen(false); }}>
-                <span><UiIcon name={icon} size={20} /></span>{label}
+            <div className="sheetHead">
+              <b>همهٔ بخش‌ها</b>
+              <span>{fa(visibleMore.length)} بخش</span>
+            </div>
+            <div
+              className="sheetScroll"
+              ref={sheetScrollRef}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                const above = el.scrollTop > 6;
+                const below = el.scrollTop + el.clientHeight < el.scrollHeight - 6;
+                setSheetScroll((prev) => (
+                  prev.above === above && prev.below === below ? prev : { above, below }
+                ));
+              }}
+            >
+              {visibleMore.map(([id, label, icon]) => (
+                <button key={id} role="menuitem"
+                  className={tab === id ? 'on' : ''}
+                  onClick={() => { setTab(id); setMoreOpen(false); }}>
+                  <span><UiIcon name={icon} size={20} /></span>{label}
+                </button>
+              ))}
+              <div className="sheetDivider" aria-hidden="true"><span>حساب</span></div>
+              <button role="menuitem" className="sheetDanger"
+                onClick={() => { setMoreOpen(false); logout(); }}>
+                <span><UiIcon name="close" size={20} /></span>خروج از حساب
               </button>
-            ))}
-            <button role="menuitem" className="sheetDanger"
-              onClick={() => { setMoreOpen(false); logout(); }}>
-              <span><UiIcon name="close" size={20} /></span>خروج از حساب
-            </button>
+            </div>
+            {sheetScroll.above && <div className="sheetFade top" aria-hidden="true" />}
+            {sheetScroll.below && <div className="sheetFade bottom" aria-hidden="true" />}
           </div>
         </>
       )}
@@ -828,6 +944,30 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
           تمام‌صفحه هم دیده می‌شود. میزبان این‌جا سوار می‌شود (نه داخلِ
           هر صفحه) تا هیچ مسیرِ جایزه‌ای بدونِ جشن نماند. */}
       <RewardMomentHost />
+
+      {/* ── راهنمای اسکرول ────────────────────────────────────────────────
+          یک لایهٔ `fixed` داخلِ ستونِ اپ (نه چسبیده به نما — درسِ دسکتاپِ
+          به‌هم‌ریخته). جملهٔ هر تب از `SCROLL_HINTS` می‌آید و با عوض‌شدنِ تب
+          دوباره فعال می‌شود.
+
+          کِی خاموش است:
+            • شیتِ «بیشتر» باز است (نشانه‌ها روی شیت می‌افتند)،
+            • بازی‌های تمام‌صفحه (قواعد و صفحهٔ خودشان)،
+            • لحظهٔ جایزه روی صفحه است (دو لایهٔ شناور روی هم ننشینند). */}
+      {/* ⚠️ این‌جا **`key` نمی‌دهیم**. قبلاً `key={tab}` بود و همان
+          کلیدِ `<main key={tab}>` را تکرار می‌کرد؛ React دو فرزندِ هم‌کلید
+          را «تکراری» می‌بیند و عناصر را بدونِ حذفِ قبلی‌ها می‌سازد. نتیجهٔ
+          سنجش‌شده: با هر بار عوض‌کردنِ تب یک `.scrollHintLayer` تازه به
+          DOM اضافه می‌شد و قرص‌های تب‌های قبلی (با متنِ خودشان) روی هم
+          می‌ماندند — سه تب که می‌رفتیم، چهار قرصِ روی‌هم‌افتاده.
+          تازه‌سازیِ تب با `resetKey` انجام می‌شود و نیازی به remount نیست. */}
+      <ScrollHint
+        hintLabel={SCROLL_HINTS[tab] || 'پایین‌تر هم هست'}
+        resetKey={tab}
+        enabled={!moreOpen && !GAME_TABS.has(tab) && !momentUp}
+        padBottom={NAV_SAFE_PAD}
+        topOffset={72}
+      />
 
       {/* `data-tab` وضعیتِ واقعیِ ناوبری را در DOM آشکار می‌کند.
           ابزارِ ممیزی قبلاً «رسیدن به تب» را از روی امضای متنِ صفحه حدس

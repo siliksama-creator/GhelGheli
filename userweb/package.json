@@ -19,6 +19,7 @@
     "test:chat-parity": "node tool/chat-parity.mjs",
     "test:league-live": "node tool/league-live-parity.mjs",
     "test:desktop-layout": "node tool/desktop-layout.mjs",
+    "test:scroll-hint": "node tool/scroll-hint.mjs",
     "test:round-intro-parity": "node tool/round-intro-parity.mjs",
     "test:club-tabs": "node tool/club-tabs-parity.mjs",
     "test:reward-parity": "node tool/reward-parity.mjs",

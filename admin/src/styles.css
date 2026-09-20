@@ -4,9 +4,22 @@
 */
 
 /* ---------- App shell ---------- */
+/* ══ ارتفاعِ قاب = ارتفاعِ نما ═══════════════════════════════════════════
+   قبلاً `min-height: 100vh` بود و کلِ صفحه (بدنه) اسکرول می‌شد؛ در نتیجه
+   `.content-area` با `max-height: calc(100vh - 72px)` روی گوشی — که نوارِ
+   بالایش با زیرعنوان دو خط می‌شود و ۱۱۰px ارتفاع دارد — از پایینِ نما بیرون
+   می‌زد. اثرش در نشانهٔ راهنمای اسکرول دیده شد: قرص دقیقاً به لبهٔ پایینِ
+   «قابِ محتوا» می‌چسبید و ۱۶px از آن بیرونِ صفحه می‌افتاد.
+
+   حالا خودِ اسکرول‌کردن هم یک‌جا متمرکز است: بدنه اسکرول نمی‌شود و
+   `.content-area` تنها ظرفِ اسکرولِ پنل است — همان چیزی که راهنمای اسکرول
+   می‌سنجد. `dvh` برای نوارِ آدرسِ مرورگرهای موبایل است (پاییزِ ۱۰۰vh را
+   جبران می‌کند) و برای مرورگرهای قدیمی‌تر، `vh` می‌ماند. */
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -131,8 +144,11 @@
 .main-area {
   flex: 1;
   min-width: 0;
+  min-height: 0;                /* تا اسکرول به ناحیهٔ محتوا برسد، نه بدنه */
   display: flex;
   flex-direction: column;
+  /* لنگرِ لایهٔ راهنمای اسکرول (`.scrollHintLayer`). */
+  position: relative;
 }
 
 .topbar {
@@ -179,6 +195,9 @@
 .content-area {
   padding: var(--gg-space-6);
   flex: 1;
+  min-height: 0;
+  /* ظرفِ اسکرولِ پنل — تنها ظرفِ اسکرول. راهنمای اسکرول همین را می‌سنجد. */
+  overflow-y: auto;
 }
 
 .mobile-menu-btn {
@@ -1818,63 +1837,96 @@ table.data-table {
 .tier-missing { color: #64748b; padding: 10px; font-size: 12px; }
 
 
-/* ScrollHint admin */
-.scrollHintRoot{position:relative;width:100%;min-height:100%}
-.scrollHintFade{
-  position:sticky;bottom:0;left:0;right:0;height:56px;margin-top:-56px;
-  z-index:20;pointer-events:none;
-  background:linear-gradient(to bottom, transparent, color-mix(in srgb, var(--gg-bg) 88%, transparent));
+/* ══ راهنمای اسکرولِ پنل ═══════════════════════════════════════════════════
+   قراردادِ واحد با `userweb/src/components/ScrollHint.jsx` (و آینهٔ اندروید):
+
+     • لنگر = **قابِ محتوا**، نه نمای صفحه. لایه `absolute` داخل `.main-area`
+       است؛ ریل/قرص دیگر با `position:fixed` به لبهٔ نمایشگر نمی‌چسبند —
+       همان چیزی که روی مانیتورِ پهن «چیدمان را به‌هم ریخته» به نظر می‌رسید.
+     • لایه `pointer-events:none` است و فقط قرص کلیک‌پذیر — هیچ دکمه‌ای
+       زیرِ نشانه‌ها گم نمی‌شود.
+     • هیچ `min-width` و هیچ `vw` — گاردِ `userweb/tool/scroll-hint.mjs`
+       همین را قفل می‌کند (و `desktop-layout.mjs` اجازهٔ بیشتر از یک بلاکِ
+       min-width در وب‌کاربر را نمی‌دهد).
+   ────────────────────────────────────────────────────────────────────────── */
+.contentPane { position: relative; width: 100%; min-height: 100%; }
+.scrollHintLayer {
+  position: absolute; inset: 0; width: 100%;
+  margin-inline: auto; max-width: 100%;
+  z-index: 30;                 /* بالای محتوای قاب، زیرِ مودال‌ها (۱۰۰۰) */
+  pointer-events: none;
+  overflow: hidden;            /* هرگز اسکرول/سرریز نمی‌سازد */
+  contain: layout paint;
 }
-/* fixed rail relative to viewport of main */
-.main-area{position:relative}
-.content-area{position:relative;overflow-y:auto;max-height:calc(100vh - 72px)}
-.scrollHintRail{
-  position:fixed;top:88px;right:6px;width:5px;bottom:16px;z-index:30;pointer-events:none;
-  border-radius:99px;background:color-mix(in srgb, var(--gg-emerald) 18%, transparent);
+.scrollHintFade {
+  position: absolute; left: 0; right: 0;
+  bottom: var(--scrollHint-pad, 14px);
+  height: 64px;
+  background: linear-gradient(to bottom,
+    rgba(6, 13, 24, 0) 0%,
+    rgba(6, 13, 24, .5) 55%,
+    rgba(6, 13, 24, .92) 100%);
 }
-.scrollHintThumb{
-  position:absolute;left:0;right:0;border-radius:99px;min-height:28px;
-  background:var(--gg-emerald);
-  box-shadow:0 0 10px color-mix(in srgb, var(--gg-emerald) 45%, transparent);
+.scrollHintRail {
+  position: absolute; width: 5px; right: 6px;
+  top: var(--scrollHint-top, 72px);
+  bottom: calc(var(--scrollHint-pad, 14px) + 6px);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--gg-emerald) 18%, transparent);
 }
-.scrollHintPill{
-  position:fixed;right:22px;z-index:31;pointer-events:auto;cursor:pointer;
-  display:inline-flex;align-items:center;gap:6px;
-  padding:7px 12px;border-radius:999px;
-  background:linear-gradient(135deg,rgba(13,26,44,.94),rgba(6,16,29,.96));
-  backdrop-filter:blur(16px) saturate(1.4);
-  -webkit-backdrop-filter:blur(16px) saturate(1.4);
-  color:#eef8ff;font-size:12px;font-weight:800;
-  border:1px solid rgba(181,239,88,.42);
-  box-shadow:0 8px 26px rgba(0,0,0,.5), 0 0 14px rgba(181,239,88,.18);
-  transition:transform .2s cubic-bezier(0.16,1,0.3,1), opacity .25s ease, border-color .2s;
-  user-select:none;
+.scrollHintThumb {
+  position: absolute; left: 0; right: 0; min-height: 30px;
+  border-radius: 99px;
+  background: var(--gg-emerald);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--gg-emerald) 45%, transparent);
+  transition: top .12s linear, height .12s linear;
 }
-.scrollHintPill:hover{
-  transform:translateY(-2px);
-  border-color:rgba(181,239,88,.75);
-  box-shadow:0 12px 32px rgba(0,0,0,.6), 0 0 20px rgba(181,239,88,.26);
+.scrollHintPill {
+  position: absolute; right: 16px;
+  bottom: calc(var(--scrollHint-pad, 14px) + 8px);
+  display: inline-flex; align-items: center; gap: 7px;
+  pointer-events: auto; cursor: pointer;
+  max-width: min(260px, calc(100% - 32px));
+  padding: 8px 13px; border-radius: 999px;
+  background: linear-gradient(135deg, rgba(13, 26, 44, .95), rgba(6, 16, 29, .97));
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  color: #eef8ff; font-size: 12px; font-weight: 800; line-height: 1.2;
+  border: 1px solid rgba(181, 239, 88, .42);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, .5), 0 0 14px rgba(181, 239, 88, .18),
+    inset 0 1px 0 rgba(255, 255, 255, .1);
+  transition: transform .2s cubic-bezier(.16, 1, .3, 1), border-color .2s;
+  animation: scrollHintIn .26s cubic-bezier(.2, 1, .3, 1);
+  user-select: none;
 }
-.scrollHintPill:active{
-  transform:translateY(1px) scale(.96);
+.scrollHintPill:hover {
+  transform: translateY(-2px);
+  border-color: rgba(181, 239, 88, .75);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .6), 0 0 20px rgba(181, 239, 88, .26);
 }
-.scrollHintDot{
-  width:5px;height:5px;border-radius:50%;background:#b5ef58;
-  box-shadow:0 0 6px #b5ef58;flex-shrink:0;
+.scrollHintPill:active { transform: translateY(1px) scale(.96); }
+.scrollHintDot {
+  width: 5px; height: 5px; border-radius: 50%; background: #b5ef58;
+  box-shadow: 0 0 6px #b5ef58; flex-shrink: 0;
 }
-.scrollHintText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.scrollHintChevron{
-  display:inline-flex;align-items:center;justify-content:center;
-  color:#b5ef58;flex-shrink:0;
-  animation:scrollHintChevronBounce 1.4s ease-in-out infinite;
+.scrollHintText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scrollHintChevron {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #b5ef58; flex-shrink: 0;
+  animation: scrollHintChevronBounce 1.4s ease-in-out infinite;
 }
-@keyframes scrollHintChevronBounce{
-  0%,100%{transform:translateY(0)}
-  50%{transform:translateY(2.5px)}
+@keyframes scrollHintIn {
+  from { opacity: 0; transform: translateY(10px) }
+  to { opacity: 1; transform: none }
+}
+@keyframes scrollHintChevronBounce {
+  0%,100% { transform: translateY(0) }
+  50% { transform: translateY(2.5px) }
 }
 @media (prefers-reduced-motion:reduce){
   .scrollHintChevron{animation:none}
-  .scrollHintPill{transition:none}
+  .scrollHintPill{animation:none; transition:none}
+  .scrollHintThumb{transition:none}
 }
 
 
