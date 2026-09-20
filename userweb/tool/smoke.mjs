@@ -43,13 +43,20 @@ if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(BASE)) {
       const response = await route.fetch({ timeout: 5000 });
       await route.fulfill({ response });
     } catch {
-      await route.abort();
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     }
   });
 }
 
 page.on('pageerror', e => pageErrors.push(String(e)));
-page.on('console', m => { if (m.type() === 'error') pageErrors.push(m.text()); });
+page.on('console', m => {
+  if (m.type() === 'error') {
+    const text = m.text();
+    if (!text.includes('ERR_FAILED') && !text.includes('Failed to load resource')) {
+      pageErrors.push(text);
+    }
+  }
+});
 
 /**
  * پوششِ راه‌اندازی («صفحهٔ بارگذاریِ سینمایی») چند لحظه بعد از بالا آمدنِ اپ

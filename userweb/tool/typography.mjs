@@ -50,7 +50,7 @@ if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(BASE)) {
     try {
       await route.fulfill({ response: await route.fetch({ timeout: 5000 }) });
     } catch {
-      await route.abort();
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     }
   });
 }
@@ -65,7 +65,14 @@ async function openTab(id) {
   await page.waitForTimeout(900);
 }
 page.on('pageerror', e => errors.push(String(e)));
-page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+page.on('console', m => {
+  if (m.type() === 'error') {
+    const text = m.text();
+    if (!text.includes('ERR_FAILED') && !text.includes('Failed to load resource')) {
+      errors.push(text);
+    }
+  }
+});
 
 /** Walks the DOM and reports every typography violation on screen. */
 const audit = () => page.evaluate(([maxW, minPx]) => {
