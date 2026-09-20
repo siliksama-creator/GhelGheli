@@ -196,10 +196,28 @@ try {
     await page.locator('.card', { hasText: 'دوئل کارت‌ها' }).last().click();
     await page.waitForTimeout(1200);
     const duelText = await page.innerText('body');
+    // ── چرا این‌جا دو تغییر شد (۲۹ شهریور) ───────────────────────────────
+    //  ۱. بین «کارتِ دوئل» و «راندِ اول» یک **صفحهٔ لابی** هست (قوانین،
+    //     قدرتِ تیم، دکمهٔ «ورود به تمرین با ربات» + کارت‌های قرضی). تستِ
+    //     قبلی مستقیم منتظرِ واژهٔ «راند» می‌ماند و روی حسابِ تازه‌ای که
+    //     کارتی ندارد هرگز به راند نمی‌رسید — یعنی گارد، شکستِ واقعیِ
+    //     محصول را نمی‌سنجید و فقط بی‌دلیل قرمز می‌شد.
+    //  ۲. متنِ «راند» فقط در لحظهٔ آغازِ راند دیده می‌شود و بعد می‌رود؛
+    //     یک نمونه‌برداری در لحظهٔ ثابت، آزمونی بود که به شانس وابسته
+    //     است. حالا تا ۸ ثانیه فعالانه صبر می‌کنیم.
+    const enterPractice = page.locator('button', { hasText: 'ورود به تمرین' }).first();
+    if (await enterPractice.count()) {
+      await enterPractice.click();
+    }
+    let sawRound = false;
+    for (let i = 0; i < 16 && !sawRound; i++) {
+      await page.waitForTimeout(500);
+      sawRound = (await page.innerText('body')).includes('راند');
+    }
     // «سه راند» به «پنج راند» تغییر کرد (بازطراحیِ دوئل، کامیتِ 4f67a5e).
     // به‌جای عددِ ثابت، به تیترِ صفحه و واژهٔ «راند» تکیه می‌کنیم تا تست با
     // هر تغییرِ بعدیِ تعدادِ راندها بی‌دلیل قرمز نشود.
-    ok(duelText.includes('دوئل کارت‌ها') && duelText.includes('راند'),
+    ok(duelText.includes('دوئل کارت‌ها') && sawRound,
       'card duel full screen renders');
     ok(pageErrors.length === 0, 'card duel has no runtime error');
     await page.getByRole('button', { name: /بازگشت/ }).first().click();
