@@ -49,7 +49,13 @@ async function call(path, { method = 'GET', body, token } = {}) {
   const before = await call('/api/admin/custom-mission', { token: admin });
   ok(before.status === 200 && Array.isArray(before.json?.missions),
     'پنل فهرستِ ماموریت‌ها را می‌خواند (شکلِ تازه)');
-  ok(before.json?.max === 5, `سقفِ تعداد از سرور می‌آید (${before.json?.max})`);
+  // سقفِ ۱۰ خواستهٔ صریحِ مالک است (۲۹ شهریور): «تا ۱۰ تا ماموریت هم اگه
+  // بخوام ادد کنم یا حذف کنم یا ویرایش کنم». عدد از سرور خوانده می‌شود نه
+  // از UI، پس همین‌جا هم قراردادِ سرور سنجیده می‌شود.
+  ok(before.json?.max === 10, `سقفِ تعداد از سرور می‌آید (${before.json?.max})`);
+  const CAP = Number(before.json?.max) || 10;
+  ok(typeof before.json?.updatedAt === 'string' && before.json.updatedAt.length > 10,
+    'سرور مُهرِ زمانیِ فهرست را می‌دهد (گاردِ تبِ کهنه)');
   const original = before.json?.missions || [];
 
   // ── سه ماموریت: دو فعال، یکی خاموش ───────────────────────────────────────
@@ -141,12 +147,31 @@ async function call(path, { method = 'GET', body, token } = {}) {
   const claimAgain = await call(`/api/missions/custom/${newIdA}/claim`, { method: 'POST', token: user });
   ok(claimAgain.json?.ok === true && claimAgain.json?.reward === 30, 'و امتیازِ دورهٔ تازه را می‌گیرد');
 
-  // ── سقف ─────────────────────────────────────────────────────────────────
+  // ── سقف: دقیقاً ۱۰ تا قبول، ۱۱ تا رد ───────────────────────────────────
+  const fill = n => Array.from({ length: n }, (_, i) => ({ enabled: true, title: `م${i}`, points: 1 }));
+  const atCap = await call('/api/admin/custom-mission', {
+    method: 'PUT', token: admin, body: { items: fill(CAP) },
+  });
+  ok(atCap.status === 200 && (atCap.json?.missions || []).length === CAP,
+    `${CAP} ماموریت با هم ذخیره می‌شود (سقفِ کامل)`);
+
   const tooMany = await call('/api/admin/custom-mission', {
-    method: 'PUT', token: admin,
-    body: { items: Array.from({ length: 6 }, (_, i) => ({ enabled: true, title: `م${i}`, points: 1 })) },
+    method: 'PUT', token: admin, body: { items: fill(CAP + 1) },
   });
   ok(tooMany.status === 400, `بیش از سقف رد می‌شود (${tooMany.status})`);
+
+  // ── گاردِ «فهرستِ کهنه»: ذخیرهٔ یک تبِ قدیمی نباید کارِ پنلِ دیگر را پاک کند
+  const fresh = await call('/api/admin/custom-mission', { token: admin });
+  const staleSave = await call('/api/admin/custom-mission', {
+    method: 'PUT', token: admin,
+    body: { items: [{ enabled: true, title: 'تبِ قدیمی', points: 1 }],
+      ifUnchangedSince: '2020-01-01T00:00:00.000Z' },
+  });
+  ok(staleSave.status === 409, `ذخیره با مُهرِ قدیمی ۴۰۹ می‌گیرد (${staleSave.status})`);
+  const stillTen = await call('/api/admin/custom-mission', { token: admin });
+  ok((stillTen.json?.missions || []).length === CAP,
+    'فهرستِ سرور دست‌نخورده ماند (کارِ پنلِ دیگر پاک نشد)');
+  ok(stillTen.json?.updatedAt === fresh.json?.updatedAt, 'مُهرِ فهرست هم عوض نشد');
 
   // ── آمارِ پنل ───────────────────────────────────────────────────────────
   const after = await call('/api/admin/custom-mission', { token: admin });
