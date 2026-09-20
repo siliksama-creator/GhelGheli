@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
- * راهنمای اسکرول — آینهٔ mobile/lib/widgets/scroll_hint.dart
- * FIX FUNDAMENTAL v2: حذف MutationObserver سنگین روی کل document.body که هر تغییر
- * در لیگ/چت باعث اندازه‌گیری و رندروم می‌شد و "فنر" ایجاد می‌کرد.
- * حالا فقط ResizeObserver روی خودِ محتوا + window resize/scroll
+ * راهنمای اسکرول تعاملی و حرفه‌ای — آینهٔ mobile/lib/widgets/scroll_hint.dart
+ * کلیک‌پذیر با اسکرول نرم، انیمیشن چورون، ظاهر گلس‌مورفیسم تیره، و بهینه‌سازی رندر
  */
 export function ScrollHint({
   children,
@@ -68,21 +66,33 @@ export function ScrollHint({
     });
   }, [resolveEl, target]);
 
+  const handleScrollDown = useCallback((e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const el = resolveEl();
+    if (!el || target === 'window') {
+      window.scrollBy({ top: 380, behavior: 'smooth' });
+    } else {
+      el.scrollBy({ top: 380, behavior: 'smooth' });
+    }
+  }, [resolveEl, target]);
+
   useEffect(() => {
     const el = resolveEl();
     const onScroll = () => {
-      if (!touchedRef.current) {
-        const st = target === 'window' || !el
-          ? (window.scrollY || document.documentElement.scrollTop || 0)
-          : el.scrollTop;
-        if (st > 8) touchedRef.current = true;
+      const st = target === 'window' || !el
+        ? (window.scrollY || document.documentElement.scrollTop || 0)
+        : el.scrollTop;
+      if (st > 30) {
+        touchedRef.current = true;
       }
       measure();
     };
     const onResize = () => measure();
 
     measure();
-    // فقط دو بار بعد از لود اولیه اندازه بگیر، نه سه بار + MutationObserver سنگین
     const t1 = setTimeout(measure, 300);
     const t2 = setTimeout(measure, 1200);
 
@@ -93,14 +103,13 @@ export function ScrollHint({
       el.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('resize', onResize, { passive: true });
     }
-    // ResizeObserver سبک فقط روی خودِ محتوا، نه کل body
+
     let ro;
     try {
       const targetEl = el || wrapRef.current;
       if (targetEl && typeof ResizeObserver !== 'undefined') {
         ro = new ResizeObserver(() => measure());
         ro.observe(targetEl);
-        // اگر window target است، body را هم observe کن ولی فقط size نه childList
         if (target === 'window' && document.body) {
           ro.observe(document.body);
         }
@@ -117,7 +126,6 @@ export function ScrollHint({
     };
   }, [measure, resolveEl, target]);
 
-  // reset touch when tab/content identity changes via key on parent
   useEffect(() => {
     touchedRef.current = false;
     setState((s) => ({ ...s, touched: false }));
@@ -133,7 +141,6 @@ export function ScrollHint({
       ref={wrapRef}
       className={`scrollHintRoot ${className}`.trim()}
       data-scrollable={state.scrollable ? '1' : '0'}
-      style={{ contain: 'layout' }}
     >
       {children}
       {state.scrollable && !state.atBottom && (
@@ -162,10 +169,20 @@ export function ScrollHint({
         <div
           className="scrollHintPill"
           style={{ bottom: 14 + padBottom }}
-          aria-hidden="true"
+          onClick={handleScrollDown}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleScrollDown(e); }}
+          aria-label="اسکرول به ادامه مطالب"
+          title="مشاهده ادامه محتوا"
         >
-          <span>{label.length > 18 ? 'ادامه پایین‌تر' : label}</span>
-          <b>↓↓</b>
+          <span className="scrollHintDot" aria-hidden="true" />
+          <span className="scrollHintText">{label.length > 20 ? 'ادامه پایین‌تر' : label}</span>
+          <span className="scrollHintChevron" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </span>
         </div>
       )}
     </div>

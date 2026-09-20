@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-/** راهنمای اسکرول برای پنل ادمین — همان قرارداد userweb/Flutter. */
+/** راهنمای اسکرول تعاملی برای پنل ادمین — همان قرارداد userweb/Flutter. */
 export function ScrollHint({
   children,
   label = 'پایین‌تر هم هست',
@@ -42,9 +42,7 @@ export function ScrollHint({
       clientH = window.innerHeight || 1;
       scrollH = Math.max(doc.scrollHeight, document.body?.scrollHeight || 0);
     } else {
-      // re-check if still scrollable; maybe content-area is the one
       if (el.scrollHeight <= el.clientHeight + 8) {
-        // try content-area
         const ca = root.closest('.content-area') || root.closest('.main-area');
         if (ca && ca.scrollHeight > ca.clientHeight + 8) {
           el = ca; scrollParentRef.current = ca;
@@ -71,6 +69,19 @@ export function ScrollHint({
       return { scrollable, fraction, viewport, atBottom, touched };
     });
   }, [findScrollParent]);
+
+  const handleScrollDown = useCallback((e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const el = scrollParentRef.current;
+    if (!el) {
+      window.scrollBy({ top: 380, behavior: 'smooth' });
+    } else {
+      el.scrollBy({ top: 380, behavior: 'smooth' });
+    }
+  }, []);
 
   useEffect(() => {
     touchedRef.current = false;
@@ -124,9 +135,23 @@ export function ScrollHint({
         </div>
       )}
       {pill && (
-        <div className="scrollHintPill" style={{ bottom: 16 + padBottom }} aria-hidden>
-          <span>{label}</span>
-          <b>↓↓</b>
+        <div
+          className="scrollHintPill"
+          style={{ bottom: 16 + padBottom }}
+          onClick={handleScrollDown}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleScrollDown(e); }}
+          aria-label="اسکرول به ادامه مطالب"
+          title="مشاهده ادامه محتوا"
+        >
+          <span className="scrollHintDot" aria-hidden="true" />
+          <span className="scrollHintText">{label}</span>
+          <span className="scrollHintChevron" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </span>
         </div>
       )}
     </div>
