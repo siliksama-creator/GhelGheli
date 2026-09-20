@@ -24,6 +24,7 @@
  *   node tool/typography.mjs <baseUrl> <jwt>
  */
 import { chromium } from 'playwright';
+import { installApiStub, isLocalBase } from './api-stub.mjs';
 
 const BASE = process.argv[2] || 'http://localhost:4173';
 const TOKEN = process.argv[3] || '';
@@ -45,15 +46,10 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 430, height: 950 } });
 const errors = [];
 
-if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(BASE)) {
-  await page.route('https://api.ghelghelishop.ir/**', async route => {
-    try {
-      await route.fulfill({ response: await route.fetch({ timeout: 5000 }) });
-    } catch {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
-    }
-  });
-}
+// روی پیش‌نمایشِ لوکال، درخواست‌های APIِ تولیدی در همان مرورگر استاب می‌شوند
+// (توضیحِ کاملِ چرایی: tool/api-stub.mjs). روی دامنهٔ زنده هیچ مسیری نصب
+// نمی‌شود و تست واقعاً با APIِ تولید حرف می‌زند.
+if (isLocalBase(BASE)) await installApiStub(page);
 
 async function openTab(id) {
   if (DIRECT[id]) {
@@ -65,14 +61,12 @@ async function openTab(id) {
   await page.waitForTimeout(900);
 }
 page.on('pageerror', e => errors.push(String(e)));
-page.on('console', m => {
-  if (m.type() === 'error') {
-    const text = m.text();
-    if (!text.includes('ERR_FAILED') && !text.includes('Failed to load resource')) {
-      errors.push(text);
-    }
-  }
-});
+// دوباره سخت‌گیر: هر خطای کنسول می‌شکند. یک دور اینجا خطاها را با «شاملِ
+// ERR_FAILED بودن» فیلتر می‌کردیم تا صدای درخواستِ مسدودشدهٔ APIِ تولیدی
+// خاموش شود؛ ولی آن فیلتر خطای واقعیِ شبکه در اپِ خودمان را هم قربانی
+// می‌کرد. حالا منبعِ آن نویز (درخواستِ بیرونی) خودش استاب شده، پس دلیلی
+// برای کورکردنِ این شنونده نمی‌ماند.
+page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 
 /** Walks the DOM and reports every typography violation on screen. */
 const audit = () => page.evaluate(([maxW, minPx]) => {
@@ -186,6 +180,9 @@ try {
   try {
     await page.goto(BASE, { waitUntil: 'networkidle', timeout: 15000 });
   } catch {
+    // روی رانرهای کند، «شبکهٔ بی‌کار» ممکن است دیر برسد؛ این‌جا به 'load'
+    // بسنده می‌کنیم و صبر می‌کنیم؛ سنجش‌های بعدی همه روی DOMِ آمادهٔ همان
+    // صفحه اجرا می‌شوند و اگر صفحه خالی/شکسته باشد، پایین‌تر قرمز می‌شود.
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 15000 });
   }
   await page.evaluate(() => document.fonts.ready);

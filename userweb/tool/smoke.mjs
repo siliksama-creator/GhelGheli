@@ -7,6 +7,7 @@
  * Usage: node tool/smoke.mjs <baseUrl> <jwt>
  */
 import { chromium } from 'playwright';
+import { installApiStub, isLocalBase } from './api-stub.mjs';
 
 const BASE = process.argv[2] || 'http://localhost:4173';
 const TOKEN = process.argv[3] || '';
@@ -34,29 +35,19 @@ const page = await browser.newPage();
 const pageErrors = [];
 
 // Local preview talks to the production API by design, whose CORS allow-list
-// correctly rejects localhost. Playwright relays those requests from Node so
-// we can runtime-test an authenticated local build without weakening CORS or
-// deploying unverified code. This only proxies requests initiated by the page.
-if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(BASE)) {
-  await page.route('https://api.ghelghelishop.ir/**', async route => {
-    try {
-      const response = await route.fetch({ timeout: 5000 });
-      await route.fulfill({ response });
-    } catch {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
-    }
-  });
-}
+// correctly rejects localhost — and a CI runner has no guaranteed route to that
+// domain either. Both cases used to leave the page hanging until the 30s
+// `networkidle` window expired and then throw two console errors. The stub
+// answers those requests inside the browser instead of the network, so the page
+// settles immediately and no error is produced at all. Full reasoning:
+// tool/api-stub.mjs.
+if (isLocalBase(BASE)) await installApiStub(page);
 
 page.on('pageerror', e => pageErrors.push(String(e)));
-page.on('console', m => {
-  if (m.type() === 'error') {
-    const text = m.text();
-    if (!text.includes('ERR_FAILED') && !text.includes('Failed to load resource')) {
-      pageErrors.push(text);
-    }
-  }
-});
+// هر خطای کنسول می‌شکند. فیلترکردنِ پیام‌ها (یک دور همین‌جا بود) علاوه بر
+// نویزِ APIِ تولیدی، خطای واقعیِ شبکه در اپ را هم پنهان می‌کرد. نویز حالا
+// از منبعش قطع شده است (tool/api-stub.mjs)، پس شنونده سخت‌گیر می‌ماند.
+page.on('console', m => { if (m.type() === 'error') pageErrors.push(m.text()); });
 
 /**
  * پوششِ راه‌اندازی («صفحهٔ بارگذاریِ سینمایی») چند لحظه بعد از بالا آمدنِ اپ
