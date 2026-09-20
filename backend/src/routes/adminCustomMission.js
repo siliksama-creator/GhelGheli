@@ -38,6 +38,9 @@ module.exports = function createAdminCustomMissionRoutes(deps) {
       // فهرستِ کامل — همهٔ ماموریت‌ها، خاموش و روشن، با ترتیبی که ادمین
       // چیده. کلیدِ `missions` چیزی است که پنلِ تازه می‌خواند.
       missions: customMission.list(),
+      // مُهرِ زمانیِ فهرست — پنل آن را هنگامِ ذخیره پس می‌فرستد تا ذخیرهٔ
+      // یک تبِ کهنه، فهرستِ تازه را بی‌صدا پاک نکند (خطای ۴۰۹).
+      updatedAt: customMission.listStamp(),
       max: customMission.MAX_ITEMS,
       colors: COLORS,
       // پیش‌نمایشِ دقیقاً همان چیزی که کاربر می‌بیند (برای پنلِ وب).
@@ -70,6 +73,7 @@ module.exports = function createAdminCustomMissionRoutes(deps) {
           ? `${items.length} ماموریت ذخیره شد — ${active} ماموریت فعال از همین لحظه به کاربران نشان داده می‌شود`
           : `${items.length} ماموریت ذخیره شد (هیچ‌کدام فعال نیست و به کاربران نشان داده نمی‌شود)`,
         missions: items,
+        updatedAt: customMission.listStamp(),
         preview: customMission.publicView(),
         stats: await customMission.stats(),
       });
@@ -93,8 +97,9 @@ module.exports = function createAdminCustomMissionRoutes(deps) {
       await audit(req.admin.id, 'reset_custom_mission', 'app_settings', null,
         'دورهٔ تازه برای ماموریت اختصاصی', { id: req.params.id, items });
       res.json({
-        message: 'دورهٔ تازه ساخته شد — از این لحظه همهٔ کاربران می‌توانند امتیازِ این ماموریت را بگیرند',
+        message: 'دوباره به همه فرستاده شد — از این لحظه حتی کاربرانی که این ماموریت را گرفته بودند هم آن را می‌بینند',
         missions: items,
+        updatedAt: customMission.listStamp(),
         preview: customMission.publicView(),
       });
     }));

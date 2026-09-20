@@ -128,12 +128,66 @@ const uuid = () => require('crypto').randomUUID();
     items: [{ enabled: true, title: 'خطرناک', points: 5, link: { url: 'javascript:alert(1)' } }],
   }).then(() => null).catch(e => e);
   ok(badLink && badLink.status === 400, 'لینکِ javascript: رد می‌شود');
+
   ok(customMission.safeLinkUrl('data:text/html,x') === '', 'لینکِ data: رد می‌شود');
   ok(customMission.safeLinkUrl('https://ghelghelishop.ir') !== '', 'لینکِ https قبول است');
 
   const afterBad = customMission.list();
   ok(afterBad.length === 3 && afterBad.every(m => /^[0-9a-f-]{36}$/i.test(m.id)),
     'ذخیرهٔ نامعتبر چیزی را نصفه‌ونیمه عوض نکرد (فهرستِ قبلی سرِ جایش است)');
+
+  // ═══════════════════════════════════════════════════════════════════════
+  console.log('\n== سقفِ ۱۰ و گاردِ «فهرستِ کهنه» (خواستهٔ مالک، ۲۹ شهریور) ==');
+  // ═══════════════════════════════════════════════════════════════════════
+  // مالک: «باید تا ۱۰ تا ماموریت هم اگه بخوام ادد کنم یا حذف کنم یا ویرایش
+  // کنم و یا همون ماموریت رو دوباره به کاربرا بفرستم» + «حتی روی ۲ ماموریت
+  // قرار نمی‌گیره و لیست دوباره برمی‌گرده روی یکی».
+  ok(customMission.MAX_ITEMS === 10, 'سقفِ ماموریت‌های اختصاصی ۱۰ است');
+  ok(/MAX_ITEMS = 10\b/.test(src('src/services/customMission.js')),
+    'سقف یک‌جا تعریف شده (پنل آن را از پاسخِ API می‌خواند)');
+
+  const ten = Array.from({ length: 10 }, (_, i) => ({ enabled: true, title: `م${i + 1}`, points: 1 }));
+  const savedTen = await customMission.saveMany('admin-10', { items: ten });
+  ok(savedTen.length === 10 && customMission.activeItems().length === 10,
+    'ده ماموریت با هم ذخیره و فعال می‌شوند');
+
+  // ── گاردِ فهرستِ کهنه ─────────────────────────────────────────────────
+  const stampedId = uuid();
+  const STAMP = '2026-09-20T09:00:00.000Z';
+  stored = {
+    items: [{ id: stampedId, enabled: true, title: 'روبیکا', points: 500 }],
+    updatedAt: STAMP,
+    updatedBy: 'admin-old',
+  };
+  const staleErr = await customMission.saveMany('admin-new', {
+    items: [{ id: stampedId, enabled: true, title: 'روبیکا', points: 500 },
+      { enabled: true, title: 'اینستاگرام', points: 500 }],
+    ifUnchangedSince: '2026-09-19T00:00:00.000Z',   // تبِ قدیمی
+  }).then(() => null).catch(e => e);
+  ok(staleErr && staleErr.status === 409,
+    'ذخیرهٔ تبِ قدیمی ۴۰۹ می‌گیرد (کارِ پنلِ دیگر پاک نمی‌شود)');
+  ok(customMission.list().length === 1,
+    'با ۴۰۹ هیچ‌چیز نوشته نمی‌شود — فهرست همان یکی می‌ماند');
+
+  const okSave = await customMission.saveMany('admin-new', {
+    items: [{ id: stampedId, enabled: true, title: 'روبیکا', points: 500 },
+      { enabled: true, title: 'اینستاگرام', points: 500 }],
+    ifUnchangedSince: STAMP,                        // همان مُهری که خوانده بود
+  });
+  ok(okSave.length === 2 && customMission.activeItems().length === 2,
+    'با مُهرِ درست، هر دو ماموریت ذخیره می‌شوند (روبیکا + اینستاگرام)');
+
+  const legacySave = await customMission.saveMany('admin-legacy', {
+    items: [{ enabled: true, title: 'کلاینتِ قدیمی', points: 1 }],
+  }).then(r => r).catch(e => e);
+  ok(Array.isArray(legacySave) && legacySave.length === 1,
+    'پنلِ قدیمی که مُهر نمی‌فرستد هم بی‌مشکل ذخیره می‌کند (سازگاری)');
+
+  // ── شناسهٔ فهرست به پنل می‌رود و برمی‌گردد ────────────────────────────
+  ok(typeof customMission.listStamp() === 'string' && customMission.listStamp().length > 10,
+    'سرور مُهرِ زمانیِ فهرست را می‌دهد');
+  ok(/updatedAt: customMission\.listStamp\(\)/.test(src('src/routes/adminCustomMission.js')),
+    'مسیرِ ادمین مُهر را در پاسخ می‌فرستد');
 
   // ═══════════════════════════════════════════════════════════════════════
   console.log('\n== وضعیتِ کاربر: هر ماموریت جداگانه یک‌بار ==');
@@ -292,6 +346,10 @@ const uuid = () => require('crypto').randomUUID();
   const adminPage = fs.readFileSync(path.join(__dirname, '../../admin/src/pages/custom-mission.jsx'), 'utf8');
   ok(/missions/.test(adminPage) && /items:/.test(adminPage),
     'پنل ادمین فهرست را ویرایش و به شکلِ `items` ذخیره می‌کند');
+  ok(/ifUnchangedSince: stamp/.test(adminPage),
+    'پنل مُهرِ فهرست را همراهِ ذخیره می‌فرستد (گاردِ تبِ کهنه)');
+  ok(/custom-mission\/\$\{item\.id\}\/reset/.test(adminPage) && /ارسال دوباره به همه/.test(adminPage),
+    'دکمهٔ «ارسال دوباره به همه» در پنل هست (همان ماموریت، برای همه از نو)');
 
   opsConfig.syncGet = realSyncGet;
   opsConfig.set = realSet;

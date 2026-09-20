@@ -67,6 +67,10 @@ export function CustomMissionPage({ request }) {
   const [resetting, setResetting] = useState('');
   const [items, setItems] = useState([]);
   const [stats, setStats] = useState({});
+  // مُهرِ زمانیِ فهرست روی سرور. هنگامِ ذخیره پس فرستاده می‌شود تا اگر
+  // تب/پنلِ دیگری در این فاصله فهرست را عوض کرده باشد، ذخیرهٔ ما کارِ او را
+  // بی‌صدا پاک نکند (سرور ۴۰۹ می‌دهد و ما پیام روشن نشان می‌دهیم).
+  const [stamp, setStamp] = useState('');
   const [meta, setMeta] = useState({
     colors: ['blue', 'green'], defaultLinkText: 'اینجا کلیک کنید', max: 5, hint: '',
   });
@@ -94,6 +98,7 @@ export function CustomMissionPage({ request }) {
         // برای پنلی که روی نسخهٔ قدیمیِ سرور باز مانده باشد هم کار می‌کند.
         applyMissions(d.missions ?? (d.mission ? [d.mission] : []), colors);
         setStats(d.stats || {});
+        setStamp(d.updatedAt || '');
       })
       .catch((e) => notify(e.message || 'خواندنِ ماموریت‌ها ناموفق بود', 'error'))
       .finally(() => setLoading(false));
@@ -127,18 +132,30 @@ export function CustomMissionPage({ request }) {
     setItems(rows => rows.filter(r => r.key !== key));
   }
 
-  async function rotate(item) {
+  /**
+   * «ارسال دوباره به همه» — همان ماموریت، دورهٔ تازه.
+   *
+   * چرا لازم است: کاربری که امتیازِ یک ماموریت را گرفته، آن کارت را دیگر
+   * نمی‌بیند (خواستهٔ مالک). اگر ادمین بخواهد همان کار را دوباره بخواهد،
+   * نباید متن را از نو بنویسد؛ این دکمه شناسهٔ ماموریت را عوض می‌کند و به
+   * این ترتیب **همه** — از جمله کسانی که قبلاً گرفته‌اند — دوباره می‌بینند.
+   *
+   * ⚠️ ویرایشِ متن این کار را **نمی‌کند**: شناسه دست‌نخورده می‌ماند تا
+   *    اصلاحِ یک غلطِ تایپی، به همه امتیازِ تازه پخش نکند.
+   */
+  async function resend(item) {
     if (item.id && !window.confirm(
-      'دورهٔ تازه: همهٔ کاربران — حتی کسانی که این ماموریت را گرفته‌اند — می‌توانند دوباره امتیاز بگیرند. ادامه؟')) return;
-    if (!item.id) { notify('اول ذخیره کن تا دورهٔ تازه ساخته شود', 'error'); return; }
+      'ارسال دوباره به همه: کاربرانی که این ماموریت را گرفته‌اند هم دوباره آن را می‌بینند و می‌توانند امتیاز بگیرند. ادامه؟')) return;
+    if (!item.id) { notify('اول ذخیره کن تا ارسالِ دوباره ممکن شود', 'error'); return; }
     setResetting(item.key);
     try {
       const r = await request(`/api/admin/custom-mission/${item.id}/reset`, { method: 'POST' });
       notify(r.message, 'success');
       if (r.missions) applyMissions(r.missions, meta.colors);
       if (r.stats) setStats(r.stats);
+      if (r.updatedAt) setStamp(r.updatedAt);
     } catch (e) {
-      notify(e.message || 'ساختِ دورهٔ تازه ناموفق بود', 'error');
+      notify(e.message || 'ارسالِ دوباره ناموفق بود', 'error');
     } finally {
       setResetting('');
     }
@@ -151,6 +168,7 @@ export function CustomMissionPage({ request }) {
       const r = await request('/api/admin/custom-mission', {
         method: 'PUT',
         body: {
+          ifUnchangedSince: stamp || undefined,
           items: items.map(m => ({
             id: m.id || undefined,
             enabled: m.enabled,
@@ -164,8 +182,19 @@ export function CustomMissionPage({ request }) {
       notify(r.message, 'success');
       if (r.missions) applyMissions(r.missions, meta.colors);
       if (r.stats) setStats(r.stats);
+      if (r.updatedAt) setStamp(r.updatedAt);
     } catch (e) {
       notify(e.message || 'ذخیره ناموفق بود', 'error');
+      // ۴۰۹ یعنی «فهرستِ سرور عوض شده». ویرایش‌های همین صفحه دست‌نخورده
+      // می‌ماند (ادمین نباید کارِ نوشته‌اش را از دست بدهد) ولی مُهر تازه
+      // می‌شود تا ذخیرهٔ بعدی — با آگاهیِ او — کار کند.
+      if (e?.status === 409) {
+        try {
+          const fresh = await request('/api/admin/custom-mission');
+          if (fresh.updatedAt) setStamp(fresh.updatedAt);
+          if (fresh.stats) setStats(fresh.stats);
+        } catch { /* اگر نخواند، همان پیامِ خطا برای ادمین کافی است */ }
+      }
     } finally {
       setBusy(false);
     }
@@ -205,8 +234,8 @@ export function CustomMissionPage({ request }) {
           <p style={{ color: 'var(--gg-muted)', fontSize: 13, lineHeight: 1.9 }}>
             ترتیبِ زیر، همان ترتیبی است که کاربر می‌بیند. حداکثر {meta.max} ماموریت؛
             هر کاربر برای هر ماموریت <b>یک‌بار</b> امتیاز می‌گیرد و بعد آن کارت
-            برای او پنهان می‌شود (تا ماموریتِ تازه‌ای بگذاری). اگر کمپینِ دوباره
-            با همان متن می‌خواهی، «دورهٔ تازه» را بزن.
+            برای او پنهان می‌شود. <b>ویرایشِ متن</b> کارت را برای کسانی که گرفته‌اند
+            برنمی‌گرداند؛ فقط <b>«ارسال دوباره به همه»</b> این کار را می‌کند.
           </p>
         )}
       </Card>
@@ -233,7 +262,8 @@ export function CustomMissionPage({ request }) {
                 <Button variant="ghost" icon={ArrowDown} onClick={() => move(index, 1)}
                   disabled={index === items.length - 1} title="یک پله پایین" />
                 <Button variant="secondary" icon={RotateCcw} loading={resetting === item.key}
-                  onClick={() => rotate(item)}>دورهٔ تازه</Button>
+                  onClick={() => resend(item)}
+                  title="کاربرانی که این ماموریت را گرفته‌اند هم دوباره آن را می‌بینند">ارسال دوباره به همه</Button>
                 <Button variant="danger" icon={Trash2} onClick={() => removeItem(item.key)}>حذف</Button>
               </div>
             )}
