@@ -5,6 +5,8 @@ import { req, fa } from '../lib/api.js';
 import { useAsync } from '../lib/useAsync.js';
 import { AsyncSection } from '../components/states.jsx';
 import { AssetIcon, SvgIcon, UiIcon } from '../components/IconAsset.jsx';
+import { rewardMoment } from '../lib/rewardMoment.js';
+import { text } from '../lib/liveConfig.js';
 
 function xpPills(d) {
   const sources = Array.isArray(d?.sources) ? d.sources : [];
@@ -82,7 +84,21 @@ export default function Pass({ token, setMsg, openShop }) {
     setBusy(true);
     try {
       const r = await req(`/api/pass/claim/${tierId}`, 'POST', {}, token);
-      setMsg?.(r.message || 'جایزه گرفتی!');
+      // ⚠️ پیامِ گوشه‌ایِ «جایزه دریافت شد» حذف شد: کارتِ پله خودش
+      // «دریافت‌شده» می‌شود و رسید روی «لحظهٔ جایزه» می‌آید (خواستهٔ مالک).
+      // ── لحظهٔ جایزهٔ گذر نبرد ──
+      // `granted` از سرور می‌آید: {kind, amount, label}. نگاشتِ kind به
+      // چیپِ درست همین‌جاست تا «۱۰۰ سکه» به‌اشتباه «۱۰۰ امتیاز» نشان داده
+      // نشود — باگی که در پنل‌های مشابه زیاد اتفاق می‌افتد.
+      const g = r.granted || {};
+      rewardMoment({
+        source: 'pass',
+        points: g.kind === 'points' ? Number(g.amount || 0) : 0,
+        coins: g.kind === 'coins' ? Number(g.amount || 0) : 0,
+        xp: g.kind === 'xp' ? Number(g.amount || 0) : 0,
+        item: ['item', 'shop', 'cosmetic', 'frame', 'avatar'].includes(g.kind) ? (g.label || 'آیتم') : '',
+        note: g.label && !['points', 'coins', 'xp'].includes(g.kind) ? g.label : '',
+      });
       st.reload();
     } catch (e) { setMsg?.(e.message || 'دریافت جایزه ناموفق بود'); }
     finally { setBusy(false); }
@@ -92,7 +108,11 @@ export default function Pass({ token, setMsg, openShop }) {
     setBusy(true);
     try {
       const r = await req('/api/pass/claim-all', 'POST', {}, token);
-      setMsg?.(r.message || 'جوایز دریافت شد');
+      // «دریافت همه» یک لحظهٔ واحد است، نه ۲۰ کارتِ پشت‌سرهم: تعدادِ
+      // جوایز را نشان می‌دهد (نه جمعِ مبهمِ ریالی که کاربر نمی‌داند از کجاست).
+      if (Number(r.claimed) > 0) {
+        rewardMoment({ source: 'pass', note: text('reward.passAll', `${fa(r.claimed)} جایزهٔ گذر نبرد`, { count: r.claimed }) });
+      }
       st.reload();
     } catch (e) { setMsg?.(e.message || 'ناموفق'); }
     finally { setBusy(false); }

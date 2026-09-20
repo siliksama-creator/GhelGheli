@@ -814,6 +814,27 @@ class GameSession extends ChangeNotifier {
 
   /// Result line shown when the game ends.
   String get resultText {
+    // ── جفت‌یاب: لحنِ نرم ──
+    // خواستهٔ مالک: «زمانی که بازی رو می‌بازه نمی‌دونم چطوری باید بگم که
+    // اعصابش خورد نشه.» جفت‌یاب از سیستمِ یکپارچهٔ «لحظهٔ جایزه» رد می‌شود
+    // که هیچ‌جا کلمهٔ «باخت» ندارد؛ این متن در دکمهٔ اشتراک‌گذاری هم
+    // استفاده می‌شود، پس همان لحن را نگه می‌دارد.
+    // ⚠️ دوئل کارت و ضربات پنالتی عمداً دست‌نخورده‌اند: صحنهٔ نتیجهٔ خودشان
+    //    خواستهٔ صریحِ دورِ ۳۳ مالک بود (exempt).
+    if (gameId == 'memory') {
+      if (finishReason == 'disconnect') {
+        return iWon ? 'حریف بازی را ترک کرد' : 'اتصال قطع شد';
+      }
+      switch (winner) {
+        case 'DRAW':
+          return 'پایاپای';
+        case null:
+          return 'پایان بازی';
+        default:
+          if (mySymbol == null) return 'برنده: $winner';
+          return winner == mySymbol ? 'بردِ تو' : 'این دور تمام شد';
+      }
+    }
     if (finishReason == 'disconnect') {
       return iWon
           ? 'حریف بازی را ترک کرد؛ برد برای تو ثبت شد'

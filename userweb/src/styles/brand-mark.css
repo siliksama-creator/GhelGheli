@@ -4129,65 +4129,12 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   border: 1px solid rgba(255,209,102,.25);
 }
 .tapCoinGuide b { color: #FFD166; font-weight: 900; }
-.tapCoinToast {
-  position: relative; z-index: 6;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  margin: 4px 0 8px; padding: 8px 14px;
-  border-radius: 99px; font-size: 14px;
-  color: #1A1205; background: linear-gradient(135deg, #FFD166, #F59E0B);
-  box-shadow: 0 8px 24px rgba(255,209,102,.35);
-  animation: tapCoinPop .45s cubic-bezier(.2,.8,.2,1.2);
-}
-.tapCoinToast b { font-weight: 900; }
-.tapCoinToast span { font-size: 11.5px; opacity: .8; font-weight: 700; }
 
-/* ── جشنِ سکهٔ لول‌آپ (دورِ ۳۳) ─────────────────────────────────────────
-   خواستهٔ مالک: «+۵ سکه با انیمیشنی جذاب». سه لایه: سکهٔ SVG که مثل سکهٔ
-   واقعی می‌چرخد (rotateY) و می‌درخشد، هشت جرقه که به طرفین پرتاب می‌شوند،
-   و عددِ «+N» که با پاپ بالا می‌آید. همه با CSS — بدون ایموجی. */
-.tapCoinBurst {
-  position: relative; z-index: 6;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  margin: 6px auto 10px; padding: 12px 26px 10px;
-  border-radius: 18px;
-  background: linear-gradient(160deg, rgba(255,209,102,.16), rgba(245,158,11,.10));
-  border: 1px solid rgba(255,209,102,.45);
-  box-shadow: 0 10px 30px rgba(255,180,40,.22), inset 0 1px 0 rgba(255,255,255,.14);
-  animation: tapCoinBurstIn .5s cubic-bezier(.18,1.4,.4,1) both;
-}
-.tapCoinBurst .tapCoinRing {
-  display: flex; animation: tapCoinSpinY 1.15s cubic-bezier(.3,.7,.3,1) both;
-  filter: drop-shadow(0 4px 10px rgba(255,190,60,.55));
-}
-.tapCoinBurst .tapCoinNum {
-  font-size: 19px; font-weight: 900; color: #FFD166;
-  text-shadow: 0 2px 12px rgba(255,200,60,.45);
-  animation: tapCoinNumPop .55s cubic-bezier(.2,1.6,.4,1) .12s both;
-}
-.tapCoinBurst .tapCoinWallet { font-size: 11.5px; font-weight: 700; color: #EAD9A8; opacity: .9; }
-.tapCoinBurst .tapCoinSpark {
-  position: absolute; left: 50%; top: 46%; width: 5px; height: 5px; border-radius: 50%;
-  background: radial-gradient(circle, #FFE9AD 0%, #FFC53D 60%, transparent 75%);
-  animation: tapCoinSparkFly .8s cubic-bezier(.15,.75,.4,1) .06s both;
-}
-@keyframes tapCoinBurstIn {
-  from { transform: scale(.55) translateY(14px); opacity: 0; }
-  60%  { transform: scale(1.06); }
-  to   { transform: scale(1) translateY(0); opacity: 1; }
-}
-@keyframes tapCoinSpinY {
-  from { transform: rotateY(-100deg) scale(.5); opacity: 0; }
-  55%  { transform: rotateY(18deg) scale(1.12); opacity: 1; }
-  to   { transform: rotateY(0) scale(1); }
-}
-@keyframes tapCoinNumPop {
-  from { transform: scale(.4); opacity: 0; }
-  to   { transform: scale(1); opacity: 1; }
-}
-@keyframes tapCoinSparkFly {
-  from { transform: rotate(calc(var(--i) * 45deg)) translateX(6px) scale(1); opacity: 1; }
-  to   { transform: rotate(calc(var(--i) * 45deg)) translateX(64px) scale(.1); opacity: 0; }
-}
+/* ── کارت‌های سکهٔ میانِ بازی حذف شدند (۲۹ شهریور) ────────────────────
+   خواستهٔ مالک: «دریافتی‌های ضربه‌زن فقط آخرِ بازی نشون داده بشن.»
+   `.tapCoinToast` و `.tapCoinBurst` و keyframeهایشان رفتند و جایش
+   «لحظهٔ جایزه»ی پایانِ بازی (`.momentCard`) نشسته تا در وب و اندروید
+   یک سبک باشد. بازخوردِ میانِ بازی (پاپ و «+۱»های شناور) سرِ جایش است. */
 
 /* ── صفحهٔ «بازی تمام شد» (دورِ ۳۳) ── */
 .tapFinished { gap: 10px; }
@@ -4211,7 +4158,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   min-width: 118px; padding: 10px 14px; border-radius: 14px;
   background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
-  animation: tapCoinBurstIn .5s cubic-bezier(.18,1.4,.4,1) .18s both;
+  animation: tapStatIn .5s cubic-bezier(.18,1.4,.4,1) .18s both;
 }
 .tapFinishStat b { font-size: 21px; font-weight: 900; color: #A3E635; }
 .tapFinishStat--coin b { color: #FFD166; }
@@ -4223,16 +4170,30 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   background: rgba(148,163,184,.1); border: 1px solid rgba(148,163,184,.28);
   color: #C7D5E4; font-size: 12.5px; font-weight: 700;
 }
-@keyframes tapCoinPop {
-  from { transform: scale(.6); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+/* آینهٔ همان پاپی که قبلاً `tapCoinBurstIn` می‌داد — با نامی که به کارتِ
+   سکهٔ حذف‌شده اشاره نکند. */
+@keyframes tapStatIn {
+  from { transform: scale(.55) translateY(14px); opacity: 0; }
+  60%  { transform: scale(1.06); }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
 }
 
 /* ═══ جشنِ بزرگِ برندهٔ پایانِ مسابقه (دورِ ۳۳) ═══
    خواستهٔ مالک: برنده باید «بزرگ و زیبا و جذاب» مشخص شود. صحنهٔ تمام‌صفحهٔ
    بازی با هالهٔ رنگیِ نتیجه، آیکونِ درشت، تیترِ بزرگ و خطِ نتیجه. */
-.winStage {
-  position: relative; overflow: hidden;
+/* ── پنلِ نتیجهٔ جفت‌یاب (۲۹ شهریور) ─────────────────────────────────────
+   جشنِ «تو برنده شدی/حریف برنده شد» از جفت‌یاب برداشته شد و جایش لحظهٔ
+   جایزه نشست؛ ولی خودِ نتیجه و دکمه‌های ادامهٔ کار باید سرِ جایشان بمانند —
+   نه کاغذرنگی، نه تیترِ جشن، فقط یک کارتِ آرام با امتیازِ دو طرف. */
+.memoryResultPanel {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  padding: 22px 6px 6px; margin-top: 8px;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(148,163,184,.10), rgba(7,21,34,.86));
+  border: 1px solid rgba(148,163,184,.28);
+  animation: winStageIn .45s cubic-bezier(.2,1.3,.4,1) both;
+}
+.winStage {  position: relative; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
   padding: 42px 18px 26px; margin-top: 10px;
   border-radius: 22px;
@@ -4480,95 +4441,113 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   جشنِ کوچکِ «دریافت شد» (۳۱ شهریور)
+   لحظهٔ جایزه — تنها سبکِ نمایشِ جایزه/نتیجه در وب (۲۹ شهریور)
    ───────────────────────────────────────────────────────────────────────────
-   خواستهٔ مالک: «کاربر باید جلوی چشمش ببیند که جایزه را گرفت — بدونِ
-   ایموجی، و یکپارچه در وب و اندروید». پیش از این پیام در `.toast` بالای
-   صفحه می‌نشست و کاربرِ درحالِ‌اسکرول هرگز نمی‌دیدش.
+   خواستهٔ مالک: «هر وقت کاربر امتیاز/سکه/هدیه/آیتمی به دست می‌آورد، دیگه یه
+   گوشه ننویسه "شما ۱۰۰۰ امتیاز دریافت کردید" یا "شما باختید"؛ به‌جاش یه
+   سیستمِ خوشگلِ انیمیشنیِ جذاب، یکپارچه در وب و اندروید، که یه لحظه اون
+   چیزی که به دست آورده رو نشون بده و بعد چند ثانیه بره.»
 
-   چرا `position: fixed` و نه استیکی/داخلِ جریانِ صفحه: این لایه باید به
-   اسکرول و به صفحهٔ جاری کار نداشته باشد. `pointer-events:none` هم لازم
-   است وگرنه دکمهٔ «دریافت» بعدی زیرش گیر می‌کند.
+   ⚠️ این بلوک **جانشین** سبکِ قبلی (`.rewardBurst*`) است؛ آن حذف شد تا
+   دو سبکِ موازی در محصول نماند — همان «یک سبکِ یکپارچه و هماهنگ» که مالک
+   خواست. آینهٔ اندروید: `mobile/lib/widgets/reward_moment.dart`.
 
-   آینهٔ اندروید: `mobile/lib/widgets/reward_burst.dart` — همان زمان‌بندی
-   (۲٬۴ ثانیه)، همان چیدمانِ آیکون+عنوان+مقدار، همان رنگ‌ها.
+   سه قاعده‌ای که «بی‌اختلال بودن» را می‌سازند:
+     • `position: fixed` + `inset: 0` ولی با `pointer-events: none` — نه
+       جریانِ صفحه را عوض می‌کند، نه یک کلیک را می‌خورد.
+     • یک کارت در هر لحظه (صف در JS)؛ عرض با `min(...)` تا روی گوشیِ
+       ۳۶۰px هم بیرون نزند (درسِ `.moreSheet`).
+     • خروجِ نرم: کلاسِ `isLeaving` قبل از برداشتن، محو می‌کند — کارت
+       «یک‌دفعه نمی‌پرد».
    ═══════════════════════════════════════════════════════════════════════ */
-.rewardBurstHost {
-  position: fixed;
-  inset-inline: 0;
-  /* کمی بالاتر از مرکز: نوار ناوبریِ پایین و نوار پیشرفتِ بازی‌ها آن‌جا
-     هستند و رویشان می‌افتاد. ۱۸٪ ارتفاع، همان‌جایی است که در اندروید هم
-     نشسته (`Alignment(0, -0.55)`). */
-  top: 18%;
-  z-index: 60;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
+.momentHost{
+  position:fixed;inset:0;z-index:60;
+  display:flex;justify-content:center;align-items:flex-start;
+  /* ۱۸٪ از بالا: بالاتر از نوارِ ناوبریِ پایین و از نوارِ پیشرفتِ بازی‌ها
+     (همان عددی که اندروید با Alignment(0,-0.62) نشسته). */
+  padding-top:max(64px,18vh);
+  pointer-events:none;
 }
-.rewardBurst {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: min(420px, 92vw);
-  padding: 12px 16px 12px 12px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #10322a, #0b2135 60%, #0d2a20);
-  border: 1px solid #b5ef5866;
-  box-shadow: 0 22px 60px #000b, inset 0 1px 0 #ffffff1f;
-  animation: rewardBurstIn 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+.momentCard{
+  position:relative;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:13px;
+  width:min(430px,calc(100% - 26px));padding:14px 16px 14px 14px;border-radius:22px;overflow:hidden;
+  background:linear-gradient(135deg,#0f2f27,#0a2033 58%,#132038);
+  border:1px solid #b5ef5855;
+  box-shadow:0 26px 66px #000000c4,inset 0 1px 0 #ffffff1f;
+  animation:momentIn .52s cubic-bezier(.16,1,.3,1) both;
+  transition:opacity .4s ease,transform .4s cubic-bezier(.4,0,1,1),filter .4s ease;
 }
-.rewardBurst[data-source='wheel'] { border-color: #ffd16677; }
-.rewardBurst[data-source='streak'] { border-color: #38bdf866; }
-.rewardBurstIcon {
-  flex: none;
-  width: 46px; height: 46px;
-  border-radius: 50%;
-  display: grid; place-items: center;
-  background: radial-gradient(circle at 30% 25%, #b5ef58, #00d49a 70%);
-  color: #06220f;
-  box-shadow: 0 0 22px #b5ef5855;
+.momentCard.isLeaving{opacity:0;transform:translateY(-12px) scale(.965);filter:blur(3px)}
+
+/* ── پالتِ هر حالت: برد/جایزه طلایی-زمرد، تساوی آبی، پایانِ دور فولادی ── */
+.momentCard[data-tone='gold']{border-color:#ffd16666;
+  background:linear-gradient(135deg,#2a2410,#0a2033 58%,#0d2a20)}
+.momentCard[data-tone='sky']{border-color:#38bdf866;
+  background:linear-gradient(135deg,#0d2740,#0a2033 60%,#151b3a)}
+.momentCard[data-tone='steel']{border-color:#94a3b844;
+  background:linear-gradient(135deg,#161c26,#0b1520 62%,#141a22);
+  box-shadow:0 22px 54px #000000b0,inset 0 1px 0 #ffffff14}
+
+/* هالهٔ چرخانِ پشتِ نشان — «جشن» را از یک کارتِ ساده جدا می‌کند. */
+.momentHalo{position:absolute;top:-42px;right:-34px;width:150px;height:150px;border-radius:50%;
+  opacity:.5;pointer-events:none;filter:blur(2px)}
+.momentHalo i{display:block;width:100%;height:100%;border-radius:50%;
+  background:conic-gradient(from 0deg,#ffd16600,#ffd166aa,#22e7a600,#38bdf8aa,#ffd16600);
+  animation:momentSpin 4.2s linear infinite}
+.momentCard[data-tone='steel'] .momentHalo{opacity:.22}
+.momentCard[data-tone='steel'] .momentHalo i{background:conic-gradient(from 0deg,#94a3b800,#cbd5e1aa,#94a3b800)}
+
+.momentIcon{flex:none;position:relative;z-index:2;width:50px;height:50px;border-radius:50%;
+  display:grid;place-items:center;color:#06220f;
+  background:radial-gradient(circle at 30% 24%,#b5ef58,#00d49a 72%);
+  box-shadow:0 0 26px #b5ef5855,0 6px 18px #00000055;animation:momentPop .6s .04s cubic-bezier(.2,1.5,.4,1) both}
+.momentCard[data-tone='gold'] .momentIcon{background:radial-gradient(circle at 30% 24%,#ffe9a3,#e0a51d 72%);color:#2a1a00;box-shadow:0 0 26px #ffd16666,0 6px 18px #00000055}
+.momentCard[data-tone='sky'] .momentIcon{background:radial-gradient(circle at 30% 24%,#bfe9ff,#0b8ed0 72%);color:#04202e;box-shadow:0 0 26px #38bdf855,0 6px 18px #00000055}
+.momentCard[data-tone='steel'] .momentIcon{background:radial-gradient(circle at 30% 24%,#e2e8f0,#8fa3b8 74%);color:#0d1620;
+  box-shadow:inset 0 0 0 1px #ffffff33,0 6px 18px #00000055;animation-duration:.42s}
+
+.momentBody{display:grid;gap:2px;min-width:0;position:relative;z-index:2}
+.momentTitle{font-size:15px;font-weight:900;color:#eaf6ff;line-height:1.35}
+.momentSub{font-size:12px;font-weight:800;color:#b5ef58;line-height:1.5}
+.momentCard[data-tone='gold'] .momentSub{color:#ffd166}
+.momentCard[data-tone='sky'] .momentSub{color:#8ed8f8}
+.momentCard[data-tone='steel'] .momentSub{color:#a8b8c8;font-weight:700}
+.momentRow{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.momentChip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;
+  background:#ffffff12;border:1px solid #ffffff26;font-size:12.5px;font-weight:900;color:#fff;
+  font-variant-numeric:tabular-nums}
+.momentNote{font-size:12.5px;font-weight:900;color:#ffd166}
+
+/* درخششِ کشیده روی سطحِ کارت — یک بار، سریع، بی‌تکرار. */
+.momentShine{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:inherit}
+.momentShine::after{content:"";position:absolute;top:-60%;bottom:-60%;width:38%;
+  background:linear-gradient(100deg,transparent,#ffffff2e,transparent);
+  transform:translateX(-140%);animation:momentSweep 1.15s .12s ease-out 1 both}
+.momentCard[data-tone='steel'] .momentShine::after{background:linear-gradient(100deg,transparent,#ffffff1a,transparent)}
+
+/* ذره‌های ریزِ بالا‌رونده — فقط برای جایزه و برد. */
+.momentParticles{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:inherit}
+.momentParticles span{position:absolute;bottom:-6px;left:var(--x);width:5px;height:5px;border-radius:50%;
+  background:var(--c);opacity:0;animation:momentRise 1.5s ease-out calc(var(--i)*.05s + var(--d)) both}
+
+@keyframes momentIn{from{opacity:0;transform:translateY(20px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes momentPop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.14);opacity:1}100%{transform:scale(1)}}
+@keyframes momentSpin{to{transform:rotate(360deg)}}
+@keyframes momentSweep{to{transform:translateX(140%)}}
+@keyframes momentRise{
+  0%{opacity:0;transform:translateY(0) scale(.6)}
+  22%{opacity:.9}
+  100%{opacity:0;transform:translateY(-70px) scale(1.05)}
 }
-.rewardBurstBody { display: grid; gap: 1px; min-width: 0; }
-.rewardBurstBody b { font-size: 14.5px; font-weight: 900; color: #eaf6ff; }
-.rewardBurstState {
-  font-size: 12px; font-weight: 800; color: #b5ef58;
-  letter-spacing: 0;
+/* احترام به «کم‌کردنِ حرکت»: کارت **حذف نمی‌شود** (تنها نشانهٔ «چیزی
+   گرفتم» است) ولی بی‌حرکت و بی‌ذره می‌شود. */
+@media (prefers-reduced-motion: reduce){
+  .momentCard{animation-duration:.01s}
+  .momentHalo i{animation:none}
+  .momentShine,.momentParticles{display:none}
 }
-.rewardBurstRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
-.rewardBurstChip {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px; border-radius: 99px;
-  background: #ffffff12; border: 1px solid #ffffff24;
-  font-size: 12.5px; font-weight: 900; color: #ffffff;
-  font-variant-numeric: tabular-nums;
-}
-.rewardBurstNote {
-  font-size: 12.5px; font-weight: 800; color: #ffd166;
-}
-/* کاغذرنگی: همان الگوی WinnerCelebration، کوچک‌تر و بی‌صدا. */
-.rewardBurstConfetti { position: absolute; inset: -14px 0 0; pointer-events: none; }
-.rewardBurstConfetti span {
-  position: absolute;
-  top: 0; left: calc(6% + (var(--i) * 9.5%));
-  width: 6px; height: 10px;
-  background: var(--c);
-  border-radius: 2px;
-  opacity: 0;
-  animation: rewardBurstFall 1.05s ease-out calc(var(--i) * 0.045s) both;
-}
-@keyframes rewardBurstIn {
-  from { opacity: 0; transform: translateY(-14px) scale(0.92); }
-  to   { opacity: 1; transform: none; }
-}
-@keyframes rewardBurstFall {
-  0%   { opacity: 0; transform: translateY(-6px) rotate(0deg); }
-  18%  { opacity: 1; }
-  100% { opacity: 0; transform: translateY(52px) rotate(200deg); }
-}
-/* احترام به «کم‌کردنِ حرکت»: انیمیشن حذف نمی‌شود، فقط کوتاه — چون این
-   تنها نشانهٔ «چیزی گرفتم» است و نباید ناپدید شود. */
-@media (prefers-reduced-motion: reduce) {
-  .rewardBurst { animation-duration: 0.01s; }
-  .rewardBurstConfetti { display: none; }
+@media (max-width:400px){
+  .momentCard{width:calc(100% - 18px);grid-template-columns:auto 1fr;padding:12px 13px 12px 12px;border-radius:19px}
+  .momentIcon{width:44px;height:44px}
+  .momentTitle{font-size:14px}
 }

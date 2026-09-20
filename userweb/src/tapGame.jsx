@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { req, asset, avatarUrl } from './lib/api.js';
 import { heavyImpact, mediumImpact, selectionClick } from './haptics.js';
 import { SvgIcon } from './components/IconAsset.jsx';
+import { rewardMoment } from './lib/rewardMoment.js';
 // شماره معکوسِ شروعِ لیگ — خواستهٔ مالک: «ضربه‌زن هم تا شروعِ لیگ بسته
 // باشه و شمارش در همون قسمت نمایش داده بشه.» ضربه‌زن منبعِ سکه است.
 import LeagueCountdown, { useLeagueCountdown } from './components/LeagueCountdown.jsx';
@@ -287,8 +288,6 @@ export default function TapGame({ token, onBack, economy }) {
   // ── سکهٔ لول‌آپ جلوی چشمِ کاربر (خواستهٔ مالک) ──
   // وقتی سرور پاسخِ بسته را با coinsEarned برمی‌گرداند، یک نشانِ شناور
   // «+N سکه» چند ثانیه نمایش داده می‌شود.
-  const [coinToast, setCoinToast] = useState(null);
-  const coinToastTimer = useRef(null);
   // ── «بازی تمام شد» (دورِ ۳۳) ──
   // پرچم و جمعِ واقعی از سرور می‌آیند؛ تا ادمین ریست نکند بازیکن می‌ماند.
   const [srvFinished, setSrvFinished] = useState(false);
@@ -367,7 +366,6 @@ export default function TapGame({ token, onBack, economy }) {
   useEffect(() => () => {
     for (const id of timers.current) clearTimeout(id);
     timers.current.clear();
-    clearTimeout(coinToastTimer.current);
   }, []);
 
   const level = progress.level;
@@ -503,16 +501,6 @@ export default function TapGame({ token, onBack, economy }) {
       }
       if (typeof res?.pointsAwarded === 'number' && !res.finished) {
         setPointsTotalFromSrv(res.pointsAwarded);
-      }
-      // ── سکهٔ لول‌آپ: «+۵ سکه» جلوی چشمِ کاربر ──
-      if (res && Number(res.coinsEarned) > 0) {
-        setCoinToast({
-          coins: Number(res.coinsEarned),
-          total: Number(res.coinsTotal ?? 0),
-          at: Date.now(),
-        });
-        clearTimeout(coinToastTimer.current);
-        coinToastTimer.current = setTimeout(() => setCoinToast(null), 3000);
       }
       // The server is authoritative: adopt its numbers when they differ.
       if (res && typeof res.level === 'number') {
@@ -781,6 +769,29 @@ export default function TapGame({ token, onBack, economy }) {
     });
   }, [isComplete, capped, notice, clock, flush, later]);
 
+  // ── لحظهٔ جایزهٔ «ضربه‌زن تمام شد» ──────────────────────────────────────
+  //
+  // خواستهٔ مالک: «دریافتی‌های ضربه‌زن فقط آخرِ بازی نشون داده بشن.» پس
+  // همان جمعِ صفحهٔ پایان (که از سرور می‌آید) یک بار در «لحظهٔ جایزه»
+  // جشن گرفته می‌شود.
+  //
+  // ⚠️ بازیکنی که از قبل بازی را تمام کرده، با هر بار بازِ‌کردنِ صفحه جشن
+  // نمی‌گیرد: مقدارِ اولیهٔ `finishedRef` همان وضعیتِ ورود است، پس فقط
+  // **گذارِ** «در حال بازی → تمام شد» لحظه می‌سازد.
+  const finishedRef = useRef(isComplete);
+  useEffect(() => {
+    if (!isComplete || finishedRef.current) {
+      if (isComplete) finishedRef.current = true;
+      return;
+    }
+    finishedRef.current = true;
+    rewardMoment({
+      source: 'tap',
+      points: Number(pointsTotalFromSrv ?? points ?? 0),
+      coins: Number(coinsTotalFromSrv ?? 0),
+    });
+  }, [isComplete, points, pointsTotalFromSrv, coinsTotalFromSrv]);
+
   const nearLimit = rate >= CFG.maxTapsPerSecond - 2;
 
   // رتبه‌بندی inline — top-10 + رتبهٔ واقعی خودت اگر خارج ۱۰.
@@ -846,35 +857,13 @@ export default function TapGame({ token, onBack, economy }) {
         </div>
       </div>
 
-      {coinToast && (
-        // ── جشنِ سکهٔ لول‌آپ (دورِ ۳۳) ──
-        // خواستهٔ مالک: «۵ سکهٔ دریافتی بصورت انیمیشنی جذاب نمایش داده
-        // بشه». سه لایه: سکهٔ SVG با چرخشِ سه‌بعدی و پرتو، ذراتِ
-        // جرقه، و شمارندهٔ «+N» با پاپ. بدونِ ایموجی — همه SVG/CSS.
-        <div className="tapCoinBurst" role="status" aria-live="polite">
-          <span className="tapCoinRing" aria-hidden="true">
-            <svg viewBox="0 0 40 40" width="46" height="46">
-              <defs>
-                <linearGradient id="tcg" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#FFE38A" />
-                  <stop offset=".5" stopColor="#FFC53D" />
-                  <stop offset="1" stopColor="#E59A1F" />
-                </linearGradient>
-              </defs>
-              <circle cx="20" cy="20" r="17" fill="url(#tcg)" />
-              <circle cx="20" cy="20" r="17" fill="none" stroke="#B9770E" strokeWidth="2" />
-              <circle cx="20" cy="20" r="12.5" fill="none" stroke="#B9770E" strokeWidth="1.4" opacity=".55" />
-              <path d="M20 12.5v15M15.8 15.2h5.1a2.6 2.6 0 0 1 0 5.2h-5.1h6a2.6 2.6 0 0 1 0 5.2h-5.1"
-                fill="none" stroke="#8C5E0B" strokeWidth="2.1" strokeLinecap="round" />
-            </svg>
-          </span>
-          {Array.from({ length: 8 }, (_, i) => (
-            <span key={i} className="tapCoinSpark" style={{ '--i': i }} aria-hidden="true" />
-          ))}
-          <b className="tapCoinNum">+{fa(coinToast.coins)} سکه</b>
-          <span className="tapCoinWallet">موجودی: {fa(coinToast.total)}</span>
-        </div>
-      )}
+      {/* ── چرا دیگر کارتِ سکهٔ میانِ بازی نیست (۲۹ شهریور) ──────────────
+         خواستهٔ مالک: «اینا همه‌شونو بیار توی یه سیستم؛ دریافتی‌های ضربه‌زن
+         فقط آخرِ بازی نشون داده بشن، وسطِ بازی کارت نیاد.» کارتِ «+۵ سکه»ی
+         لول‌آپ حذف شد و جایش «لحظهٔ جایزه»ی جمعِ پایانِ بازی نشست (پایین‌تر
+         با `rewardMoment`). بازخوردِ میانِ بازی حذف نشد: پاپِ شخصیت،
+         «+۱»های شناور، هپتیک و نوارِ پیشرفت سرِ جای‌شان‌اند — آن‌ها حسِ
+         بازی را می‌سازند، ولی دیگر دو سیستمِ نتیجه‌ی موازی نداریم. */}
 
       {notice && <div className="tapNotice">{notice}</div>}
 

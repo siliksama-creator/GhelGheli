@@ -26,7 +26,7 @@ import Home from './screens/Home.jsx';
 import { LoadingView, ErrorView } from './components/states.jsx';
 import SplashScreen, { SPLASH_STAGES, SPLASH_MIN_MS } from './components/SplashScreen.jsx';
 import { UiIcon } from './components/IconAsset.jsx';
-import RewardBurstHost from './components/RewardBurst.jsx';
+import RewardMomentHost from './components/RewardMoment.jsx';
 
 // ── چرا این‌ها تنبل بارگذاری می‌شوند ──────────────────────────────────────
 //
@@ -824,10 +824,10 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
 
       {msg && <div className="toast">{msg}</div>}
 
-      {/* جشنِ دریافت: یک لایهٔ `fixed` بالای همه‌چیز — پس روی بازی‌های
+      {/* لحظهٔ جایزه: یک لایهٔ `fixed` بالای همه‌چیز — پس روی بازی‌های
           تمام‌صفحه هم دیده می‌شود. میزبان این‌جا سوار می‌شود (نه داخلِ
           هر صفحه) تا هیچ مسیرِ جایزه‌ای بدونِ جشن نماند. */}
-      <RewardBurstHost />
+      <RewardMomentHost />
 
       {/* `data-tab` وضعیتِ واقعیِ ناوبری را در DOM آشکار می‌کند.
           ابزارِ ممیزی قبلاً «رسیدن به تب» را از روی امضای متنِ صفحه حدس

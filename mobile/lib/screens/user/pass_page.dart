@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../core/assets.dart';
 import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/reward_moment.dart';
 
 const _freeColor = Color(0xFF38BDF8);
 const _plusGold = Color(0xFFFFD166);
@@ -96,7 +98,34 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
     try {
       final r = await widget.api.post('/api/pass/claim/$tierId', {});
       if (!mounted) return;
-      _toast(r is Map ? '${r['message'] ?? 'جایزه دریافت شد!'}' : 'جایزه دریافت شد!');
+      // ⚠️ پیامِ گوشه‌ایِ «جایزه دریافت شد» حذف شد: کارتِ پله خودش
+      // «دریافت‌شده» می‌شود و رسید روی «لحظهٔ جایزه» می‌آید (خواستهٔ مالک:
+      // «یه گوشه ننویسه … یه لحظه اون چیزی که گرفته رو نشون بده»).
+      // ── لحظهٔ جایزهٔ گذر نبرد ──
+      // `granted` از سرور می‌آید: {kind, amount, label}. نگاشتِ kind به
+      // چیپِ درست همین‌جاست تا «۱۰۰ سکه» به‌اشتباه «۱۰۰ امتیاز» نشان داده
+      // نشود — همان نگاشتی که در وب (`Pass.jsx`) هم هست.
+      final g = r is Map && r['granted'] is Map
+          ? Map<String, dynamic>.from(r['granted'] as Map)
+          : const <String, dynamic>{};
+      final kind = g['kind']?.toString() ?? '';
+      final amount = NumberParser.toInt(g['amount']);
+      RewardMoment.moment(
+        context,
+        RewardMomentData(
+          source: RewardSource.pass,
+          points: kind == 'points' ? amount : 0,
+          coins: kind == 'coins' ? amount : 0,
+          xp: kind == 'xp' ? amount : 0,
+          item: const ['item', 'shop', 'shop_item', 'cosmetic', 'frame', 'avatar']
+                  .contains(kind)
+              ? (g['label']?.toString() ?? 'آیتم')
+              : null,
+          note: g['label'] != null && !const ['points', 'coins', 'xp'].contains(kind)
+              ? g['label'].toString()
+              : null,
+        ),
+      );
       widget.onChanged?.call();
       await _load(jump: false);
     } catch (e) {
@@ -111,7 +140,20 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
     try {
       final r = await widget.api.post('/api/pass/claim-all', {});
       if (!mounted) return;
-      _toast(r is Map ? '${r['message'] ?? 'جوایز دریافت شد'}' : 'جوایز دریافت شد');
+      // «دریافت همه» یک لحظهٔ واحد است، نه ۲۰ کارتِ پشت‌سرهم: تعدادِ جوایز
+      // را نشان می‌دهد (نه جمعِ مبهمی که کاربر نمی‌داند از کجاست).
+      final claimed = NumberParser.toInt(r is Map ? r['claimed'] : null);
+      if (claimed > 0) {
+        RewardMoment.moment(
+          context,
+          RewardMomentData(
+            source: RewardSource.pass,
+            note: AppConfig.instance.text('reward.passAll',
+                '${faNum(claimed)} جایزهٔ گذر نبرد',
+                vars: {'count': claimed}),
+          ),
+        );
+      }
       widget.onChanged?.call();
       await _load(jump: false);
     } catch (e) {

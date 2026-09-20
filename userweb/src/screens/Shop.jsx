@@ -6,6 +6,7 @@ import { text, useLive } from '../lib/liveConfig.js';
 import { AnimatedName, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
 import CardBox from '../components/CardBox.jsx';
+import { rewardMoment } from '../lib/rewardMoment.js';
 
 const KINDS = [
   ['club_badge', 'باشگاه‌ها'],
@@ -155,11 +156,30 @@ export default function Shop({ token, reloadProfile }) {
     if (data && !(data.groups?.[activeKind] || []).length && availableKinds[0]) setActiveKind(availableKinds[0][0]);
   }, [data, activeKind, availableKinds]);
 
-  const act = async (key, request, success) => {
+  /**
+   * هر عملیاتِ خرید/تجهیز از این‌جا می‌گذرد.
+   *
+   * `moment` (اختیاری): اگر بدهید، بعد از موفقیت «لحظهٔ جایزه» هم نشان داده
+   * می‌شود. چرا هر خرید نه: «انتخاب کردنِ» یک قابِ قبلاً خریداری‌شده هیچ
+   * چیزی به کاربر اضافه نمی‌کند و جشن گرفتنش برایش بی‌معنی است؛ ولی خریدِ
+   * یک آیتمِ تازه یک «به دست آوردن» است.
+   *
+   * `success` (اختیاری): پیامِ گوشه‌ای. برای **رسیدِ خرید** دیگر نمی‌فرستیم
+   * (کارتِ لحظه همان حرف را می‌زند و دو روایتِ موازی همان چیزی بود که مالک
+   * شکایت کرد)؛ فقط جایی می‌ماند که حرفِ **اضافه‌ای** دارد — مثل «هدیه‌های
+   * دائمیِ پلاس فعال شد» که وضعیتِ حساب است، نه عددِ جایزه.
+   *
+   * ⚠️ صندوقِ کارت (`CardBox`) از این تابع نمی‌گذرد و عمداً هم نمی‌گذرد:
+   * صحنهٔ باز کردنِ کارت‌ها مالِ خودش است و مالک صریحاً آن را مستثنا کرد.
+   */
+  const act = async (key, request, success, moment) => {
     if (busy) return;
     setBusy(key); setNotice('');
     try {
-      await request(); setNotice(success); await load(); await reloadProfile?.();
+      const result = await request();
+      if (success) setNotice(success);
+      if (moment) rewardMoment({ source: 'shop', ...(typeof moment === 'function' ? moment(result) : moment) });
+      await load(); await reloadProfile?.();
     } catch (e) { setNotice(e.message || 'عملیات انجام نشد'); }
     finally { setBusy(''); }
   };
@@ -204,7 +224,10 @@ export default function Shop({ token, reloadProfile }) {
   const buyPlan = (billingCycle) => act(`plus-${billingCycle}`, async () => {
     const order = await req('/api/shop/plus', 'POST', { billingCycle }, token);
     return purchase(order);
-  }, billingCycle === 'annual' ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد');
+  }, billingCycle === 'annual' ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد',
+  // نامِ پلن از خودِ سرور می‌آید (همان چیزی که روی کارتِ پلن نوشته شده)،
+  // نه یک جملهٔ تازهٔ سفت‌شده در کلاینت.
+  { note: (data?.plans || []).find((pl) => pl.billingCycle === billingCycle)?.label || '' });
 
   const buyItem = (item) => act(`buy-${item.id}`, async () => {
     const order = await req(`/api/shop/items/${item.id}/buy`, 'POST',
@@ -213,7 +236,8 @@ export default function Shop({ token, reloadProfile }) {
     // دوباره پول گرفتن. همین‌جا تمام.
     if (order?.settled) return order;
     return purchase(order);
-  }, `${item.name} به کلکسیونت اضافه شد`);
+  // بدونِ پیامِ گوشه‌ای: نامِ آیتم روی کارتِ لحظه می‌آید.
+  }, null, { item: item.name });
   const equipItem = (item) => act(`equip-${item.id}`,
     () => req('/api/shop/equip', 'POST', { slug: item.slug, kind: item.kind }, token), `${item.name} فعال شد`);
 

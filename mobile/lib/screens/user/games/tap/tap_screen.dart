@@ -23,6 +23,7 @@ import 'tap_engine.dart';
 import 'tap_storage.dart';
 import 'tap_sync.dart';
 import '../../../../core/app_config.dart';
+import '../../../widgets/reward_moment.dart';
 
 class TapGameScreen extends StatefulWidget {
   const TapGameScreen({
@@ -118,11 +119,13 @@ class _TapGameScreenState extends State<TapGameScreen>
   String? _lastSkin;
   String? _lastNotice;
 
-  // ── سکهٔ لول‌آپ جلوی چشمِ کاربر (خواستهٔ مالک) ──
-  int _seenCoinsSerial = 0;
-  int? _coinsToast;
-  int? _coinsTotal;
-  Timer? _coinsToastTimer;
+  // ── یادآوریِ یک‌بارِ لحظهٔ پایان ──
+  //
+  // خواستهٔ مالک (۲۹ شهریور): «دریافتی‌های ضربه‌زن فقط آخرِ بازی نشون داده
+  // بشن، وسطِ بازی کارت نیاد.» نشانِ شناورِ «+N سکه»ی لول‌آپ حذف شد و جایش
+  // «لحظهٔ جایزه»ی جمعِ پایانِ بازی نشست. بازخوردِ میانِ بازی سرِ جایش است
+  // (تپشِ شخصیت، هپتیک، نوارِ پیشرفت) — ولی دیگر دو سیستمِ نتیجه نداریم.
+  bool _finishMomentShown = false;
 
   /// اقتصادِ بازی‌ها از /api/config — سکهٔ هر لول و درصدِ انتقالِ سکه.
   Map<String, dynamic>? _economy;
@@ -186,7 +189,6 @@ class _TapGameScreenState extends State<TapGameScreen>
     // Must be cancelled: a pending rebuild firing after dispose would call
     // setState on a defunct State.
     _rebuildTimer?.cancel();
-    _coinsToastTimer?.cancel();
     _hapticClock.stop();
     _uiTick.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -253,21 +255,23 @@ class _TapGameScreenState extends State<TapGameScreen>
           break;
       }
     }
-    // ── سکهٔ لول‌های تأییدشده: نشانِ شناور «+N سکه» ──
-    if (_engine.coinsEarnedSerial != _seenCoinsSerial) {
-      _seenCoinsSerial = _engine.coinsEarnedSerial;
-      if (_engine.coinsEarnedLastBatch > 0) {
-        setState(() {
-          _coinsToast = _engine.coinsEarnedLastBatch;
-          _coinsTotal = _engine.coinsTotalLastBatch;
-        });
-        _coinsToastTimer?.cancel();
-        _coinsToastTimer =
-            Timer(const Duration(milliseconds: 2600), () {
-          if (!mounted) return;
-          setState(() => _coinsToast = null);
-        });
-      }
+    // ── لحظهٔ جایزهٔ پایانِ بازی (یک بار) ──
+    //
+    // همان جمعی که `_CompletionView` نشان می‌دهد، این‌جا هم جشن گرفته
+    // می‌شود: عددِ یکسان از یک منبع، نه دو روایتِ متفاوت. `mounted` لازم
+    // است چون کاربر می‌تواند در فاصلهٔ مهرِ سرور از صفحه بیرون برود.
+    if (_engine.isFinished && !_finishMomentShown && mounted) {
+      _finishMomentShown = true;
+      RewardMoment.moment(
+        context,
+        RewardMomentData(
+          source: RewardSource.tap,
+          points: _engine.pointsAwardedTotal > 0
+              ? _engine.pointsAwardedTotal
+              : _engine.pointsEarned,
+          coins: _engine.coinsAwardedTotal,
+        ),
+      );
     }
 
     _scheduleRebuild();
@@ -407,13 +411,7 @@ class _TapGameScreenState extends State<TapGameScreen>
           padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.xxs, Gaps.lg, 0),
           child: _CoinGuide(accent: _accent, economy: _economy),
         ),
-        // ── نشانِ شناورِ سکهٔ لول‌آپ ──
-        if (_coinsToast != null) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(Gaps.lg, Gaps.xs, Gaps.lg, 0),
-            child: _CoinToast(coins: _coinsToast!, total: _coinsTotal),
-          ),
-        ],
+        // (نشانِ «+N سکه»ی میانِ بازی این‌جا بود؛ رفت — توضیح در state.)
         Expanded(
           // دورِ ۳۳: مهرِ سرور (isFinished) هم مثل عبورِ محلی از لولِ آخر
           // (isComplete) صفحهٔ پایان را می‌آورد — جمعِ امتیاز و سکه از
@@ -952,174 +950,10 @@ class _CoinGuide extends StatelessWidget {
   }
 }
 
-/// نشانِ شناورِ «+N سکه» بعد از لول‌آپ (خواستهٔ مالک).
-/// ── جشنِ سکهٔ لول‌آپ (دورِ ۳۳) ──────────────────────────────────────────
-///
-/// خواستهٔ مالک: «وقتی کاربر لول آپ می‌شه باید ۵ سکهٔ دریافتی بصورتِ
-/// انیمیشنی جذاب نشون داده بشه». نسخهٔ قبلی یک چیپِ ساکن بود؛ حالا:
-/// سکهٔ طلایی با چرخشِ سه‌بعدی (rotateY مثل سکهٔ واقعی) و پاپِ فنری،
-/// هشت جرقه که به اطراف می‌پرند، و عددِ «+N» که با تأخیرِ کوتاه می‌ترکد.
-/// همه با یک AnimationController — بدون ایموجی، مطابقِ سلیقهٔ مالک.
-class _CoinToast extends StatefulWidget {
-  const _CoinToast({required this.coins, this.total});
-  final int coins;
-  final int? total;
-
-  @override
-  State<_CoinToast> createState() => _CoinToastState();
-}
-
-class _CoinToastState extends State<_CoinToast>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // سکه: ۰→۰.۴۵ چرخشِ + پاپ؛ بعدرتر حالتِ شناورِ آرام.
-    final coinT = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0, 0.45, curve: Curves.easeOutBack),
-    );
-    final floatT = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.45, 1, curve: Curves.easeInOut),
-    );
-    final numT = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.12, 0.5, curve: Curves.easeOutBack),
-    );
-
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0x2EFFD166), Color(0x1AF59E0B)]),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0x73FFD166)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x38FFB42C),
-              blurRadius: 26,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 64,
-              height: 64,
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (_, __) {
-                  final spin = (1 - coinT.value) * 3.4; // از چرخش به ثابت
-                  final dy = (1 - floatT.value) * 6;
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // جرقه‌ها: هشت پرتو که با پیشرفتِ انیمیشن دور می‌شوند.
-                      for (var i = 0; i < 8; i++)
-                        () {
-                          final angle = i * 45.0 * math.pi / 180;
-                          final dist = 10 + coinT.value * 22;
-                          final op = (1 - _controller.value).clamp(0.0, 1.0);
-                          return Transform.translate(
-                            offset: Offset(
-                              math.cos(angle) * dist,
-                              math.sin(angle) * dist - dy,
-                            ),
-                            child: Opacity(
-                              opacity: op * 0.9,
-                              child: Container(
-                                width: 5,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: RadialGradient(colors: [
-                                    const Color(0xFFFFE9AD),
-                                    const Color(0xFFFFC53D)
-                                        .withValues(alpha: 0),
-                                  ]),
-                                ),
-                              ),
-                            ),
-                          );
-                        }(),
-                      Transform.translate(
-                        offset: Offset(0, -dy),
-                        child: Transform(
-                          alignment: Alignment.center,
-                          transform: Matrix4.identity()
-                            ..setEntry(3, 2, 0.002)
-                            ..rotateY(spin)
-                            ..scaleByDouble(0.5 + coinT.value * 0.5,
-                                0.5 + coinT.value * 0.5, 1.0, 1.0),
-                          child: Image.asset(
-                            'assets/pass/icon_coin.webp',
-                            width: 46,
-                            height: 46,
-                            errorBuilder: (_, __, ___) => const Icon(
-                                Icons.monetization_on_rounded,
-                                size: 46,
-                                color: Color(0xFFFFD166)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 6),
-            // عددِ «+N» با ترکیدنِ فنری.
-            ScaleTransition(
-              scale: numT,
-              child: Text(
-                '+${faNum(widget.coins)} سکه',
-                style: const TextStyle(
-                  color: Color(0xFFFFD166),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 19,
-                  shadows: [
-                    Shadow(color: Color(0x66FFC53D), blurRadius: 14),
-                  ],
-                ),
-              ),
-            ),
-            if (widget.total != null)
-              Text(
-                'موجودی: ${faNum(widget.total!)}',
-                style: const TextStyle(
-                  color: Color(0xFFEAD9A8),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11.5,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+/* ── نشانِ «+N سکه»ی میانِ بازی حذف شد (۲۹ شهریور) ──────────────────
+   خواستهٔ مالک: «دریافتی‌های ضربه‌زن فقط آخرِ بازی نشون داده بشن،
+   وسطِ بازی کارت نیاد.» جایش «لحظهٔ جایزه»ی پایانِ بازی نشست
+   (`widgets/reward_moment.dart`) تا وب و اندروید یک سبک باشند. */
 
 class _CompletionView extends StatelessWidget {
   const _CompletionView({

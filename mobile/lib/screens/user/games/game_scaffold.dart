@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
+import '../../../widgets/reward_moment.dart';
 import 'coin_award.dart';
 import 'game_audio.dart';
 import 'game_session.dart';
@@ -347,13 +348,29 @@ class GameScaffold extends StatelessWidget {
             Gaps.vXxs,
             if (scoreboard != null) ...[scoreboard!, Gaps.vXxs],
             if (session.phase == GamePhase.over) ...[
-              // ── جشنِ بزرگِ برنده (دورِ ۳۳) ──
-              // خواستهٔ مالک: «در بازی پنالتی چه با ربات و چه با کاربر
-              // آنلاین، برنده باید بزرگ و زیبا و جذاب مشخص بشه» — برای
-              // هر سه بازیِ این اسکلت، هم‌ارزِ WinnerCelebration وب.
-              WinnerStage(session: session, accent: accent),
+              // ── جشنِ پایانِ بازی ──
+              //
+              // خواستهٔ مالک (دورِ ۳۳): «در بازی پنالتی چه با ربات و چه با
+              // کاربر آنلاین، برنده باید بزرگ و زیبا و جذاب مشخص بشه» —
+              // پس **دوئل کارت و ضربات پنالتی** صحنهٔ خودشان را نگه
+              // می‌دارند. خواستهٔ مالک (۲۹ شهریور): «جای "شما بازی رو
+              // بردید"/"شما باختید" یه لحظه بیاد که چیزی که گرفتی رو نشون
+              // بده» — پس جفت‌یاب از سیستمِ یکپارچهٔ «لحظهٔ جایزه» رد
+              // می‌شود و تیترِ جشن از این صحنه برداشته شده.
+              if (session.gameId == 'memory')
+                _MemoryResultMoment(session: session)
+              else
+                WinnerStage(session: session, accent: accent),
               Gaps.vXs,
-              _ResultStrip(session: session, accent: accent),
+              _ResultStrip(
+                session: session,
+                accent: accent,
+                // در جفت‌یاب، پیامِ نتیجه مالِ «لحظهٔ جایزه» است؛ این خط
+                // فقط حسابِ خشکِ مسابقه (امتیازِ رد‌و‌بدل‌شده) را نشان
+                // می‌دهد تا کاربر بداند چه‌قدر کم/زیاد شد.
+                showText: session.gameId != 'memory',
+                soft: session.gameId == 'memory',
+              ),
               // سکهٔ لیگ. `coinsWinner` نمادِ برنده است (X/O) و با
               // `mySymbol` مقایسه می‌شود نه با `winner` — چون در قطعِ
               // ارتباط، `winner` می‌تواند چیز دیگری باشد در حالی که تسویه
@@ -484,9 +501,21 @@ class _TurnBanner extends StatelessWidget {
 }
 
 class _ResultStrip extends StatelessWidget {
-  const _ResultStrip({required this.session, required this.accent});
+  const _ResultStrip({
+    required this.session,
+    required this.accent,
+    this.showText = true,
+    this.soft = false,
+  });
   final GameSession session;
   final Color accent;
+
+  /// آیا خطِ پیامِ نتیجه («شما بردید!»/«شما باختید») نشان داده شود؟
+  /// در جفت‌یاب نه — آن پیام از «لحظهٔ جایزه» می‌آید.
+  final bool showText;
+
+  /// لحنِ نرم: نه قرمزِ هشدار، نه آیکونِ ضربدر برای پایانِ دور.
+  final bool soft;
 
   @override
   Widget build(BuildContext context) {
@@ -497,12 +526,12 @@ class _ResultStrip extends StatelessWidget {
         ? accent
         : draw
             ? theme.colorScheme.outline
-            : const Color(0xFFEF4444);
+            : (soft ? const Color(0xFF94A3B8) : const Color(0xFFEF4444));
     final icon = won
         ? Icons.emoji_events_rounded
         : draw
             ? Icons.handshake_rounded
-            : Icons.close_rounded;
+            : (soft ? Icons.shield_rounded : Icons.close_rounded);
     // ── امتیازِ مثبت برای برنده، منفی برای بازنده (خواستهٔ مالک) ──
     // فقط در مسابقهٔ امتیازیِ واقعی: نه ربات، نه رایگان، نه قطعِ اتصال.
     final int stakeVal = session.stake;
@@ -540,7 +569,10 @@ class _ResultStrip extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
+          if (!showText)
+            // بدونِ پیام: فقط حسابِ امتیاز می‌ماند (اگر مسابقهٔ امتیازی باشد).
+            Icon(icon, size: 18, color: color),
+          if (showText) Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 18, color: color),
@@ -574,6 +606,59 @@ class _ResultStrip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// ثبتِ «لحظهٔ جایزه»ی پایانِ مسابقه در جفت‌یاب.
+///
+/// `GameScaffold` بی‌حالت (Stateless) است و این ثبت باید **یک بار** انجام
+/// شود؛ پس یک ویجتِ کوچکِ حالت‌دار که چیزی رندر نمی‌کند: خودِ جشن را
+/// `RewardMoment` روی `Overlay` می‌گذارد. اگر این کار را در `build` انجام
+/// می‌دادیم، هر رندرِ دوباره یک کارتِ تازه می‌ساخت و صف پر می‌شد.
+///
+/// اعداد از همان `session` می‌آیند که `_ResultStrip` و `CoinAward` از آن
+/// می‌خوانند — یک منبع، تا دو روایتِ متفاوت ساخته نشود.
+class _MemoryResultMoment extends StatefulWidget {
+  const _MemoryResultMoment({required this.session});
+  final GameSession session;
+
+  @override
+  State<_MemoryResultMoment> createState() => _MemoryResultMomentState();
+}
+
+class _MemoryResultMomentState extends State<_MemoryResultMoment> {
+  bool _sent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _send());
+  }
+
+  void _send() {
+    if (_sent || !mounted) return;
+    _sent = true;
+    final s = widget.session;
+    if (s.winner == null) return;
+    final kind = s.winner == 'DRAW'
+        ? RewardKind.draw
+        : (s.iWon ? RewardKind.win : RewardKind.loss);
+    // فقط بردِ مسابقهٔ امتیازیِ واقعی عدد دارد: بازنده چیزی روی کارت نمی‌بیند
+    // (چیپِ منفیِ حساب مسابقه پایین‌تر می‌ماند) و تساوی هم چیزی اضافه نمی‌کند.
+    final net = kind == RewardKind.win && !s.vsBot
+        ? math.max(0, s.netPot - s.stake)
+        : 0;
+    RewardMoment.moment(
+      context,
+      RewardMomentData(
+        source: RewardSource.memory,
+        kind: kind,
+        points: net,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 class _ResultActions extends StatelessWidget {

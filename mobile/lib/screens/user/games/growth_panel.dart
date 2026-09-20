@@ -9,7 +9,7 @@ import '../../../api_client.dart';
 import '../../../core/assets.dart';
 import '../../../core/share_invite.dart';
 import '../../../theme/tokens.dart';
-import '../../../widgets/reward_burst.dart';
+import '../../../widgets/reward_moment.dart';
 import '../../../widgets/ui_icon.dart';
 
 class GrowthPanel extends StatefulWidget {
@@ -118,10 +118,10 @@ class _GrowthPanelState extends State<GrowthPanel> {
     try {
       final response = await action();
       if (mounted) setState(() => _notice = response is Map ? '${response['message'] ?? 'انجام شد'}' : 'انجام شد');
-      // ── جشنِ دریافت ──
+      // ── لحظهٔ جایزه ──
       // `_run` برای کارهای بی‌جایزه هم استفاده می‌شود (پذیرشِ دوستی،
       // درخواستِ دوستی). عددِ واریزشده را از پاسخ می‌خوانیم و اگر صفر بود
-      // `RewardBurst` خودش هیچ‌چیز نشان نمی‌دهد — یعنی «درخواست فرستاده شد»
+      // `RewardMoment` خودش هیچ‌چیز نشان نمی‌دهد — یعنی «درخواست فرستاده شد»
       // جشن راه نمی‌اندازد. کلیدها: ماموریت‌ها `reward` می‌دهند و مسیرهای
       // دیگر `points`.
       final gained = NumberParser.toInt(
@@ -129,9 +129,9 @@ class _GrowthPanelState extends State<GrowthPanel> {
       // `mounted` لازم است و نه تشریفاتی: کاربر می‌تواند در فاصلهٔ پاسخِ
       // سرور تب را عوض کند؛ `Overlay`ِ والدی که رفته دیگر وجود ندارد.
       if (mounted) {
-        RewardBurst.celebrate(
+        RewardMoment.moment(
           context,
-          RewardBurstData(
+          RewardMomentData(
             source: key == 'daily-bonus'
                 ? RewardSource.daily
                 // ماموریت‌های اختصاصی کلیدِ `custom:<id>` دارند (هر کارت

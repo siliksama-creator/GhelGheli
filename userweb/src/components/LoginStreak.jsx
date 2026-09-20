@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 import { fa, req } from '../lib/api.js';
 import { text, useLive } from '../lib/liveConfig.js';
-import { celebrateReward } from '../lib/rewards.js';
+import { rewardMoment } from '../lib/rewardMoment.js';
 
 /** A premium seven-day claim card shared by the web dashboard. */
 export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
@@ -31,10 +31,12 @@ export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
     try {
       const next = await req('/api/login-streak/claim', 'POST', {}, token);
       setData(next);
-      setMsg?.(next.message || 'امتیاز استریک دریافت شد');
-      // پاداشِ زنجیره هم یک «دریافت» است و باید جلوی چشم باشد. متنِ پیامِ
-      // سرور برای `toast` می‌ماند و جشن عددِ خالصِ واریزشده را نشان می‌دهد.
-      celebrateReward({ source: 'streak', points: Number(next?.claimedReward ?? next?.reward ?? 0) });
+      // ── پیامِ گوشه‌ایِ موفقیت حذف شد (۲۹ شهریور) ──
+      // خواستهٔ مالک: «دیگه یه گوشه ننویسه "شما ۱۰۰۰ امتیاز دریافت کردید"؛
+      // به‌جاش یه لحظه اون چیزی که گرفته رو نشون بده.» پس رسیدِ دریافت فقط
+      // «لحظهٔ جایزه» است. `setMsg` برای خطاها سرِ جایش ماند — خطا باید
+      // جایی بنشیند که کاربر دنبالش بگردد، نه روی کارتِ جشن.
+      rewardMoment({ source: 'streak', points: Number(next?.claimedReward ?? next?.reward ?? 0) });
       // The claim changes the visible points total in the hero header. The old
       // card only refreshed itself, so users saw their reward message while the
       // balance above it stayed stale.

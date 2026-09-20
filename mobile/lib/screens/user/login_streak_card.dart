@@ -8,7 +8,7 @@ import '../../core/assets.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/gradient_panel.dart';
-import '../../widgets/reward_burst.dart';
+import '../../widgets/reward_moment.dart';
 
 /// Premium compact seven-day login streak card for the user dashboard.
 ///
@@ -110,20 +110,14 @@ class _LoginStreakCardState extends State<LoginStreakCard>
       });
       widget.onClaimed?.call();
       final reward = _int(data['claimedReward']);
-      final message = data['message']?.toString() ??
-          '${faNum(reward > 0 ? reward : 100)} امتیاز پاداش استریک دریافت شد!';
       // پیش از این پاداشِ زنجیره فقط یک `SnackBar` پایینِ صفحه بود — همان
-      // «دور از دید»ی که مالک اعتراض کرد. الان جشنِ مشترک وسطِ نما می‌آید و
-      // `SnackBar` فقط برای خطاها می‌ماند.
-      RewardBurst.celebrate(
+      // «دور از دید»ی که مالک اعتراض کرد. الان «لحظهٔ جایزه» وسطِ نما می‌آید
+      // و `SnackBar` فقط برای خطاها ماند (۲۹ شهریور: «پیامِ گوشه‌ایِ موفقیت
+      // دیگر لازم نیست، خودِ کارت نشانش می‌دهد»).
+      RewardMoment.moment(
         context,
-        RewardBurstData(source: RewardSource.streak, points: reward),
+        RewardMomentData(source: RewardSource.streak, points: reward),
       );
-      if (message.isEmpty) {
-        // مسیرِ مرده: `message` از سرور می‌آید؛ این‌جا فقط برای این است که
-        // تحلیل‌گر بداند متغیر استفاده شده. عملاً همیشه پر است.
-        debugPrint(message);
-      }
       Future<void>.delayed(const Duration(milliseconds: 2500), () {
         if (mounted) setState(() => _justClaimed = false);
       });

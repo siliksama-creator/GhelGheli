@@ -12,6 +12,7 @@ import { CosmeticAvatarFrame, LevelBadge, DisplayName } from './components/Cosme
 // یک کامپوننت، سه صفحه را پوشش می‌دهد و یک درخواست می‌گیرد.
 import LeagueCountdown, { useLeagueCountdown } from './components/LeagueCountdown.jsx';
 import CoinAward from './components/CoinAward.jsx';
+import { rewardMoment } from './lib/rewardMoment.js';
 import CoinRateStrip from './components/CoinRateStrip.jsx';
 import { ASSETS, SvgIcon } from './components/IconAsset.jsx';
 import WinnerCelebration from './components/WinnerCelebration.jsx';
@@ -749,6 +750,30 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
   const resultColors = ['#071522', '#38BDF8'];
   const gameTitle = activeGameId === 'penalty' ? 'ضربات پنالتی' : activeGameId === 'memory' ? 'جفت‌یاب' : 'دوئل کارت‌ها';
 
+  // ── لحظهٔ نتیجهٔ جفت‌یاب ────────────────────────────────────────────────
+  //
+  // خواستهٔ مالک: «جای "شما بازی رو بردید"/"شما باختید" یه لحظه بیاد که
+  // چیزی که گرفتی رو نشون بده.» ولی دوئل کارت و ضربات پنالتی **مستثنا**
+  // شدند: صحنهٔ نتیجهٔ خودشان («در بازی پنالتی برندهٔ باید بزرگ و زیبا مشخص
+  // بشه» — خواستهٔ دورِ ۳۳) دست‌نخورده می‌ماند. پس فقط جفت‌یاب از این
+  // گذرگاه رد می‌شود.
+  useEffect(() => {
+    if (phase !== 'over' || activeGameId !== 'memory' || !g.winner) return;
+    // ⚠️ کلمهٔ «باخت» هیچ‌جا ساخته نمی‌شود؛ `rewardMoment` با kind='loss'
+    //    خودش جملهٔ نرم و آرامِ پنل را می‌آورد (تصمیمِ مالک: «نمی‌دونم چطوری
+    //    بگم که اعصابش خورد نشه»).
+    const kind = g.winner === 'DRAW' ? 'draw' : g.winner === g.me ? 'win' : 'loss';
+    // فقط بردِ مسابقهٔ امتیازی عدد دارد: بازنده هیچ چیزی از دست نمی‌دهد
+    // که روی کارت بیاید (چیپِ «−۵۰۰» پایین‌تر در حسابِ مسابقه می‌ماند) و
+    // تساوی هم چیزی به کسی اضافه نمی‌کند.
+    const net = Math.max(0, Number(g.netPot || 0) - Number(activeStake || 0));
+    rewardMoment({
+      source: 'memory',
+      kind,
+      points: kind === 'win' && !g.vsBot ? net : 0,
+    });
+  }, [phase, activeGameId, g.winner, g.me, g.netPot, g.vsBot, activeStake]);
+
   const shareResult = async () => {
     const title = g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : g.winner === g.me ? 'من برنده شدم!' : 'این بار حریف برد!';
     try {
@@ -767,6 +792,64 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
         matchId:g.matchId, target:navigator.share?'system_share_image':'download' }, token).catch(() => {});
     } catch (e) { if (e?.name !== 'AbortError') alert(e.message || 'اشتراک‌گذاری ناموفق بود'); }
   };
+
+  /**
+   * حسابِ پایانِ مسابقه و دکمه‌های ادامهٔ کار — **همان بلوک در هر دو
+   * شاخه** (جفت‌یاب بدونِ صحنهٔ جشن، دوئل/پنالتی با صحنهٔ خودشان).
+   *
+   * چرا یک متغیر و نه دو نسخه: اگر دو بار نوشته می‌شد، یک روز یکی از
+   * دو نسخه ویرایش می‌شد و «ادامهٔ کار» در دو بازی شکلِ متفاوتی
+   * می‌گرفت — همان «بی‌اختلالی» که مالک رویش تأکید کرد.
+   */
+  const overActions = (
+        <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', position:'relative', zIndex:5 }}>
+          {/* ── امتیازِ مثبت برای برنده، منفی برای بازنده ──
+              خواستهٔ مالک: «امتیاز مثبت رو بنویسه برای برنده، امتیاز منفی
+              رو بنویسه برای بازنده». فقط در مسابقهٔ امتیازیِ واقعی (نه ربات،
+              نه رایگان). برندهٔ واقعی: netPot منهای ورودیِ خودش؛ بازنده:
+              منهایِ ورودی. */}
+          {activeStake > 0 && !g.vsBot && g.winner && g.winner !== 'DISCONNECT' && (
+            <div style={{
+              display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center',
+              fontSize: '13.5px', fontWeight: 900,
+            }}>
+              {g.winner === 'DRAW' ? (
+                <span style={{ color: '#94A3B8', background: 'rgba(148,163,184,0.12)', padding: '5px 14px', borderRadius: 99 }}>
+                  امتیاز تو: {fa(0)} (ورودی کامل برگشت)
+                </span>
+              ) : g.winner === g.me ? (
+                <span style={{ color: '#22E7A6', background: 'rgba(34,231,166,0.14)', padding: '5px 14px', borderRadius: 99 }}>
+                  +{fa(Math.max(0, Number(g.netPot || 0) - Number(activeStake)))} امتیاز
+                </span>
+              ) : (
+                <span style={{ color: '#FB7185', background: 'rgba(251,113,133,0.14)', padding: '5px 14px', borderRadius: 99 }}>
+                  −{fa(activeStake)} امتیاز
+                </span>
+              )}
+            </div>
+          )}
+          {/* سکهٔ لیگ. `coinsWinner` نمادِ برنده است (X/O) و با `g.me`
+              مقایسه می‌شود، نه با `g.winner` — چون در قطعِ ارتباط،
+              `g.winner` می‌تواند DISCONNECT باشد در حالی که تسویه واقعاً
+              یک برنده داشته. مقایسه با نمادِ خودِ تسویه همیشه درست است. */}
+          <CoinAward amount={g.coinsAwarded} mine={g.coinsWinner === g.me} />
+          <div style={{ display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center' }}>
+            <button type="button" disabled={rematchWaiting || !g.rematchAvailable} onClick={rematch}
+              style={{ background:'linear-gradient(135deg,#22E7A6,#38BDF8)',color:'#03121f',border:0,padding:'12px 20px',borderRadius:16,fontWeight:900 }}>
+              {rematchWaiting ? 'منتظر قبول حریف…' : 'دوباره با همین حریف'}
+            </button>
+            <button type="button" onClick={shareResult}
+              style={{background:'linear-gradient(135deg,#7C3AED,#EC4899)',color:'#fff',border:0,padding:'12px 18px',borderRadius:16,fontWeight:900}}>
+              اشتراک کارت نتیجه · تلگرام/اینستاگرام
+            </button>
+            <button
+              type="button"
+              onClick={() => { leave(); onBack(); }}
+              style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)', color: '#FFF', border: 'none', padding: '12px 28px', borderRadius: '16px', fontWeight: '900', fontSize: '14px', cursor: 'pointer' }}
+            >بازگشت به باشگاه بازی‌ها</button>
+          </div>
+        </div>
+  );
 
   return (
     /* `gameShell` جای `maxWidth:640px`ِ inline نشسته: روی گوشی همان ۶۴۰px
@@ -873,12 +956,32 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
         </div>
       )}
 
-      {phase === 'over' && (
-        /* ── جشنِ بزرگِ برنده (دورِ ۳۳) ──
-           خواستهٔ مالک: برنده باید «بزرگ و به‌شکلِ زیبا» مشخص شود — چه
-           با ربات چه آنلاین، چه پنالتی چه بقیهٔ بازی‌ها. صحنهٔ قدیمی یک
-           آیکونِ ۴۶ پیکسلی و یک h2 بود؛ حالا کاغذرنگی + آیکونِ درشت +
-           تیترِ بزرگ + خطِ نتیجه با نام و امتیاز دو طرف. */
+      {phase === 'over' && (activeGameId === 'memory' ? (
+        /* ── جفت‌یاب: نتیجهٔ «خشک» + لحظهٔ جایزه ──
+           خواستهٔ مالک: تیترِ «تو برنده شدی»/«حریف برنده شد» در جفت‌یاب
+           دیگر نباشد؛ جشن مالِ «لحظهٔ جایزه» است. ولی خودِ نتیجه (امتیازِ
+           دو طرف، سکهٔ لیگ و دکمه‌های ادامهٔ کار) باید بماند: لحظه بعد از
+           چند ثانیه می‌رود و کاربر نباید بی‌دلیل گیر کند. پس فقط لایهٔ
+           جشنِ صحنه حذف شد، نه اطلاعات. */
+        <div className="memoryResultPanel">
+          <div className="winStageVs">
+            <span className="winSide me">
+              {pX.nickname || 'بازیکن یک'}
+              {g.state?.scores && <b>{fa(Number(g.state.scores[g.me] ?? 0))}</b>}
+            </span>
+            <span className="winStageSep" aria-hidden="true" />
+            <span className="winSide">
+              {pO.nickname || (g.vsBot ? 'ربات هوشمند' : 'بازیکن دو')}
+              {g.state?.scores && <b>{fa(Number(g.state.scores[g.me === 'X' ? 'O' : 'X'] ?? 0))}</b>}
+            </span>
+          </div>
+          {overActions}
+        </div>
+      ) : (
+        /* ── دوئل کارت و پنالتی: صحنهٔ نتیجهٔ خودشان، دست‌نخورده ──
+           خواستهٔ مالک (دورِ ۳۳): «در بازی پنالتی برندهٔ بعد از پایانِ بازی
+           باید بزرگ و به‌شکلِ زیبا و جذاب مشخص بشه» — این دو بازی از سیستمِ
+           یکپارچه **مستثنا** شدند و جشنِ خودشان سرِ جایش ماند. */
         <WinnerCelebration
           outcome={g.winner === 'DRAW' ? 'draw' : (g.winner === g.me ? 'win' : 'loss')}
           myName={pX.nickname || 'بازیکن یک'} oppName={pO.nickname || (g.vsBot ? 'ربات هوشمند' : 'بازیکن دو')}
@@ -886,55 +989,9 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
           myScore={g.state?.scores ? Number(g.state.scores[g.me] ?? 0) : undefined}
           oppScore={g.state?.scores ? Number(g.state.scores[g.me === 'X' ? 'O' : 'X'] ?? 0) : undefined}
         >
-        <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', position:'relative', zIndex:5 }}>
-          {/* ── امتیازِ مثبت برای برنده، منفی برای بازنده ──
-              خواستهٔ مالک: «امتیاز مثبت رو بنویسه برای برنده، امتیاز منفی
-              رو بنویسه برای بازنده». فقط در مسابقهٔ امتیازیِ واقعی (نه ربات،
-              نه رایگان). برندهٔ واقعی: netPot منهای ورودیِ خودش؛ بازنده:
-              منهایِ ورودی. */}
-          {activeStake > 0 && !g.vsBot && g.winner && g.winner !== 'DISCONNECT' && (
-            <div style={{
-              display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center',
-              fontSize: '13.5px', fontWeight: 900,
-            }}>
-              {g.winner === 'DRAW' ? (
-                <span style={{ color: '#94A3B8', background: 'rgba(148,163,184,0.12)', padding: '5px 14px', borderRadius: 99 }}>
-                  امتیاز تو: {fa(0)} (ورودی کامل برگشت)
-                </span>
-              ) : g.winner === g.me ? (
-                <span style={{ color: '#22E7A6', background: 'rgba(34,231,166,0.14)', padding: '5px 14px', borderRadius: 99 }}>
-                  +{fa(Math.max(0, Number(g.netPot || 0) - Number(activeStake)))} امتیاز
-                </span>
-              ) : (
-                <span style={{ color: '#FB7185', background: 'rgba(251,113,133,0.14)', padding: '5px 14px', borderRadius: 99 }}>
-                  −{fa(activeStake)} امتیاز
-                </span>
-              )}
-            </div>
-          )}
-          {/* سکهٔ لیگ. `coinsWinner` نمادِ برنده است (X/O) و با `g.me`
-              مقایسه می‌شود، نه با `g.winner` — چون در قطعِ ارتباط،
-              `g.winner` می‌تواند DISCONNECT باشد در حالی که تسویه واقعاً
-              یک برنده داشته. مقایسه با نمادِ خودِ تسویه همیشه درست است. */}
-          <CoinAward amount={g.coinsAwarded} mine={g.coinsWinner === g.me} />
-          <div style={{ display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center' }}>
-            <button type="button" disabled={rematchWaiting || !g.rematchAvailable} onClick={rematch}
-              style={{ background:'linear-gradient(135deg,#22E7A6,#38BDF8)',color:'#03121f',border:0,padding:'12px 20px',borderRadius:16,fontWeight:900 }}>
-              {rematchWaiting ? 'منتظر قبول حریف…' : 'دوباره با همین حریف'}
-            </button>
-            <button type="button" onClick={shareResult}
-              style={{background:'linear-gradient(135deg,#7C3AED,#EC4899)',color:'#fff',border:0,padding:'12px 18px',borderRadius:16,fontWeight:900}}>
-              اشتراک کارت نتیجه · تلگرام/اینستاگرام
-            </button>
-            <button
-              type="button"
-              onClick={() => { leave(); onBack(); }}
-              style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)', color: '#FFF', border: 'none', padding: '12px 28px', borderRadius: '16px', fontWeight: '900', fontSize: '14px', cursor: 'pointer' }}
-            >بازگشت به باشگاه بازی‌ها</button>
-          </div>
-        </div>
-        </WinnerCelebration>
-      )}
+        {overActions}
+      </WinnerCelebration>
+      ))}
     </div>
   );
 }

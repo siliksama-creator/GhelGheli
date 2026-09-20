@@ -85,6 +85,12 @@ class UiIcons {
     'heart': Icons.favorite_rounded,
     'idcard': Icons.badge_rounded,
     'coins': Icons.monetization_on_rounded,
+    // «نشان» و «آیتم» — کلیدهایی که در وب از قبل بودند (`.momentIcon`
+    // گذرِ نبرد و آیتمِ فروشگاه) و لحظهٔ جایزه به آن‌ها نیاز دارد.
+    // بدونِ این دو، کاربرِ اندروید جای آیکون یک دایرهٔ خالی می‌دید —
+    // همان چیزی که گاردِ `icon-parity` می‌گیرد.
+    'medal': Icons.military_tech_rounded,
+    'item': Icons.category_rounded,
     'hand': Icons.back_hand_rounded,
     'crown': Icons.workspace_premium_rounded,
     'target': Icons.gps_fixed_rounded,

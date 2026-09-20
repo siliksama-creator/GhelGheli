@@ -28,7 +28,7 @@ import '../../api_client.dart';
 import '../../core/app_config.dart';
 import '../../utils/fa_date.dart';
 import '../../theme/tokens.dart';
-import '../../widgets/reward_burst.dart';
+import '../../widgets/reward_moment.dart';
 import 'games/game_audio.dart';
 
 /// یک برش، همان‌طور که سرور توصیفش می‌کند.
@@ -337,9 +337,9 @@ class _WheelPageState extends State<WheelPage>
       // بیاید، عددِ جایزه را لو می‌دهد و تعلیقِ بازی از بین می‌رود.
       // برچسب از سرور می‌آید («۱۰۰ امتیاز»، «۵۰٬۰۰۰ تومان») و خودش رقمِ
       // فارسی دارد؛ همان را نشان می‌دهیم تا دو روایتِ متفاوت ساخته نشود.
-      RewardBurst.celebrate(
+      RewardMoment.moment(
         context,
-        RewardBurstData(
+        RewardMomentData(
           source: RewardSource.wheel,
           note: prize.label,
           points: prize.kind == 'points' ? prize.value : 0,

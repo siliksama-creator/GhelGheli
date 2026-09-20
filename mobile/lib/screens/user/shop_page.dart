@@ -14,6 +14,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/async_section.dart';
 import '../../services/bazaar_billing.dart';
 import '../../widgets/card_box.dart';
+import '../../widgets/reward_moment.dart';
 
 class ShopPage extends StatefulWidget {
   final ApiClient api;
@@ -109,18 +110,36 @@ class _ShopPageState extends State<ShopPage> {
     }
   }
 
+  /// هر عملیاتِ خرید/تجهیز از این‌جا می‌گذرد.
+  ///
+  /// `moment` (اختیاری): اگر بدهید، بعد از موفقیت «لحظهٔ جایزه» هم نشان داده
+  /// می‌شود. چرا هر خرید نه: «انتخاب کردنِ» یک قابِ قبلاً خریداری‌شده هیچ
+  /// چیزی به کاربر اضافه نمی‌کند؛ ولی خریدِ یک آیتمِ تازه یک «به دست آوردن»
+  /// است و مالک صریحاً خواست آیتم‌های فروشگاه هم لحظه داشته باشند.
+  ///
+  /// `success` (اختیاری): پیامِ گوشه‌ای. برای **رسیدِ خرید** دیگر نمی‌فرستیم
+  /// (کارتِ لحظه همان حرف را می‌زند و دو روایتِ موازی همان چیزی بود که مالک
+  /// شکایت کرد)؛ فقط جایی می‌ماند که حرفِ **اضافه‌ای** دارد — مثل «هدیه‌های
+  /// دائمیِ پلاس فعال شد» که وضعیتِ حساب است، نه عددِ جایزه.
+  ///
+  /// ⚠️ صندوقِ کارت (`CardBox`) از این تابع نمی‌گذرد و عمداً هم نمی‌گذرد:
+  /// صحنهٔ باز کردنِ کارت‌ها مالِ خودش است و مالک آن را **مستثنا** کرد.
   Future<dynamic> _run(
     Future<dynamic> Function() action,
     String key,
-    String success,
-  ) async {
+    String? success, {
+    RewardMomentData? moment,
+  }) async {
     if (_busy != null) return null;
     setState(() => _busy = key);
     try {
       final result = await action();
       if (!mounted) return result;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(success)));
+      if (success != null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(success)));
+      }
+      if (moment != null) RewardMoment.moment(context, moment);
       await _reload();
       return result;
     } catch (error) {
@@ -208,6 +227,12 @@ class _ShopPageState extends State<ShopPage> {
       })),
       'plus-${plan['billingCycle']}',
       annual ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد',
+      // نامِ پلن از خودِ سرور می‌آید (همان چیزی که روی کارتِ پلن نوشته شده)،
+      // نه یک جملهٔ تازهٔ سفت‌شده در کلاینت.
+      moment: RewardMomentData(
+        source: RewardSource.shop,
+        note: plan['label']?.toString(),
+      ),
     );
   }
 
@@ -221,7 +246,6 @@ class _ShopPageState extends State<ShopPage> {
     // شده باشد.
     var wantWallet = _useWallet && _walletBalance > 0;
     final fromWallet = wantWallet ? math.min(_walletBalance, price) : 0;
-    final remainder = price - fromWallet;
 
     final ok = await showDialog<bool>(
       context: context,
@@ -288,8 +312,8 @@ class _ShopPageState extends State<ShopPage> {
     );
     if (ok != true) return;
 
-    // ── پیامِ موفقیت متناسب با مسیرِ واقعیِ پرداخت ──
-    final settledFully = wantWallet && fromWallet >= price && remainder == 0;
+    // (پیامِ موفقیتِ خرید این‌جا بود؛ حذف شد — کارتِ لحظه نامِ آیتم را
+    //  نشان می‌دهد و دو پیامِ موازی برای یک رویداد همان تکرارِ شکایت‌شده بود.)
     await _run(
       () async => _purchase(
         await widget.api.post('/api/shop/items/${item['id']}/buy', {
@@ -297,9 +321,12 @@ class _ShopPageState extends State<ShopPage> {
         }),
       ),
       'buy-${item['id']}',
-      settledFully
-          ? '${item['name']} با موجودی کیف پول خریداری شد'
-          : '${item['name']} به کلکسیون اضافه شد',
+      // بدونِ پیامِ گوشه‌ای: نامِ آیتم روی کارتِ لحظه می‌آید.
+      null,
+      moment: RewardMomentData(
+        source: RewardSource.shop,
+        item: item['name']?.toString(),
+      ),
     );
   }
 
