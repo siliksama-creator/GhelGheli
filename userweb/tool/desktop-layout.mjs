@@ -142,6 +142,7 @@ check('هیچ min-width دیگری در growth.css باقی نمانده', () =>
 const gamesCss = fs.readFileSync(path.join(root, 'userweb/src/styles/games.css'), 'utf8');
 const appbarCss = fs.readFileSync(path.join(root, 'userweb/src/styles/appbar.css'), 'utf8');
 const growthCss = fs.readFileSync(path.join(root, 'userweb/src/growth.css'), 'utf8');
+const brandCss = fs.readFileSync(path.join(root, 'userweb/src/styles/brand-mark.css'), 'utf8');
 
 check('عرضِ نوارِ تبِ باشگاه نسبتی با قاب است، نه با نما (بدونِ vw)', () => {
   const rule = gamesCss.slice(gamesCss.indexOf('.socialTripleTabs'), gamesCss.indexOf('.socialTripleTabs') + 200);
@@ -181,6 +182,31 @@ check('گریدِ پیام‌های آمادهٔ چت اسکرولِ افقی د
   const after = chat.slice(gridAt, gridAt + 260);
   assert.ok(/overflowX:\s*'auto'/.test(after),
     'گریدِ پیام‌های آماده در قابِ ۵۱۶px جا نمی‌شود؛ بدونِ اسکرول، سرریزش توسطِ paint containment بریده می‌شود');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  شیتِ «بیشتر» هم باید در ستونِ اپ بماند — «دسکتاپ = موبایل»
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// گزارش مالک: «فقط دکمهٔ بیشتر وقتی باز می‌کنیم سایزش رعایت نشده».
+//
+// اندازه‌گیریِ واقعی (نمای ۱۶۷۸px): شیت ۱۶۵۸px عرض داشت — تمامِ مانیتور —
+// در حالی که ستونِ اپ ۵۴۰px است. ردیف‌هایش هم ۱۶۴۰px کشیده می‌شدند.
+//
+// علت: عنصرِ `position:fixed` با `left:0; right:0` و فقط `margin-inline:10px`؛
+// برای عنصرِ fixed، درصدِ عرض نسبت به **نما** حساب می‌شود، پس هیچ سقفی
+// نداشت — همان تلهٔ نوارِ تبِ باشگاه، این‌بار در یک شیت.
+// رفع: `margin-inline:auto` (وسط‌چین) + `width: min(540px, calc(100% - 20px))`.
+
+check('شیتِ «بیشتر» سقفِ عرضِ ۵۴۰px دارد و وسط‌چین است (نه تمامِ عرضِ نما)', () => {
+  const sheet = brandCss.slice(brandCss.indexOf('.moreSheet {'), brandCss.indexOf('.sheetGrip {'));
+  assert.ok(sheet.length > 50, 'قاعدهٔ `.moreSheet` پیدا نشد');
+  assert.ok(/width:\s*min\(540px/.test(sheet),
+    'شیت سقفِ عرض ندارد — روی دسکتاپ تمامِ عرضِ مانیتور را می‌گیرد');
+  assert.ok(/margin-inline:\s*auto/.test(sheet),
+    'شیت وسط‌چین نیست؛ عرضِ سقف‌دار بدونِ auto چپ‌چین می‌ماند');
+  assert.ok(!/right:\s*0[^;]*;[\s\S]*?margin-inline:\s*10px/.test(sheet),
+    'الگوی قدیمیِ `margin-inline:10px` برگشته که سقفی برای عرض نمی‌گذارد');
 });
 
 check('theme.css (تولیدشده) بلاک min-width ندارد', () => {

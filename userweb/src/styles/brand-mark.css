@@ -551,9 +551,24 @@
   max-height: min(72vh, calc(100dvh - 150px));
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* ═══ عرضِ شیت = عرضِ ستونِ اپ (تصمیمِ «دسکتاپ = موبایل») ═══════════════
+     اندازه‌گیریِ واقعی روی نمای ۱۶۷۸px: شیت ۱۶۵۸px درمی‌آمد (تمامِ عرضِ
+     مانیتور) در حالی که ستونِ اپ ۵۴۰px و نوارِ پایین هم ۵۴۰px است. یعنی
+     روی دسکتاپ شیتی که باید امتدادِ همان داک باشد، کلِ صفحه را می‌گرفت و
+     ردیف‌هایش ۱۶۴۰px کشیده می‌شدند — ناقضِ تصمیمِ صریحِ مالک
+     («دسکتاپ دقیقاً مثل موبایل»).
+
+     علت: `position:fixed; left:0; right:0` + فقط `margin-inline:10px`؛
+     برای عنصرِ fixed، درصدِ عرض نسبت به **نما** حساب می‌شود، پس هیچ سقفی
+     نداشت. این دقیقاً همان تلهٔ `.socialTripleTabs` (عرض بر مبنای نما، نه
+     قاب) است.
+     رفع: وسط‌چین با `margin-inline:auto` + عرضِ سقف‌دار ۵۴۰px که همان
+     عددِ `.page`/`.mobileNav` است. روی موبایل هیچ تغییری نمی‌کند
+     (۳۹۰px → همان ۳۷۰px قبلی) چون سقف فقط در عرض‌های بزرگ اثر دارد. */
   left: 0; right: 0;
+  margin-inline: auto;
+  width: min(540px, calc(100% - 20px));
   bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  margin-inline: 10px;
   display: flex; flex-direction: column; gap: 4px;
   padding: 8px;
   border-radius: 24px;
