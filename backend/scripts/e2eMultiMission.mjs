@@ -16,7 +16,8 @@
 //
 // ⚠️ در پایان، وضعیتِ پنل را به همان چیزی که اول بود برمی‌گرداند.
 //
-// متغیرها: BASE (پیش‌فرض 127.0.0.1:4999)، GG_ADMIN_USER، GG_ADMIN_PASSconst BASE = process.env.BASE || 'http://127.0.0.1:4999';
+// متغیرها: BASE (پیش‌فرض 127.0.0.1:4999)، GG_ADMIN_USER، GG_ADMIN_PASS
+const BASE = process.env.BASE || 'http://127.0.0.1:4999';
 let pass = 0, fail = 0;
 const ok = (c, n) => (c ? (pass++, console.log(`  ✓ ${n}`))
   : (fail++, console.error(`  ✗ ${n}`)));
