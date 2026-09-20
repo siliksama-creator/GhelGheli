@@ -5,6 +5,8 @@ import '../../theme/tokens.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart'
+    show ValueListenable, ValueNotifier;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1601,7 +1603,7 @@ class _MoreSheet extends StatefulWidget {
   final List<int> Function() indexes;
   final List<String> titles;
   final int selected;
-  final IconData Function(int index, bool selected) iconOf;
+  final IconData? Function(int index, bool selected) iconOf;
   final ValueChanged<int> onPick;
 
   @override
