@@ -225,14 +225,84 @@ export default function GrowthHub({ api, token, onSocketGame }) {
  * قرینهٔ `_CustomMissionCard` در `mobile/.../growth_panel.dart`؛ هر دو یک
  * شکلِ داده از سرور می‌گیرند (`{title, body, points, link:{url,text,color},
  * claimed, claimable}`) تا دو پلتفرم هرگز دو متنِ مختلف نشان ندهند.
+ *
+ * خواستهٔ مالک:
+ *   «وقتی کاربر روی لینک ماموریت اختصاصی کلیک کرد بجای دکمه دریافت امتیاز
+ *    دکمه درحال بررسی بیاد، بعد از یه ثانیه‌شمار ۱۵ ثانیه‌ای دکمه دریافت
+ *    فعال شه و وقتی دکمه دریافت رو زد باید امتیاز رو بگیره و دیگه اون
+ *    ماموریت اختصاصی قبلی به اون کاربر نمایش داده نشه تا زمانی که ماموریت
+ *    اختصاصی دیگه‌ای قرار بگیره.»
  */
 function CustomMissionCard({ mission, busy, onClaim }) {
   const points = Number(mission.points || 0);
   const claimed = mission.claimed === true;
-  const claimable = mission.claimable === true;
   const link = mission.link || null;
   const linkColor = link?.color === 'green' ? '#22E7A6' : '#7DD8FF';
   const body = String(mission.body || '').trim();
+  const hasLink = Boolean(link?.url);
+
+  const storageKey = 'cm_click_' + (mission.id || 'curr');
+  const [clicked, setClicked] = useState(false);
+  const [remaining, setRemaining] = useState(0);
+
+  // بررسی وضعیت از روی localStorage تا اگر کاربر در تب دیگری رفت و برگشت، زمان هدر نرود
+  useEffect(() => {
+    if (!hasLink) return;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const elapsed = Math.floor((Date.now() - Number(saved)) / 1000);
+        if (elapsed < 15) {
+          setClicked(true);
+          setRemaining(15 - elapsed);
+        } else {
+          setClicked(true);
+          setRemaining(0);
+        }
+      }
+    } catch (_) {}
+  }, [storageKey, hasLink]);
+
+  // ثانیه‌شمار معکوس ۱۵ ثانیه‌ای
+  useEffect(() => {
+    if (!clicked || remaining <= 0) return;
+    const interval = setInterval(() => {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          const elapsed = Math.floor((Date.now() - Number(saved)) / 1000);
+          const left = 15 - elapsed;
+          if (left <= 0) {
+            setRemaining(0);
+            clearInterval(interval);
+            return;
+          }
+          setRemaining(left);
+          return;
+        }
+      } catch (_) {}
+      setRemaining(prev => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [clicked, remaining, storageKey]);
+
+  const handleLinkClick = () => {
+    try {
+      localStorage.setItem(storageKey, String(Date.now()));
+    } catch (_) {}
+    setClicked(true);
+    setRemaining(15);
+  };
+
+  const handleClaim = () => {
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (_) {}
+    onClaim();
+  };
+
+  const isChecking = hasLink && clicked && remaining > 0;
+  const canClaim = !hasLink || (clicked && remaining === 0);
 
   return <section className="customMissionCard" aria-label="ماموریت اختصاصی">
     <div className="customMissionHead">
@@ -242,18 +312,36 @@ function CustomMissionCard({ mission, busy, onClaim }) {
     </div>
     <p className="customMissionTitle">{mission.title}</p>
     {body && <p className="customMissionBody">{body}</p>}
-    {link?.url && (
+    {hasLink && (
       // rel/target: لینک از پنل می‌آید؛ بدون noopener یک صفحهٔ مقصد
       // می‌تواند به window.opener دست بزند. رنگ هم از پنل است (آبی/سبز).
       <a className="customMissionLink" href={link.url} target="_blank"
-        rel="noreferrer noopener" style={{ color: linkColor }}>
+        rel="noreferrer noopener" style={{ color: linkColor }}
+        onClick={handleLinkClick}>
         {link.text || 'اینجا کلیک کنید'}
       </a>
     )}
     {points > 0 && (
-      <button className="customMissionClaim" disabled={!claimable || claimed || busy}
-        onClick={onClaim}>
-        {claimed ? 'گرفته شد' : busy ? 'در حال دریافت…' : 'دریافت امتیاز'}
+      <button
+        className={`customMissionClaim ${isChecking ? 'checking' : canClaim ? 'ready' : ''}`}
+        disabled={claimed || busy || isChecking}
+        onClick={() => {
+          if (!clicked && hasLink) {
+            handleLinkClick();
+            window.open(link.url, '_blank', 'noreferrer,noopener');
+          } else {
+            handleClaim();
+          }
+        }}>
+        {claimed
+          ? 'گرفته شد'
+          : busy
+            ? 'در حال دریافت…'
+            : isChecking
+              ? `درحال بررسی (${fa(remaining)})`
+              : !clicked && hasLink
+                ? 'ابتدا لینک را باز کنید'
+                : 'دریافت امتیاز'}
       </button>
     )}
   </section>;

@@ -171,24 +171,36 @@ async function save(adminId, payload) {
 
 /**
  * وضعیتِ ماموریت برای یک کاربر: متن + گرفته/نگرفته.
+ * خواستهٔ صریح مالک: «وقتی دکمه دریافت رو زد باید امتیاز رو بگیره و
+ * دیگه اون ماموریت اختصاصی قبلی به اون کاربر نمایش داده نشه تا زمانی که
+ * ماموریت اختصاصی دیگه ای قرار بگیره».
+ * پس اگر ماموریت توسط این کاربر دریافت شده باشد (claimed_at)، مقدارِ null
+ * برمی‌گردانیم تا کارتی به کاربر نشان داده نشود.
+ *
  * @returns {Promise<object|null>}
  */
 async function status(userId) {
   const view = publicView();
   if (!view) return null;
   let claimed = false;
-  try {
-    const { rows } = await pool.query(
-      `SELECT claimed_at FROM user_mission_progress
-        WHERE user_id=$1 AND mission_key=$2 AND period_key=$3`,
-      [userId, missionKey(view.id), PERIOD]);
-    claimed = Boolean(rows[0]?.claimed_at);
-  } catch (e) {
-    // بدونِ دیتابیس (تست) یا خطای گذرا: «نگرفته» نشان بده ولی ادعا نکن
-    // که دفتر سالم است.
-    logger.warn(`[customMission] خواندنِ وضعیت ناموفق: ${e.message}`);
+  if (userId) {
+    try {
+      const { rows } = await pool.query(
+        `SELECT claimed_at FROM user_mission_progress
+          WHERE user_id=$1 AND mission_key=$2 AND period_key=$3`,
+        [userId, missionKey(view.id), PERIOD]);
+      claimed = Boolean(rows[0]?.claimed_at);
+    } catch (e) {
+      // بدونِ دیتابیس (تست) یا خطای گذرا: «نگرفته» نشان بده ولی ادعا نکن
+      // که دفتر سالم است.
+      logger.warn(`[customMission] خواندنِ وضعیت ناموفق: ${e.message}`);
+    }
   }
-  return { ...view, claimed, claimable: view.points > 0 && !claimed };
+  // اگر کاربر قبلاً امتیازِ این دوره را گرفته، دیگر به او نشان داده نمی‌شود
+  // تا زمانی که ادمین با ذخیرهٔ ماموریتِ جدید، شناسهٔ تازه‌ای بسازد.
+  if (claimed) return null;
+
+  return { ...view, claimed: false, claimable: view.points > 0 };
 }
 
 /**

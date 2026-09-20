@@ -264,6 +264,25 @@ class FakeClient {
   const claim2 = await customMission.claim('u1');
   ok(claim2.ok === false, 'بارِ دوم امتیاز نمی‌دهد');
   ok(credited.length === 1, 'بارِ دوم هیچ اعتباری به دفتر اضافه نمی‌شود');
+
+  // بررسی وضعیت (status): پس از دریافت، دیگر به کاربر نشان داده نمی‌شود
+  const origQuery = db.pool.query;
+  let queryClaimed = false;
+  db.pool.query = async (sql) => {
+    if (/SELECT claimed_at FROM user_mission_progress/i.test(sql)) {
+      return { rows: queryClaimed ? [{ claimed_at: new Date().toISOString() }] : [] };
+    }
+    return { rows: [] };
+  };
+  const statusBefore = await customMission.status('u1');
+  ok(statusBefore && statusBefore.title === 'ماموریت امروز',
+    'قبل از دریافت، ماموریت به کاربر نشان داده می‌شود');
+  queryClaimed = true;
+  const statusAfter = await customMission.status('u1');
+  ok(statusAfter === null,
+    'پس از دریافت، ماموریت دیگر به کاربر نمایش داده نمی‌شود (خواستهٔ صریح مالک)');
+
+  db.pool.query = origQuery;
   db.pool.connect = realConnect;
   pointService.credit = realCredit;
   opsConfig.syncGet = realSyncGet;

@@ -45,4 +45,15 @@ void main() {
         File('lib/screens/user/dashboard_page.dart').readAsStringSync();
     expect(dashboard.contains("title: 'دعوت و کسب درآمد'"), isTrue);
   });
+
+  test('ماموریت اختصاصی ثانیه‌شمار ۱۵ ثانیه‌ای و حالت درحال بررسی دارد', () {
+    final growth =
+        File('lib/screens/user/games/growth_panel.dart').readAsStringSync();
+    expect(growth.contains('class _CustomMissionCard extends StatefulWidget'), isTrue);
+    expect(growth.contains('_secondsLeft = 15'), isTrue);
+    expect(growth.contains('درحال بررسی'), isTrue);
+    expect(growth.contains('دریافت امتیاز'), isTrue);
+    expect(growth.contains('WidgetsBindingObserver'), isTrue);
+    expect(growth.contains('AppLifecycleState.resumed'), isTrue);
+  });
 }

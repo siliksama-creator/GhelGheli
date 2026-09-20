@@ -32,7 +32,14 @@
 .customMissionLink{justify-self:start;font-size:13px;font-weight:900;text-decoration:underline;padding:3px 2px}
 .customMissionClaim{border:0;border-radius:10px;padding:9px 14px;min-height:36px;justify-self:start;
   background:rgba(132,204,22,.16);border:1px solid rgba(132,204,22,.45);color:#B8F06B;
-  font-size:12px;font-weight:900}
-.customMissionClaim:disabled{opacity:.45}
+  font-size:12px;font-weight:900;cursor:pointer;transition:all .18s ease}
+.customMissionClaim:disabled{opacity:.55;cursor:not-allowed}
+.customMissionClaim.checking{
+  background:rgba(255,209,102,.16);border:1px solid rgba(255,209,102,.5);color:#FFD166;
+  opacity:1;cursor:wait;animation:pulseCustomReview 1.5s infinite ease-in-out}
+.customMissionClaim.ready{
+  background:linear-gradient(135deg,#00D49A,#00A87A);border:1px solid #00E5A3;color:#04151B;
+  opacity:1;cursor:pointer;box-shadow:0 3px 12px rgba(0,212,154,.35)}
+@keyframes pulseCustomReview{0%,100%{opacity:1}50%{opacity:.68}}
 @media(max-width:620px){.customMissionClaim{justify-self:stretch;text-align:center}}
 

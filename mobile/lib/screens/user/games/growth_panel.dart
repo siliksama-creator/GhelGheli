@@ -607,11 +607,11 @@ String _inviteHint(Map referral) {
 /// کارتِ «ماموریت اختصاصی» — نوشتهٔ ادمین، بالای «ماموریت‌های امروز»
 /// ═══════════════════════════════════════════════════════════════════════════
 ///
-/// خواستهٔ مالک (۱۷ شهریور): «قبلِ ماموریتِ امروز یک قسمتِ ماموریتِ اختصاصی
-/// قرار می‌گیرد؛ ادمین در پنل مشخص و امتیازدهی می‌کند. اگر ادمین فعالش کند
-/// به همهٔ کاربران نشان داده می‌شود. مدیر حتی اجازه دارد لینکِ قابلِ کلیک
-/// بسازد و لینک را پشتِ کلمهٔ «اینجا کلیک کنید» بگذارد، به رنگِ مثلاً آبی
-/// یا سبز.»
+/// خواستهٔ مالک: «وقتی کاربر روی لینک ماموریت اختصاصی کلیک کرد بجای دکمه
+/// دریافت امتیاز دکمه درحال بررسی بیاد، بعد از یه ثانیه‌شمار ۱۵ ثانیه‌ای دکمه
+/// دریافت فعال شه و وقتی دکمه دریافت رو زد باید امتیاز رو بگیره و دیگه اون
+/// ماموریت اختصاصی قبلی به اون کاربر نمایش داده نشه تا زمانی که ماموریت
+/// اختصاصی دیگه‌ای قرار بگیره.»
 ///
 /// نکته‌های پیاده‌سازی:
 ///   • **هیچ متنی در این فایل هاردکد نیست**: عنوان، توضیح، امتیاز، متنِ
@@ -620,7 +620,7 @@ String _inviteHint(Map referral) {
 ///   • رنگ سفیدِ متنِ لینک در تمِ تیره: `blue` = آبیِ برند، `green` =
 ///     سبزِ نئونی. هر رنگِ دیگری که سرور بفرستد به آبی می‌افتد.
 ///   • اگر لینکی نباشد، فقط متن و دکمهٔ دریافت نشان داده می‌شود.
-class _CustomMissionCard extends StatelessWidget {
+class _CustomMissionCard extends StatefulWidget {
   const _CustomMissionCard({
     required this.mission,
     required this.busy,
@@ -632,18 +632,121 @@ class _CustomMissionCard extends StatelessWidget {
   final VoidCallback onClaim;
 
   @override
+  State<_CustomMissionCard> createState() => _CustomMissionCardState();
+}
+
+class _CustomMissionCardState extends State<_CustomMissionCard>
+    with WidgetsBindingObserver {
+  Timer? _timer;
+  int _secondsLeft = 0;
+  bool _clicked = false;
+  DateTime? _clickTime;
+  String? _currentMissionId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _currentMissionId = '${widget.mission['id'] ?? ''}';
+  }
+
+  @override
+  void didUpdateWidget(covariant _CustomMissionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final newId = '${widget.mission['id'] ?? ''}';
+    if (newId != _currentMissionId) {
+      _currentMissionId = newId;
+      _timer?.cancel();
+      _secondsLeft = 0;
+      _clicked = false;
+      _clickTime = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _clickTime != null) {
+      final elapsed = DateTime.now().difference(_clickTime!).inSeconds;
+      final remaining = 15 - elapsed;
+      if (remaining <= 0) {
+        _timer?.cancel();
+        if (mounted) {
+          setState(() {
+            _secondsLeft = 0;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _secondsLeft = remaining;
+          });
+        }
+      }
+    }
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_clickTime == null) {
+        timer.cancel();
+        return;
+      }
+      final elapsed = DateTime.now().difference(_clickTime!).inSeconds;
+      final remaining = 15 - elapsed;
+      if (remaining <= 0) {
+        timer.cancel();
+        setState(() {
+          _secondsLeft = 0;
+        });
+      } else {
+        setState(() {
+          _secondsLeft = remaining;
+        });
+      }
+    });
+  }
+
+  void _handleLinkAction(String url) {
+    if (url.isNotEmpty) {
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
+    setState(() {
+      _clicked = true;
+      _clickTime = DateTime.now();
+      _secondsLeft = 15;
+    });
+    _startTimer();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final points = (mission['points'] as num?)?.toInt() ?? 0;
-    final claimed = mission['claimed'] == true;
-    final claimable = mission['claimable'] == true;
-    final link = mission['link'] is Map
-        ? Map<String, dynamic>.from(mission['link'] as Map)
+    final points = (widget.mission['points'] as num?)?.toInt() ?? 0;
+    final claimed = widget.mission['claimed'] == true;
+    final link = widget.mission['link'] is Map
+        ? Map<String, dynamic>.from(widget.mission['link'] as Map)
         : const <String, dynamic>{};
     final url = '${link['url'] ?? ''}';
+    final hasUrl = url.isNotEmpty;
     final linkColor = '${link['color'] ?? 'blue'}' == 'green'
         ? const Color(0xFF22E7A6)
         : const Color(0xFF7DD8FF);
-    final body = '${mission['body'] ?? ''}'.trim();
+    final body = '${widget.mission['body'] ?? ''}'.trim();
+
+    final isChecking = hasUrl && _clicked && _secondsLeft > 0;
+    final canClaim = !hasUrl || (_clicked && _secondsLeft == 0);
+    final isBusy = widget.busy;
 
     return Container(
       width: double.infinity,
@@ -652,7 +755,8 @@ class _CustomMissionCard extends StatelessWidget {
         gradient: const LinearGradient(
             colors: [Color(0xFF241B45), Color(0xFF0C2135)]),
         borderRadius: Corners.rMd,
-        border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: .5)),
+        border:
+            Border.all(color: const Color(0xFFFFD166).withValues(alpha: .5)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -674,7 +778,7 @@ class _CustomMissionCard extends StatelessWidget {
                     fontWeight: FontWeight.w900)),
         ]),
         const SizedBox(height: 5),
-        Text('${mission['title'] ?? ''}',
+        Text('${widget.mission['title'] ?? ''}',
             style: const TextStyle(
                 fontSize: 14.5, fontWeight: FontWeight.w900, height: 1.35)),
         if (body.isNotEmpty) ...[
@@ -683,11 +787,10 @@ class _CustomMissionCard extends StatelessWidget {
               style: const TextStyle(
                   fontSize: 12, color: Color(0xFFB6C6D8), height: 1.55)),
         ],
-        if (url.isNotEmpty) ...[
+        if (hasUrl) ...[
           const SizedBox(height: 7),
           InkWell(
-            onTap: () => launchUrl(Uri.parse(url),
-                mode: LaunchMode.externalApplication),
+            onTap: () => _handleLinkAction(url),
             borderRadius: Corners.rSm,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 2),
@@ -707,16 +810,51 @@ class _CustomMissionCard extends StatelessWidget {
           SizedBox(
             height: 36,
             child: FilledButton(
-              style: _compactClaimStyle(),
-              onPressed: (!claimable || claimed || busy) ? null : onClaim,
+              style: isChecking
+                  ? ButtonStyle(
+                      backgroundColor: WidgetStatePropertyAll(
+                          const Color(0xFFFFD166).withValues(alpha: .18)),
+                      side: WidgetStatePropertyAll(BorderSide(
+                          color:
+                              const Color(0xFFFFD166).withValues(alpha: .6))),
+                      foregroundColor:
+                          const WidgetStatePropertyAll(Color(0xFFFFD166)),
+                      minimumSize: const WidgetStatePropertyAll(Size(0, 36)),
+                      padding: const WidgetStatePropertyAll(
+                          EdgeInsets.symmetric(horizontal: 14)),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    )
+                  : canClaim
+                      ? const ButtonStyle(
+                          backgroundColor:
+                              WidgetStatePropertyAll(Color(0xFF00D49A)),
+                          foregroundColor:
+                              WidgetStatePropertyAll(Color(0xFF04151B)),
+                          minimumSize: WidgetStatePropertyAll(Size(0, 36)),
+                          padding: WidgetStatePropertyAll(
+                              EdgeInsets.symmetric(horizontal: 14)),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        )
+                      : _compactClaimStyle(height: 36),
+              onPressed: (isChecking || claimed || isBusy)
+                  ? null
+                  : (!canClaim && hasUrl)
+                      ? () => _handleLinkAction(url)
+                      : widget.onClaim,
               child: Text(
                 claimed
                     ? 'گرفته شد'
-                    : busy
+                    : isBusy
                         ? 'در حال دریافت…'
-                        : 'دریافت امتیاز',
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+                        : isChecking
+                            ? 'درحال بررسی (${faNum(_secondsLeft)})'
+                            : (!canClaim && hasUrl)
+                                ? 'ابتدا لینک را باز کنید'
+                                : 'دریافت امتیاز',
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w900),
               ),
             ),
           ),
