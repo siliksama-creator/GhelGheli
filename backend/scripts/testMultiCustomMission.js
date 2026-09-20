@@ -348,6 +348,23 @@ const uuid = () => require('crypto').randomUUID();
     'پنل ادمین فهرست را ویرایش و به شکلِ `items` ذخیره می‌کند');
   ok(/ifUnchangedSince: stamp/.test(adminPage),
     'پنل مُهرِ فهرست را همراهِ ذخیره می‌فرستد (گاردِ تبِ کهنه)');
+
+  // ── گاردهای «کارتِ خاموش» (درسِ ۲۹ شهریور: مالک دو ماموریت ساخت و یکی
+  //    را دید، چون کارتِ تازه پیش‌فرض خاموش ذخیره می‌شد) ──────────────────
+  ok(/enabled: m\.id \? m\.enabled === true : true/.test(adminPage),
+    '⚠️ کارتِ تازه در پنل پیش‌فرض فعال است (افزودن = نشان بده)');
+  ok(/همه را فعال کن/.test(adminPage) && /function enableAll\(/.test(adminPage),
+    'دکمهٔ «همه را فعال کن» هست (یک کلیک برای روشن‌کردن همهٔ کارت‌های نوشته‌شده)');
+  ok(/خاموش — دیده نمی‌شود/.test(adminPage),
+    'کارتِ خاموش که عنوان دارد، روی خودِ کارت هشدار می‌گیرد');
+  ok(/const offTitled = items\.filter\(m => !m\.enabled && m\.title\.trim\(\)\)/.test(adminPage),
+    'پنل کارت‌های خاموشِ دارای عنوان را می‌شمارد');
+  ok(/عنوان ندارد؛ /.test(adminPage),
+    'ذخیرهٔ کارتِ روشنِ بی‌عنوان، پیش از ارسال با پیامِ روشن گرفته می‌شود');
+
+  const adminRouteSrc = src('src/routes/adminCustomMission.js');
+  ok(/ماموریت خاموش است و دیده نمی‌شود/.test(adminRouteSrc),
+    'پیامِ سرور هم کارت‌های خاموشِ دارای عنوان را نام می‌برد');
   ok(/custom-mission\/\$\{item\.id\}\/reset/.test(adminPage) && /ارسال دوباره به همه/.test(adminPage),
     'دکمهٔ «ارسال دوباره به همه» در پنل هست (همان ماموریت، برای همه از نو)');
 

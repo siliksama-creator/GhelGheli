@@ -54,7 +54,15 @@ let draftSeq = 0;
 const draftOf = (m = {}) => ({
   key: m.id || `draft-${++draftSeq}`,
   id: m.id || '',
-  enabled: m.enabled === true,
+  // ⚠️ کارتِ **تازه** پیش‌فرض روشن است (درسِ ۲۹ شهریور).
+  //
+  // مالک دو ماموریت ساخت و بعد گفت «فقط یکی رو نشون میده»: کارتِ دوم با
+  // `enabled:false` ذخیره شده بود، چون «افزودن ماموریت» کارتِ خاموش می‌ساخت
+  // و کلیدِ فعال در **پایینِ** کارتِ بلند بود؛ پرکردنِ عنوان و امتیاز و زدنِ
+  // «ذخیره و اعمال» ظاهراً یعنی «این را اضافه کن»، ولی کارت بی‌صدا خاموش
+  // می‌ماند. حالا افزودن = نشان بده؛ اگر کسی کارتِ پیش‌نویس می‌خواهد،
+  // خاموشش می‌کند و همان لحظه هم هشدار می‌گیرد.
+  enabled: m.id ? m.enabled === true : true,
   title: m.title || '',
   body: m.body || '',
   points: Number(m.points || 0),
@@ -110,7 +118,17 @@ export function CustomMissionPage({ request }) {
   useEffect(load, [load]);
 
   const activeCount = items.filter(m => m.enabled && m.title.trim()).length;
+  // کارتی که کاربر **نمی‌بیند** ولی ادمین فکر می‌کند ساخته: عنوان دارد ولی
+  // خاموش است. این عدد باید روی صفحه فریاد بزند، نه اینکه در زیرنویسِ کارت
+  // گم شود.
+  const offTitled = items.filter(m => !m.enabled && m.title.trim());
   const patch = (key, p) => setItems(rows => rows.map(r => (r.key === key ? { ...r, ...p } : r)));
+
+  /** همهٔ کارت‌های دارای عنوان را یک‌جا روشن کن. */
+  function enableAll() {
+    setItems(rows => rows.map(r => (r.title.trim() ? { ...r, enabled: true } : r)));
+    notify('همهٔ کارت‌های دارای عنوان روشن شدند — یادت نرود «ذخیره و اعمال» را بزنی', 'success');
+  }
 
   function addItem() {
     if (items.length >= meta.max) {
@@ -153,7 +171,15 @@ export function CustomMissionPage({ request }) {
     setResetting(item.key);
     try {
       const r = await request(`/api/admin/custom-mission/${item.id}/reset`, { method: 'POST' });
-      notify(r.message, 'success');
+      // هشدارِ صریح: کارت‌هایی با عنوان که خاموش‌اند به کاربر نمی‌رسند.
+      const offTitled = items.filter(m => !m.enabled && m.title.trim());
+      notify(
+        offTitled.length
+          ? `${r.message} — ولی ${fa(offTitled.length)} ماموریت خاموش است و دیده `
+            + `نمی‌شود: ${offTitled.map(m => `«${m.title.trim()}»`).join('، ')}`
+          : r.message,
+        offTitled.length ? 'error' : 'success',
+      );
       if (r.missions) applyMissions(r.missions, meta.colors);
       if (r.stats) setStats(r.stats);
       if (r.updatedAt) setStamp(r.updatedAt);
@@ -166,6 +192,24 @@ export function CustomMissionPage({ request }) {
 
   async function save() {
     if (busy) return;
+
+    // ── گاردِ پیش از ارسال (درسِ «فقط یکی رو نشون میده») ──────────────────
+    // سرور «روشن بدونِ عنوان» را رد می‌کند؛ ولی پیامِ سرور برای ادمین
+    // انتزاعی است. این‌جا دقیقاً می‌گوییم کدام کارت مشکل دارد، و اگر کارتی
+    // عنوان دارد ولی خاموش است، هشدار می‌دهیم که دیده نمی‌شود — همان چیزی
+    // که باگِ گزارش‌شده بود.
+    const untitled = items
+      .map((m, i) => ({ m, i }))
+      .filter(({ m }) => m.enabled && !m.title.trim());
+    if (untitled.length) {
+      notify(
+        `کارتِ ${untitled.map(({ i }) => fa(i + 1)).join(' و ')} عنوان ندارد؛ `
+        + 'عنوان را بنویس یا خاموشش کن — وگرنه با عنوانِ خالی نمی‌شود ذخیره کرد',
+        'error',
+      );
+      return;
+    }
+
     setBusy(true);
     try {
       const r = await request('/api/admin/custom-mission', {
@@ -215,9 +259,17 @@ export function CustomMissionPage({ request }) {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <Badge tone={activeCount ? 'success' : 'neutral'}>
               {activeCount
-                ? `${activeCount} ماموریت فعال — کاربران می‌بینند`
+                ? `${fa(activeCount)} ماموریت فعال — کاربران می‌بینند`
                 : 'خاموش — کسی نمی‌بیند'}
             </Badge>
+            {offTitled.length > 0 && (
+              <Badge tone="warning">
+                {fa(offTitled.length)} ماموریتِ نوشته‌شده خاموش است — دیده نمی‌شود
+              </Badge>
+            )}
+            {offTitled.length > 0 && (
+              <Button variant="secondary" onClick={enableAll}>همه را فعال کن</Button>
+            )}
             <Button variant="secondary" icon={Plus} onClick={addItem}>
               افزودن ماموریت
             </Button>
@@ -230,8 +282,9 @@ export function CustomMissionPage({ request }) {
         ) : items.length === 0 ? (
           <p style={{ color: 'var(--gg-muted)' }}>
             هنوز ماموریتی نساخته‌اید. با «افزودن ماموریت» اولین کارت را بسازید؛
-            تا وقتی کلیدِ «فعال» روشن نشود، هیچ کاربری چیزی نمی‌بیند و رفتارِ
-            امروزِ اپ دست‌نخورده می‌ماند.
+            کارتِ تازه <b>فعال</b> ساخته می‌شود و بعد از «ذخیره و اعمال» به
+            کاربران نشان داده می‌شود. اگر می‌خواهید کارتی فعلاً دیده نشود،
+            فقط کلیدِ «فعال باشد» را در پایینِ همان کارت بردارید.
           </p>
         ) : (
           <p style={{ color: 'var(--gg-muted)', fontSize: 13, lineHeight: 1.9 }}>
@@ -254,6 +307,9 @@ export function CustomMissionPage({ request }) {
               : 'خاموش — کاربران این کارت را نمی‌بینند'}
             action={(
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                {!item.enabled && item.title.trim() && (
+                  <Badge tone="warning">خاموش — دیده نمی‌شود</Badge>
+                )}
                 {spent && (
                   <Badge tone="neutral">
                     <Users size={12} style={{ marginInlineEnd: 4, verticalAlign: '-2px' }} />

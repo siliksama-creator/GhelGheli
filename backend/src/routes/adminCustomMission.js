@@ -68,10 +68,20 @@ module.exports = function createAdminCustomMissionRoutes(deps) {
       await audit(req.admin.id, 'update_custom_mission', 'app_settings', null,
         b.reason || null, { items });
       const active = items.filter((m) => m.enabled && m.title).length;
+      // کارت‌هایی که عنوان دارند ولی خاموش‌اند، به کاربر نمی‌رسند. اگر این
+      // فهرست را نام نبریم، ادمین فکر می‌کند «۲ ماموریت ساختم» ولی کاربر
+      // یکی می‌بیند — همان گزارشِ ۲۹ شهریور («فقط یکی رو نشون میده») که
+      // ریشه‌اش همین کارتِ خاموش بود. پس صریح نوشته می‌شود.
+      const offTitled = items.filter((m) => !m.enabled && m.title).map((m) => `«${m.title}»`);
+      // بدونِ ایموجی — گاردِ `tool/no-emoji.mjs` ایموجی را در هر دو کلاینت و
+      // پیام‌های سرور ممنوع می‌کند (شکل و رنگش دستِ ما نیست).
+      const warn = offTitled.length
+        ? ` — ولی ${offTitled.length} ماموریت خاموش است و دیده نمی‌شود: ${offTitled.join('، ')}`
+        : '';
       res.json({
-        message: active
+        message: (active
           ? `${items.length} ماموریت ذخیره شد — ${active} ماموریت فعال از همین لحظه به کاربران نشان داده می‌شود`
-          : `${items.length} ماموریت ذخیره شد (هیچ‌کدام فعال نیست و به کاربران نشان داده نمی‌شود)`,
+          : `${items.length} ماموریت ذخیره شد (هیچ‌کدام فعال نیست و به کاربران نشان داده نمی‌شود)`) + warn,
         missions: items,
         updatedAt: customMission.listStamp(),
         preview: customMission.publicView(),
