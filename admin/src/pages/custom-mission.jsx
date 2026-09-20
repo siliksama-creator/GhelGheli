@@ -46,6 +46,9 @@ import { useToast } from '../lib/toast.jsx';
 
 const EMPTY_LINK = { url: '', text: '', color: 'blue' };
 
+/** رقمِ فارسی — تا «حداکثر ۱۰» نوشته شود، نه «حداکثر 10». */
+const fa = (n) => Number(n || 0).toLocaleString('fa-IR');
+
 let draftSeq = 0;
 /** یک ردیفِ قابلِ ویرایش از فهرست. `key` فقط برای React است (شناسهٔ خالی هم دارد). */
 const draftOf = (m = {}) => ({
@@ -111,7 +114,7 @@ export function CustomMissionPage({ request }) {
 
   function addItem() {
     if (items.length >= meta.max) {
-      notify(`حداکثر ${meta.max} ماموریت — اول یکی را حذف کن یا همان را ویرایش کن`, 'error');
+      notify(`حداکثر ${fa(meta.max)} ماموریت — اول یکی را حذف کن یا همان را ویرایش کن`, 'error');
       return;
     }
     setItems(rows => [...rows, draftOf()]);
@@ -232,7 +235,7 @@ export function CustomMissionPage({ request }) {
           </p>
         ) : (
           <p style={{ color: 'var(--gg-muted)', fontSize: 13, lineHeight: 1.9 }}>
-            ترتیبِ زیر، همان ترتیبی است که کاربر می‌بیند. حداکثر {meta.max} ماموریت؛
+            ترتیبِ زیر، همان ترتیبی است که کاربر می‌بیند. حداکثر {fa(meta.max)} ماموریت؛
             هر کاربر برای هر ماموریت <b>یک‌بار</b> امتیاز می‌گیرد و بعد آن کارت
             برای او پنهان می‌شود. <b>ویرایشِ متن</b> کارت را برای کسانی که گرفته‌اند
             برنمی‌گرداند؛ فقط <b>«ارسال دوباره به همه»</b> این کار را می‌کند.
