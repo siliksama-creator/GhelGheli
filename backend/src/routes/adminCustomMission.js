@@ -26,6 +26,9 @@
  * مرورگری باز مانده باشد، ذخیره‌اش نمی‌شکند.
  */
 const express = require('express');
+// رقمِ فارسی در پیام‌ها: پنل همه‌جا عدد را فارسی نشان می‌دهد؛ اگر پیامِ سرور
+// «3 ماموریت» بگوید، همان توستِ ذخیره در کنارِ «۳ کارتِ فعال» لاتین می‌ماند.
+const { faDigits } = require('../lib/faNum');
 
 const COLORS = ['blue', 'green'];
 
@@ -76,12 +79,12 @@ module.exports = function createAdminCustomMissionRoutes(deps) {
       // بدونِ ایموجی — گاردِ `tool/no-emoji.mjs` ایموجی را در هر دو کلاینت و
       // پیام‌های سرور ممنوع می‌کند (شکل و رنگش دستِ ما نیست).
       const warn = offTitled.length
-        ? ` — ولی ${offTitled.length} ماموریت خاموش است و دیده نمی‌شود: ${offTitled.join('، ')}`
+        ? ` — ولی ${faDigits(offTitled.length)} ماموریت خاموش است و دیده نمی‌شود: ${offTitled.join('، ')}`
         : '';
       res.json({
         message: (active
-          ? `${items.length} ماموریت ذخیره شد — ${active} ماموریت فعال از همین لحظه به کاربران نشان داده می‌شود`
-          : `${items.length} ماموریت ذخیره شد (هیچ‌کدام فعال نیست و به کاربران نشان داده نمی‌شود)`) + warn,
+          ? `${faDigits(items.length)} ماموریت ذخیره شد — ${faDigits(active)} ماموریت فعال از همین لحظه به کاربران نشان داده می‌شود`
+          : `${faDigits(items.length)} ماموریت ذخیره شد (هیچ‌کدام فعال نیست و به کاربران نشان داده نمی‌شود)`) + warn,
         missions: items,
         updatedAt: customMission.listStamp(),
         preview: customMission.publicView(),
