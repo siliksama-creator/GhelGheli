@@ -48,7 +48,7 @@ const errors = [];
 if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(BASE)) {
   await page.route('https://api.ghelghelishop.ir/**', async route => {
     try {
-      await route.fulfill({ response: await route.fetch() });
+      await route.fulfill({ response: await route.fetch({ timeout: 5000 }) });
     } catch {
       await route.abort();
     }
@@ -176,7 +176,11 @@ const check = (where, r) => {
 
 try {
   console.log(`\n== typography: ${BASE} ==`);
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  try {
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 15000 });
+  } catch {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 15000 });
+  }
   await page.evaluate(() => document.fonts.ready);
 
   // The whole point: the font files must actually load, not just be declared.

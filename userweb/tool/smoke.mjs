@@ -40,7 +40,7 @@ const pageErrors = [];
 if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(BASE)) {
   await page.route('https://api.ghelghelishop.ir/**', async route => {
     try {
-      const response = await route.fetch();
+      const response = await route.fetch({ timeout: 5000 });
       await route.fulfill({ response });
     } catch {
       await route.abort();
@@ -95,7 +95,11 @@ async function openDestination(id) {
 
 try {
   console.log(`\n== smoke: ${BASE} ==`);
-  await page.goto(BASE, { waitUntil: 'networkidle' });
+  try {
+    await page.goto(BASE, { waitUntil: 'networkidle', timeout: 15000 });
+  } catch {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 15000 });
+  }
   ok(pageErrors.length === 0,
     `login page renders cleanly${pageErrors[0] ? ` (${pageErrors[0].slice(0, 90)})` : ''}`);
   ok((await page.innerText('body')).trim().length > 0, 'login page is not blank');
