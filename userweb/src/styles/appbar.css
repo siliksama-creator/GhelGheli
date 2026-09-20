@@ -4,7 +4,9 @@
    into ragged rows, cards floated at random widths and toasts never left the
    screen. These rules give the whole portal one rhythm. */
 
-.portal { gap: 14px; padding-bottom: 8px; }
+.portal { gap: 14px; padding-bottom: 8px;
+  /* دسکتاپ = موبایل: کل پرتال در ستونِ ۷۲۰px وسط‌چین (۱۴۰۵/۰۷/۳۰). */
+  max-width: 720px; margin-inline: auto; }
 
 .appBar {
   position: sticky; top: 8px; z-index: 25;

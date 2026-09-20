@@ -419,7 +419,6 @@
   .refProgressBar span { transition: none; }
 }
 
-
 /* ── درخشش برشِ برنده ───────────────────────────────────────────────────
    یک قطاع با conic-gradient که سه بار نبض می‌زند. داخل .wheelSpinner است
    پس با گردونه می‌چرخد و همیشه روی همان برش می‌ماند.
@@ -906,10 +905,6 @@ a:focus-visible {
 .passSources small { font-size: 11.5px; color: #8ba3bd; }
 
 /* روی صفحهٔ بزرگ‌تر، خانه‌ها کمی بزرگ‌تر می‌شوند */
-@media (min-width: 720px) {
-  .passCell { width: 92px; }
-  .passCellText { font-size: 11.5px; }
-}
 /* احترام به کاربری که انیمیشن نمی‌خواهد */
 @media (prefers-reduced-motion: reduce) {
   .passCell.is-ready { animation: none; }
@@ -1255,7 +1250,6 @@ a:focus-visible {
   background: #b5ef58; border: 1.5px solid #0d1a2c;
 }
 
-
 @media (prefers-reduced-motion: reduce) {
   .pTile.is-ready, .pClaimAll { animation: none; }
   .pBarFill, .pRailThumb { transition: none; }
@@ -1282,7 +1276,6 @@ a:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .appLogo.glow { animation: none; box-shadow: 0 0 10px #b5ef5866; }
 }
-
 
 /* ═══════════════════════════════════════════════════════════════════════════
    نشانِ لول — آینهٔ LevelBadge در اپ اندروید
@@ -1471,7 +1464,6 @@ a:focus-visible {
   color: #c9ddf2;
   text-align: center;
 }
-
 
 /* راهنمای «چند نسخه از یک کارت».
    رنگِ برند می‌گیرد نه خاکستریِ راهنماهای معمولی: این یک نکتهٔ
@@ -2080,7 +2072,6 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .phaseDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ffffff42; }
 .streakHead .assetIcon { filter: drop-shadow(0 8px 16px #ff9c3d44); }
 
-
 /* ── FAQ & Privacy Section ── */
 .faqSection { margin-top: 10px; margin-bottom: 12px; }
 .faqSection h3 { margin: 0 0 10px; font-size: 16px; color: #7dd3fc; } /* #38bdf8 روی پس‌زمینهٔ فیروزه‌ای ۴.۴۲ می‌داد (زیرِ حدِ ۴.۵)؛ #7dd3fc همان آبیِ برند است با ۵.۶۸ */
@@ -2681,13 +2672,6 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 }
 
 /* روی دسکتاپ جا هست؛ همان شبکهٔ چندردیفه بهتر است. */
-@media (min-width:900px){
-  .duelGridV2{
-    display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
-    overflow:visible;
-  }
-  .duelGridV2>*{flex:initial}
-}
 
 /* ── ۴. پنلِ تحلیل: ۲۶۷px → جمع‌شونده ── */
 .duelIntel>.duelIntelBody{margin-top:8px}
@@ -2846,9 +2830,6 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .gameTileBody p{-webkit-line-clamp:1}
 }
 /* دسکتاپ: سه ستون، جای بیشتری هست. */
-@media (min-width:760px){
-  .gameTileGrid{grid-template-columns:repeat(3,1fr)}
-}
 
 /* ═══ رفع سرریزِ افقیِ ۱۵px صفحهٔ دوئل ═══════════════════════════════════
    اندازه‌گیری: عرضِ نما ۳۹۰px ولی `scrollWidth` سند ۴۰۵px.
@@ -4048,33 +4029,24 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 }
 .chatReplyX:hover{ background:#EF444418 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   دسکتاپ (≥1100px) — نسخهٔ وب روی مانیتور
-   ═══════════════════════════════════════════════════════════════════════
+/* ═════════════════════════════════════════════════════════════════
+   پوستهٔ دسکتاپ (۱۴۰۵/۰۷/۳۰) — دسکتاپ آینهٔ موبایل است
+   ═════════════════════════════════════════════════════════════════
 
-   چرا این بلوک لازم بود: تمام چیدمانِ پرتال برای گوشی نوشته شده و روی
-   مانیتور همان ستونِ ۱۰۸۰px را وسط می‌انداخت؛ اندازه‌گیری روی ۱۴۴۰px:
-   تبِ خانه ۲۶۸۹px ارتفاع داشت، یعنی کاربر دسکتاپ برای دیدنِ همان محتوایی
-   که گوشی یکجا نشان می‌دهد سه صفحه اسکرول می‌کرد، در حالی که دو طرفِ
-   صفحه خالی بود.
+   تصمیم مالک: وبِ دسکتاپ هم همان چیدمانِ موبایل را نشان دهد.
+   محتوا در یک ستونِ وسط‌چینِ ۷۲۰px می‌نشیند (`.page` و `.portal`
+   در base.css / appbar.css) و قواعدِ تک‌ستونهٔ موبایل همواره‌ای
+   شده‌اند. چهاردهٔ بلاکِ قدیمیِ چندستونهٔ دسکتاپ حذف شدند —
+   تاریخچه در پیام‌های کامیت و گیت‌هاب است.
 
-   ⚠️ همه‌چیز داخل `min-width` است، نه دستکاریِ قواعدِ پایه. دلیلش قید
-      «وب باید آینهٔ اندروید باشد» است: زیرِ ۱۱۰۰px حتی یک اعلانِ این بلوک
-      فعال نمی‌شود، پس رفتارِ گوشی و اندروید بیت‌به‌بیت دست‌نخورده می‌ماند و
-      فقط جایی عوض می‌شود که اندروید اصلاً وجود ندارد. */
-@media (min-width: 1100px) {
-  /* فضای افقی‌ای که هدر می‌رفت را پس می‌گیریم. */
-  .page { max-width: 1400px; padding: 22px 28px 40px; }
-  .portal > .appBar,
-  .portal > .mobileNav,
-  .portal > .tabPane { max-width: 1240px; }
-
-  /* نوار ناوبری: روی گوشی چسبیده به لبهٔ پایین درست است، ولی روی مانیتورِ
-     پهن یک نوارِ ۱۴۴۰px با پنج دکمهٔ پخش‌شده بدترکیب است. اینجا به یک
-     «پیل» شناور و جمع‌وجورِ وسط‌چین تبدیلش می‌کنیم.
-     سلکتور `.portal > .mobileNav` عمداً تکرار شده: قانونِ عرضِ بالاتر در
-     فایل همین ویژگی‌مندی (0,2,1) را دارد و با `.mobileNav`ِ تنها لغو
-     نمی‌شد. */
+   تنها تفاوتِ باقی‌ماندهٔ دسکتاپ، نوارِ ناوبریِ پایین است:
+   در موبایل یک دکِ ثابتِ تمام‌عرض است، ولی همان نوارِ کش‌آمده
+   روی مانیتورِ پهن بهم‌ریخته دیده می‌شود؛ پس از ۹۰۰px به بالا به
+   یک «پیل»ِ شناورِ وسط‌چین تبدیل می‌شود (همان ۵ تب، بدون تغییر).
+   ───────────────────────────────────────────────────────────────── */
+@media (min-width: 900px) {
+  /* جای پیلِ شناور + فاصلهٔ نفس‌کشیدن. */
+  .portal { padding-bottom: 108px; }
   .portal > .mobileNav { width: auto; max-width: none; }
   .mobileNav {
     left: 50%; right: auto;
@@ -4092,237 +4064,13 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
     padding: 9px 16px;
     border-radius: 15px;
   }
-  /* جای پیلِ شناور + فاصلهٔ نفس‌کشیدن. */
-  .portal { padding-bottom: 108px; }
-
   /* روی موس، بازخوردِ hover معنا دارد (روی لمس نداشت). */
   .mobileNav button:not(.on):hover { background: #ffffff12; color: #e8f4ff; }
-
-  /* کلکسیونِ خانه: سه ستون روی مانیتور یعنی یک نوارِ بلندِ ۱۱۶۶px.
-     پنج ستون همان کارت‌ها را در کمتر از نصفِ ارتفاع می‌نشاند. */
-  .homeInventoryPreview { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
-
-  /* کاشی‌های بازی: دو ستونِ گوشی روی مانیتور کاشی‌های غول‌پیکر می‌سازد.
-     سه ستون، چون دقیقاً سه بازی اینجا رندر می‌شود (`tap` بالاتر بنر
-     اختصاصی دارد). با `repeat(4,…)` یک ستونِ خالی می‌ماند و ردیف
-     بدقواره از وسط می‌افتد. `max-width` هم لازم است تا اگر روزی بازی
-     چهارم اضافه شد کاشی‌ها کش نیایند. */
-  .gameTileGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-    max-width: 880px;
-    margin-inline: auto;
-  }
 }
+/* پوستهٔ بازی: همواره تک‌ستونِ ۶۴۰px (آینهٔ اندروید) — چیدمانِ
+   چندستونهٔ قدیمیِ دسکتاپ (دورِ چهاردهم) طبقِ تصمیم مالک حذف شد. */
 
-/* مانیتورهای خیلی پهن: یک پله بازتر، بدون اینکه خطوط متن دراز شوند. */
-@media (min-width: 1600px) {
-  .page { max-width: 1560px; }
-  .portal > .appBar,
-  .portal > .mobileNav,
-  .portal > .tabPane { max-width: 1380px; }
-  .homeInventoryPreview { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-}
-
-/* ─────────────────────────────────────────────────────────────────────
-   دورِ چهاردهم — چیدمانِ داخلِ بازی روی دسکتاپ
-   ---------------------------------------------------------------------
-   مشکل اندازه‌گیری‌شده: پوستهٔ بازی یک `maxWidth:640px`ِ inline داشت، پس
-   روی مانیتور یک ستونِ باریکِ وسط بود و تخته از پایینِ صفحه می‌زد بیرون
-   (۱۳۶۶×۷۶۸: پنالتی ۲۹۸px و جفت‌یاب ۲۲۵px اسکرول؛ گریدِ جفت‌یاب حتی زیرِ
-   نوارِ پایین پنهان می‌شد). آن inline برداشته شد و اینجا بازسازی می‌شود:
-   موبایل دقیقاً همان ۶۴۰px قبلی می‌ماند (آینهٔ اندروید، دست‌نخورده) و
-   فقط از ۱۱۰۰px به بالا چیدمانِ دو‌ستونه فعال می‌شود. */
 .gameShell { max-width: 640px; margin-inline: auto; }
-
-@media (min-width: 1100px) {
-  /* دو ستون: تخته در ستونِ پهن، و «ریلِ» وضعیت (اسکوربورد، پات، هشدارها)
-     در ستونِ باریک کنارش — الگوی استانداردِ سایت‌های بازی. این هم فضای
-     خالیِ دو طرفِ صفحه را پر می‌کند و هم ارتفاع را نصف می‌کند، چون
-     اسکوربورد دیگر یک ردیفِ جدا بالای تخته نیست.
-     جای‌گذاری با شمارهٔ صریحِ سطر/ستون است نه auto-placement، چون
-     `.err` و بنرِ اتصال شرطی‌اند و جابه‌جا شدنشان کلِ چیدمان را می‌لغزاند. */
-  .gameShell.isPlaying {
-    display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(248px, 0.82fr);
-    grid-template-rows: auto auto auto auto 1fr;
-    column-gap: 20px;
-    row-gap: 12px;
-    align-items: start;
-    max-width: min(1080px, 96vw);
-    text-align: start;
-  }
-  .gameShell.isPlaying > .gameShellHead   { grid-area: 1 / 1 / 2 / -1; margin-bottom: 0; }
-  .gameShell.isPlaying > .gameShellBoard  { grid-area: 2 / 1 / -1 / 2; align-self: start; }
-  .gameShell.isPlaying > .gameShellScore  { grid-area: 2 / 2 / 3 / 3; margin-bottom: 0; }
-  .gameShell.isPlaying > .gameShellPot    { grid-area: 3 / 2 / 4 / 3; margin: 0 !important; }
-  .gameShell.isPlaying > .err             { grid-area: 4 / 2 / 5 / 3; margin: 0 !important; }
-  .gameShell.isPlaying > .gameReconnectBanner { grid-area: 5 / 2 / 6 / 3; margin: 0; }
-
-  /* اسکوربورد در ستونِ باریک باید عمودی شود، وگرنه دو نام و نشانِ نوبت
-     در ۲۴۸px له می‌شوند. */
-  .gameShell.isPlaying > .gameShellScore {
-    flex-direction: column;
-    gap: 10px;
-    padding: 14px 12px !important;
-  }
-
-  /* اندازه‌گیری: تختهٔ پنالتی ۷۲۴px بود و ریلِ کناری ۱۵۹px — یعنی ۳۳۹px
-     حفرهٔ خالیِ آشکار در ستونِ راست، همان چیزی که نما را «ناتمام» نشان
-     می‌داد. ریل در ردیفِ ۲ می‌نشیند در حالی که تخته ردیفِ ۲ تا آخر را
-     می‌گیرد، پس فضای اضافی به ردیفِ ۵ (که `1fr` است) می‌رسد و زیرِ ریل
-     خلأ می‌ماند.
-     راه‌حل: وقتی هیچ‌کدام از بلوک‌های شرطیِ ستونِ کناری (پات، خطا، بنرِ
-     اتصالِ مجدد) رندر نشده‌اند — یعنی حالتِ متعارفِ تمرین با ربات — ریل
-     تمامِ ارتفاعِ ستون را بگیرد و عمودی وسط‌چین شود تا کنارِ مرکزِ تخته
-     بایستد. `:has()` این شرط را دقیق و بدون تغییرِ JSX بیان می‌کند. */
-  .gameShell.isPlaying:not(:has(> .gameShellPot)):not(:has(> .err)):not(:has(> .gameReconnectBanner))
-    > .gameShellScore {
-    grid-area: 2 / 2 / -1 / 3;
-    align-self: center;
-  }
-  .gameShell.isPlaying > .gameShellScore > div { flex: 0 0 auto !important; width: 100%; justify-content: center !important; }
-
-  /* ارتفاع، نه عرض، قیدِ اصلیِ داخلِ بازی است: بالای کارت نوارِ اپ و
-     ساب‌تب‌ها (~۱۵۵px) و پایینش نوارِ شناور (~۱۰۰px) نشسته. پس تخته با
-     vh بسته می‌شود تا در ۷۶۸px هم کاملِ کادر داخلِ fold بماند. */
-  .gameShell.isPlaying .penPitch { width: min(100%, calc(43vh * 1.3)); }
-  .gameShell.isPlaying .memGrid  { width: min(392px, calc(43vh * 0.82)); }
-}
-
-/* مانیتورِ بلند: وقتی ارتفاع هست، تخته هم بزرگ‌تر نفس بکشد. */
-@media (min-width: 1100px) and (min-height: 1000px) {
-  .gameShell.isPlaying .penPitch { width: min(100%, 560px); }
-  .gameShell.isPlaying .memGrid  { width: min(392px, calc(46vh * 0.82)); }
-}
-
-/* مانیتورهای کوتاه (۷۶۸–۹۰۰px ارتفاع، یعنی لپ‌تاپِ متعارف) هنوز تنگ‌اند:
-   بالای کارت ۱۵۵px نوارِ اپ و ساب‌تب است و پایینش ۱۰۸px جای نوارِ شناور.
-   پس روی این ارتفاع‌ها کروم را می‌فشاریم تا خودِ تخته قربانی نشود. */
-@media (min-width: 1100px) and (max-height: 900px) {
-  .gameShell.isPlaying { padding: 14px !important; row-gap: 8px; }
-  .gameShell.isPlaying > .gameShellHead { margin-bottom: 0; }
-  .gameShell.isPlaying .penPitch { width: min(100%, calc(42vh * 1.3)); }
-  .gameShell.isPlaying .penaltyExact { gap: 5px; }
-  /* اسکورِ داخلِ زمین وقتی ستونِ کناری همان نام‌ها و نوبت را نشان می‌دهد
-     نباید ۳۰px جای عمودی بگیرد. */
-  .gameShell.isPlaying .penScore { padding: 4px 12px; }
-  .gameShell.isPlaying .penScore > strong { font-size: 22px; padding: 2px 14px; }
-  .gameShell.isPlaying .penPrompt { min-height: 24px; padding: 2px 12px; font-size: 14px; }
-  .gameShell.isPlaying .memEvent { margin: 0; }
-  .gameShell.isPlaying .memGrid { width: min(392px, calc(46vh * 0.82)); }
-  /* ستونِ کناری هم جمع‌وجورتر. */
-  .gameShell.isPlaying > .gameShellScore { padding: 10px !important; gap: 7px; }
-
-  /* آخرین ۱۳px: پدینگِ پایینِ پرتال برای نوارِ شناور ۱۰۸px بود، ولی روی
-     مانیتورِ کوتاه خودِ همان پدینگ اسکرول می‌سازد. نوار ۶۲px است + ۲۰px
-     فاصله از کف، پس ۹۰px کافی است و نوار همچنان چیزی را نمی‌پوشاند. */
-  .portal { padding-bottom: 90px; }
-}
-
-/* لپ‌تاپِ ۷۶۸px: یک پله کوتاه‌تر از ۹۰۰px، پس تخته باید بیشتر جمع شود.
-   جدا نگه داشته شده تا ۱۴۴۰×۹۰۰ که جا دارد بی‌خود کوچک نشود. */
-@media (min-width: 1100px) and (max-height: 820px) {
-  .gameShell.isPlaying .penPitch { width: min(100%, calc(34vh * 1.3)); }
-  .gameShell.isPlaying .memGrid  { width: min(392px, calc(40vh * 0.82)); }
-
-  /* ⚠️ دوئل از این جمع‌شدن جا افتاده بود و نتیجه‌اش بدترین باگِ داخلِ
-     بازی بود که تا امروز پیدا شد:
-     روی ۱۳۶۶×۷۶۸ تختهٔ زنده تا y=۷۳۴ ادامه می‌یافت، در حالی که
-     `.mobileNav` (شناور، `bottom:0`) از y=۶۶۵ شروع می‌شود — یعنی
-     ۶۹px همپوشانی، و **هر پنج کارتِ دستِ کاربر** زیرِ نوار می‌رفتند.
-     یعنی روی رایج‌ترین رزولوشنِ لپ‌تاپ، بازیکن کارت‌هایش را نمی‌دید و
-     نمی‌توانست نوبتش را بازی کند مگر اینکه کورکورانه اسکرول کند.
-     محافظِ `padding-bottom:84px` که برای همین باگ نوشته شده بود فقط
-     داخل `@media (max-width:520px)` بود — یعنی صرفاً موبایل.
-     ۱۴۴۰×۹۰۰ اتفاقی سالم بود چون ۱۳۲px ارتفاعِ بیشتر داشت.
-     درمان: به‌جای هُل دادنِ صفحه با padding (که اسکرولِ ۹۶px می‌ساخت)،
-     خودِ تخته یک پله جمع می‌شود — دقیقاً منطقِ penPitch/memGrid بالا. */
-  .duelPageV2.isLive .duelScoreV2       { padding: 7px 11px; }
-  .duelPageV2.isLive .duelChoicePanel   { padding: 10px; }
-  .duelPageV2.isLive .duelChoicePrompt  { margin-bottom: 6px; }
-  .duelPageV2.isLive .duelHandV2 .ggCardArt { min-height: 110px; max-height: 110px; }
-  .duelPageV2.isLive .duelClash  .ggCardArt { min-height: 116px; max-height: 116px; }
-}
-
-/* ─────────────────────────────────────────────────────────────────────
-   دوئل کارت‌ها روی دسکتاپ
-   ---------------------------------------------------------------------
-   اندازه‌گیری: صفحهٔ چیدمانِ ترکیب ۱۰۳۸px بود در نمای ۹۰۰px (و ۷۶۸px)،
-   چون هفت بلوک — بنر، قوانین، ترکیب، تحلیل، دکمهٔ شروع، کلکسیون و
-   تاریخچه — همه در یک ستونِ ۹۸۰px روی هم چیده شده بودند.
-   روی مانیتور این ترتیبِ عمودی هیچ لزومی ندارد: کلکسیون (که گرید است و
-   عرض می‌خواهد) می‌رود ستونِ پهن، و ترکیب و دکمهٔ شروع کنارش می‌نشینند
-   تا کاربر همان لحظه که کارت انتخاب می‌کند ترکیبش را هم ببیند — که
-   دقیقاً کاری است که در این صفحه انجام می‌دهد. */
-@media (min-width: 1100px) {
-  .duelPageV2.isSetup {
-    display: grid;
-    /* ستونِ ترکیب باید پنج کارت را کنارِ هم جا دهد بدون بریدنِ نام؛
-       زیر ~۴۶۰px نام‌ها clip می‌شوند. پس کفِ ستونِ دوم ۴۶۰px است و
-       ستونِ اول بقیه را می‌گیرد. */
-    grid-template-columns: minmax(0, 1.1fr) minmax(460px, 0.9fr);
-    grid-auto-rows: min-content;
-    column-gap: 18px;
-    row-gap: 12px;
-    width: min(100%, 1180px);
-    align-items: start;
-  }
-  .duelPageV2.isSetup > .duelHeroV2 { grid-column: 1 / -1; }
-  /* تقسیمِ کار بین دو ستون بر اساسِ ارتفاعشان بسته شده، نه ترتیبِ
-     موبایل: اگر همهٔ بلوک‌های کوچک در ستونِ باریک بیفتند، همان ستون
-     ۶۹۴px بلند می‌شود و باز اسکرول می‌سازد در حالی که ستونِ پهن —
-     وقتی کلکسیون جمع است — خالی مانده.
-     پس: ستونِ پهن = قوانین + کلکسیون + تاریخچه، ستونِ باریک = ترکیب +
-     تحلیل + دکمهٔ شروع (سه چیزی که کاربر همزمان نگاهشان می‌کند). */
-  /* ردیف‌ها صریح‌اند، چون auto-placementِ گرید «sparse» است: وقتی
-     ترکیب دو ردیف در ستونِ ۲ می‌گیرد، کلکسیونِ ستونِ ۱ به ردیفِ خالیِ
-     عقب برنمی‌گردد و می‌افتد پایینِ همه‌چیز — همان چیزی که اندازه‌گیری
-     نشان داد (کلکسیون در top=684 زیرِ دکمهٔ شروع). */
-  .duelPageV2.isSetup > .duelRuleStrip   { grid-area: 2 / 1 / 3 / 2; }
-  .duelPageV2.isSetup > .duelCollection  { grid-area: 3 / 1 / 5 / 2; }
-  .duelPageV2.isSetup > .duelHistoryV2   { grid-area: 5 / 1 / 6 / 2; }
-  .duelPageV2.isSetup > .duelLineupV2    { grid-area: 2 / 2 / 4 / 3; }
-  /* ⚠️ باگِ اندازه‌گیری‌شده: این نوار کلاسِ عمومیِ `card` را هم دارد و
-     `.card` عرضِ صریحِ `min(560px,95vw)` می‌دهد. ستونِ دوم ۵۲۳px است، پس
-     نوار ۵۶۰px می‌شد و ۳۷px از لبهٔ چپِ ستون — حتی از لبهٔ خودِ صفحه
-     (L=93 در برابر L=130) — بیرون می‌زد. روی گوشی این اتفاق نمی‌افتد چون
-     مدیا کوئریِ ۹۰۰px با `!important` عرض را ۱۰۰٪ می‌کند. */
-  .duelPageV2.isSetup > .duelIntelCompact{ grid-area: 4 / 2 / 5 / 3; width: 100%; }
-  .duelPageV2.isSetup > .duelLaunch      { grid-area: 5 / 2 / 6 / 3; }
-  .duelPageV2.isSetup > .duelMessage,
-  .duelPageV2.isSetup > .gameStakeNotice { grid-column: 2; grid-row: 6; }
-
-  /* کلکسیون در ستونِ پهن جا برای سه–چهار کارت در هر ردیف دارد؛
-     `auto-fit` خودش پر می‌کند، فقط سقفِ ارتفاع می‌گذاریم تا صفحه دراز
-     نشود و خودِ گرید اسکرول کند (نه کلِ صفحه). */
-  .duelPageV2.isSetup > .duelCollection[open] > .duelGridV2 {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    max-height: calc(100vh - 420px);
-    overflow-y: auto;
-    padding-inline-end: 4px;
-  }
-
-}
-
-/* حالتِ زندهٔ دوئل: نوارِ فشرده + میدانِ نبرد. اینجا تک‌ستونه درست است
-   (تمرکز روی کلَش وسط)، فقط عرض را مهار می‌کنیم تا کارت‌ها کش نیایند. */
-@media (min-width: 1100px) {
-  .duelPageV2.isLive { width: min(100%, 900px); }
-}
-
-/* روی لپ‌تاپِ کوتاه، بنرِ ۱۵۰pxیِ دوئل تنها بلوکی است که می‌شود بی‌ضرر
-   کوچکش کرد (تزیینی است، نه کارکردی). ۱۵۰→۹۶ یعنی ۵۴px آزاد. */
-@media (min-width: 1100px) and (max-height: 820px) {
-  .duelPageV2.isSetup > .duelHeroV2 {
-    min-height: 96px;
-    padding: 12px 18px;
-    grid-template-columns: auto 60px 1fr auto;
-    gap: 12px;
-  }
-  .duelPageV2.isSetup > .duelHeroV2 h1 { font-size: 22px; }
-  .duelPageV2.isSetup { row-gap: 9px; }
-}
 
 /* ─── جفت‌یاب روی گوشی: گرید زیرِ نوارِ پایین پنهان می‌شد ───
    اندازه‌گیری روی ۳۹۰×۸۴۴: صفحه ۹۰۲px بود و کفِ گرید ۷۸۸px، در حالی که
@@ -4558,7 +4306,6 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   100% { transform: translateY(560px) rotate(calc(var(--rot) + 300deg)); opacity: 0; }
 }
 
-
 /* ── ScrollHint: راهنمای «پایین هم ادامه دارد» (آینهٔ Flutter ScrollHint) ── */
 .scrollHintRoot{position:relative;width:100%;contain:layout;min-height:40vh} /* FIX: جلوگیری از پرش ارتفاع */
 .scrollHintFade{
@@ -4681,62 +4428,4 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .duelMayhemIntroGo:active{transform:translateY(1px)}
 .duelMayhemLegendHelp{margin-right:auto;padding:2px 10px;border-radius:999px;border:1px solid rgba(255,122,26,.4);background:rgba(255,122,26,.1);color:#ffb066;font:inherit;font-size:10.5px;font-weight:800;cursor:pointer}
 .duelMayhemLegend>summary{display:flex;align-items:center;gap:8px}
-
-/* ─────────────────────────────────────────────────────────────────────
-   ورودی دسکتاپ — رفع نامتقارنی (گزارش 2026-09-13)
-   ---------------------------------------------------------------------
-   مشکل دیده‌شده در اسکرین‌شات `user@ghelghelishop.ir` روی مانیتورِ پهن:
-   `.page` یک ستونِ 420px وسط‌چین بود و `.hero` (330px) و `.auth`
-   (530→420) با فاصلهٔ 16pxِ ثابت روی هم چیده می‌شدند — در حالی که دو
-   طرفِ صفحه (~400px هر طرف روی 1440px) خالی می‌ماند و ترکیب عمودی
-   «نامتقارن» و ول دیده می‌شد.
-
-   راه‌حل: فقط از 1100px به بالا (جایی که اندروید وجود ندارد) صفحهٔ
-   **احرازنشده** به دو ستونِ برابرِ متقارن تبدیل می‌شود: برندینگ راست،
-   فرم چپ (در RTL ستونِ اول راست است)، هر دو عمودی وسط‌چین و با فاصلهٔ
-   برابر از لبه‌ها. زیر 1100px حتی یک پیکسل عوض نمی‌شود — آینهٔ
-   موبایل دست‌نخورده می‌ماند (قید پروژه، گارد desktop-layout.mjs).
-
-   چرا 1fr 1fr و نه 1fr 420px: با ستونِ ثابت، فرم 420px و تصویر 330px
-   باز هم اختلافِ عرضِ بصری می‌ساخت و «متقارن» حس نمی‌شد. دو ستونِ برابر
-   با `justify-items:center` هر محتوا را در **مرکزِ ستونِ خودش** می‌نشاند،
-   پس فاصله تا لبه‌ها و تا وسطِ صفحه دقیقاً برابر است.
-   ───────────────────────────────────────────────────────────────────── */
-@media (min-width: 1100px) {
-  .page:not(.signedIn) {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: center;
-    justify-items: center;
-    gap: 56px;
-    min-height: 100vh;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 40px 32px;
-  }
-  .page:not(.signedIn) .hero {
-    margin: 0;
-    max-width: 520px;
-    width: 100%;
-    justify-self: center;
-  }
-  .page:not(.signedIn) .heroMark img {
-    width: min(380px, 28vw);
-    height: auto;
-  }
-  /* ردیفِ Auth یک divِ پوشش با استایل inline `maxWidth:420` دارد.
-     در چیدمانِ دو‌ستونه باید دقیقاً مرکزِ ستونِ خودش بایستد نه با
-     `margin:0 auto`ِ سراسری. */
-  .page:not(.signedIn) > div:not(.hero) {
-    width: 100%;
-    max-width: 420px;
-    justify-self: center;
-    margin: 0 !important;
-  }
-  .page:not(.signedIn) .auth {
-    width: 100%;
-    max-width: 420px;
-    margin-inline: auto;
-  }
-}
 

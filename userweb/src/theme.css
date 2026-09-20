@@ -76,6 +76,3 @@ body {
   color: #94a3b8; font-size: 12.5px; text-align: center;
 }
 .rgSoonWays svg { color: #7dd3fc; opacity: .9; }
-@media (min-width: 1100px) {
-  .rgSoonWays { max-width: 620px; margin-inline: auto; }
-}

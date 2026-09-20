@@ -1,40 +1,26 @@
 #!/usr/bin/env node
 //
-// گاردِ چیدمانِ دسکتاپِ نسخهٔ وب.
+// گاردِ «دسکتاپ = موبایل» نسخهٔ وب (۱۴۰۵/۰۷/۳۰).
 //
-// چرا این فایل وجود دارد
-// ──────────────────────
-// کل پرتالِ وب برای گوشی نوشته شده و اندروید هم آینهٔ همان است. تا وقتی
-// کسی وب را روی مانیتور باز نکرده بود این تفاوت دیده نمی‌شد؛ اندازه‌گیری
-// روی ۱۴۴۰px دو ایرادِ واقعی نشان داد:
+// تصمیم مالک: وبِ دسکتاپ هم همان چیدمانِ موبایل را نشان دهد —
+// یک ستونِ وسط‌چینِ ۷۲۰px روی پس‌زمینهٔ تمام‌صفحه. چیدمان‌های
+// چندستونهٔ قدیمیِ دسکتاپ (۱۴ بلاک min-width) حذف شدند.
 //
-//   ۱. سرریزِ افقی در تبِ بازی‌ها: `scrollWidth=2010` در برابرِ
-//      `clientWidth=1440`. علت: کاشیِ بازی هم‌زمان کلاسِ `card` و
-//      `gameTileSquare` می‌گیرد و `.card` عرضِ صریحِ `min(560px,95vw)`
-//      دارد. داخل گریدی که ترکِ ۵۲۸px می‌سازد آن ۵۶۰px نمی‌شکند و کاشی
-//      از قاب بیرون می‌زند. روی موبایل پنهان بود، چون
-//      `@media(max-width:900px)` قانونِ `.card{width:100%!important}` را
-//      دارد — یعنی ایراد **فقط** روی دسکتاپ ظاهر می‌شد.
+// این گارد سه چیز را قفل می‌کند:
+//   ۱. هیچ بلاک min-width جدیدی برنمی‌گردد، مگرِ همان یک بلوکِ
+//      «پوستهٔ دسکتاپ» (DESKTOP-SHELL) که فقط نوارِ ناوبری را
+//      وسط‌چین می‌کند — قاعدهٔ محتوایی در آن ممنوع است.
+//   ۲. سقفِ عرضِ پرتال و صفحه ۷۲۰px است (نه ۱۰۸۰/۱۲۸۰/۱۴۰۰).
+//   ۳. قواعدِ پایهٔ موبایل دست‌نخورده‌اند: تک‌ستونِ `.grid`،
+//      `.wide,.card{width:100%}` و پوستهٔ بازیِ ۶۴۰px.
 //
-//   ۲. چیدمانِ تک‌ستونیِ گوشی روی مانیتور: تبِ خانه ۲۶۸۹px ارتفاع داشت و
-//      دو طرفِ صفحه خالی بود.
-//
-// ⚠️ نکتهٔ حیاتی برای هر تغییرِ بعدی: قیدِ پروژه می‌گوید «وب باید آینهٔ
-//    اندروید باشد». بنابراین اصلاحاتِ دسکتاپ **فقط** حق دارند داخلِ
-//    `@media (min-width: …)` بنشینند. اگر کسی همین قواعد را به قواعدِ
-//    پایه منتقل کند، ظاهرِ گوشی هم عوض می‌شود و آینه می‌شکند. تستِ ۳
-//    دقیقاً همین را می‌بندد.
-//
-// ⚠️ گاردِ ایستا نباید کامنت را کد بخواند؛ `strip()` قبل از هر بررسی
-//    کامنت‌ها را حذف می‌کند وگرنه همین توضیحات تست را سبز می‌کردند.
-
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..', '..');
 
-/** کامنت‌های `//` و `/* *\/` را حذف می‌کند تا متنِ توضیحی به‌جای کد شمرده نشود. */
+/** کامنت‌ها را حذف می‌کند تا متنِ توضیحی به‌جای کد شمرده نشود. */
 function strip(src) {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -44,7 +30,6 @@ function strip(src) {
 
 function loadCss() {
   const hub = fs.readFileSync(path.join(root, 'userweb/src/style.css'), 'utf8');
-  // اگر hub فقط import باشد، ماژول‌ها را بخوان و بچسبان (ترتیبِ import حفظ می‌شود)
   if (hub.includes("@import './styles/")) {
     const imports = [...hub.matchAll(/@import\s+['"]\.\/styles\/([^'"]+)['"]/g)].map(m => m[1]);
     let combined = '';
@@ -52,155 +37,91 @@ function loadCss() {
       const p = path.join(root, 'userweb/src/styles', f);
       if (fs.existsSync(p)) combined += '\n' + fs.readFileSync(p, 'utf8');
     }
-    // اگر به هر دلیلی import یافت نشد، خودِ hub را برگردان
     return combined || hub;
   }
   return hub;
 }
+
 const css = strip(loadCss());
+const appbar = fs.readFileSync(path.join(root, 'userweb/src/styles/appbar.css'), 'utf8');
+const base = fs.readFileSync(path.join(root, 'userweb/src/styles/base.css'), 'utf8');
 
-/** یک فایلِ سورسِ userweb را می‌خواند و کامنت‌هایش را حذف می‌کند. */
-const read = (rel) => strip(fs.readFileSync(path.join(root, 'userweb', rel), 'utf8'));
-
-let checks = 0;
-function ok(label, cond) {
-  checks += 1;
-  assert.ok(cond, `✗ ${label}`);
-  console.log(`  ✓ ${label}`);
-}
-
-// ── ۱. کاشیِ بازی نباید عرضِ ثابتِ ارثیِ `.card` را نگه دارد ───────────────
-// بلوک را بلوک‌محور جدا می‌کنیم، نه با `[\s\S]*$` که تا آخرِ فایل می‌بلعد.
-const tileBlock = css.match(/\.gameTileSquare\s*\{([^}]*)\}/);
-ok('بلوکِ .gameTileSquare پیدا شد', Boolean(tileBlock));
-ok('کاشیِ بازی عرضش را به کانتینر گره زده (width:100%) تا ۵۶۰pxِ .card سرریز نکند',
-  /width\s*:\s*100%/.test(tileBlock[1]));
-ok('کاشیِ بازی min-width:0 دارد تا ترکِ گرید بتواند کوچکش کند',
-  /min-width\s*:\s*0/.test(tileBlock[1]));
-
-// ── ۲. اصلاحاتِ دسکتاپ واقعاً وجود دارند ────────────────────────────────
-ok('بلوکِ دسکتاپ (min-width:1100px) در استایل هست',
-  /@media\s*\(\s*min-width:\s*1100px\s*\)/.test(css));
-
-// ── ۳. مهم‌ترین تست: هیچ اصلاحِ دسکتاپی نباید بیرونِ media query باشد ─────
-// روشِ سنجش: بلوک‌های `@media (min-width: …)` را با شمارشِ آکولاد جدا و از
-// متن حذف می‌کنیم؛ چیزی که می‌ماند «قواعدِ پایه»‌ای است که موبایل هم
-// می‌بیند. سپس مطمئن می‌شویم نشانه‌های چیدمانِ دسکتاپ آنجا نیستند.
-function stripMinWidthBlocks(src) {
-  let out = '';
-  let i = 0;
-  const re = /@media[^{]*min-width[^{]*\{/g;
-  let m;
-  while ((m = re.exec(src)) !== null) {
-    out += src.slice(i, m.index);
-    let depth = 1;
-    let j = m.index + m[0].length;
-    while (j < src.length && depth > 0) {
-      if (src[j] === '{') depth += 1;
-      else if (src[j] === '}') depth -= 1;
-      j += 1;
-    }
-    i = j;
-    re.lastIndex = j;
+let passed = 0;
+function check(name, fn) {
+  try {
+    fn();
+    passed += 1;
+    console.log('  ok -', name);
+  } catch (e) {
+    console.error('  FAIL -', name);
+    console.error('    ', String(e.message).slice(0, 300));
+    process.exitCode = 1;
   }
-  return out + src.slice(i);
 }
 
-const base = stripMinWidthBlocks(css);
+// ── ۱) فقط یک بلاک min-width مجاز است: پوستهٔ دسکتاپ ──────────────
+const minWidthBlocks = [...css.matchAll(/@media[^{]*\(\s*min-width[^)]*\)\s*\{[\s\S]*?\n\}/g)];
+check('فقط یک بلاک min-width در کل استایل‌ها (پوستهٔ دسکتاپ) باقی مانده', () => {
+  assert.equal(minWidthBlocks.length, 1, `انتظار ۱ بلاک بود، ${minWidthBlocks.length} پیدا شد`);
+});
 
-// نوارِ ناوبری روی گوشی باید تمام‌عرض و چسبیده به پایین بماند. اگر
-// «پیلِ وسط‌چین»ِ دسکتاپ به قواعدِ پایه نشت کند، این را می‌گیریم.
-const baseNavBlocks = base.match(/\.mobileNav\s*\{[^}]*\}/g) || [];
-ok('در قواعدِ پایه، .mobileNav هیچ transform: translateX ندارد (پیلِ وسط‌چین فقط دسکتاپ است)',
-  !baseNavBlocks.some(b => /transform\s*:\s*translateX/.test(b)));
-ok('در قواعدِ پایه، .mobileNav با left:0;right:0 تمام‌عرض می‌ماند',
-  baseNavBlocks.some(b => /left:\s*0/.test(b) && /right:\s*0/.test(b)));
+check('بلاکِ مجاز در آستانهٔ ۹۰۰px است', () => {
+  assert.ok(minWidthBlocks.length === 1);
+  assert.ok(/min-width:\s*900px/.test(minWidthBlocks[0][0]), 'آستانه باید 900px باشد');
+});
 
-// گریدهایی که روی دسکتاپ ستون‌دار شده‌اند نباید در پایه ستون‌دار باشند.
-const baseInv = base.match(/\.homeInventoryPreview\s*\{[^}]*\}/);
-ok('کلکسیونِ خانه در قواعدِ پایه سه‌ستونیِ موبایل مانده',
-  Boolean(baseInv) && /repeat\(\s*3\s*,/.test(baseInv[0]));
+check('پوستهٔ دسکتاپ فقط نوارِ ناوبری و پرتال را لمس می‌کند (بدون قاعدهٔ محتوایی)', () => {
+  assert.ok(minWidthBlocks.length === 1);
+  const body = minWidthBlocks[0][0].slice(minWidthBlocks[0][0].indexOf('{'));
+  const parts = body.split(/[{]}+/).map(x => x.trim()).filter(Boolean);
+  // قطعات جایگزین‌اند: [پیش، سلکتور1، قواعد1، سلکتور2، قواعد2، ...]
+  const selectors = parts.filter((x, idx) => idx % 2 === 1).flatMap(x => x.split(',')).map(x => x.trim()).filter(Boolean);
+  const allowed = new Set(['.portal', '.portal > .mobileNav', '.mobileNav', '.mobileNav button', '.mobileNav button:not(.on):hover']);
+  for (const sel of selectors) {
+    assert.ok(allowed.has(sel), `سلکتورِ غیرمجاز در پوستهٔ دسکتاپ: ${sel}`);
+  }
+});
 
-const baseTileGrid = base.match(/\.gameTileGrid\s*\{[^}]*\}/);
-ok('گریدِ کاشیِ بازی در قواعدِ پایه دوستونیِ موبایل مانده',
-  Boolean(baseTileGrid) && /repeat\(\s*2\s*,/.test(baseTileGrid[0]));
+check('هیچ سقفِ قدیمیِ دسکتاپ (1080/1120/1240/1280/1380/1400/1560px) باقی نمانده', () => {
+  for (const px of ['1240px', '1280px', '1380px', '1400px', '1560px']) {
+    assert.ok(!css.includes('max-width: ' + px) && !css.includes('max-width:' + px), `سقفِ قدیمی ${px} هنوز هست`);
+  }
+});
 
-// ── ۴. تستِ شکست (fail-test) روی خودِ منطق ──────────────────────────────
-// اگر `stripMinWidthBlocks` درست کار نکند، تستِ ۳ همیشه سبز می‌شود و بی‌ارزش
-// است. با یک نمونهٔ ساختگی ثابت می‌کنیم که واقعاً محتوای داخلِ media را
-// حذف و محتوای بیرونش را نگه می‌دارد.
-const sample = '.a{color:red}@media (min-width:1100px){.b{color:blue}}.c{color:green}';
-const stripped = stripMinWidthBlocks(sample);
-ok('منطقِ حذفِ media-block: محتوای داخلِ min-width حذف می‌شود',
-  !stripped.includes('.b'));
-ok('منطقِ حذفِ media-block: محتوای بیرونِ آن دست‌نخورده می‌ماند',
-  stripped.includes('.a') && stripped.includes('.c'));
+// ── ۲) سقفِ عرضِ ۷۲۰px ──────────────────────────────────────────
+check('`.page` در ۷۲۰px سقف دارد', () => {
+  assert.ok(/\.page\{[^}]*max-width:720px/.test(base), 'قاعدهٔ .page max-width:720px در base.css نیست');
+});
 
-// ── ۵. چیدمانِ داخلِ بازی (دور ۱۴) ─────────────────────────────────────
-// اندازه‌گیری نشان داد داخلِ بازی‌ها روی دسکتاپ تا ۲۹۸px اسکرولِ عمودی
-// داشت و گریدِ جفت‌یاب زیرِ نوارِ پایین پنهان می‌شد. این تست‌ها جلوی
-// برگشتنِ علت‌های ریشه‌ای را می‌گیرند.
+check('`.portal` در ۷۲۰px سقف دارد و وسط‌چین است', () => {
+  assert.ok(/\.portal\s*\{[^}]*max-width:\s*720px[^}]*margin-inline:\s*auto/.test(appbar), 'قاعدهٔ .portal max-width:720px در appbar.css نیست');
+});
 
-// (الف) پوستهٔ بازی نباید دوباره عرضش را inline ببندد؛ آن `maxWidth:640px`
-// همان چیزی بود که همهٔ بازی‌ها را روی مانیتور در یک ستونِ باریک حبس کرد
-// و چون inline بود، هیچ media query نمی‌توانست لغوش کند.
-const gamesJsx = read('src/games.jsx');
-ok('پوستهٔ بازی کلاسِ gameShell دارد (نه maxWidth inline)',
-  /className=\{`card wide gameShell/.test(gamesJsx));
-ok('در games.jsx هیچ maxWidth: \'640px\'ِ inline نمانده',
-  !/maxWidth:\s*'640px'/.test(gamesJsx));
-ok('حالتِ بازی با کلاسِ isPlaying به CSS اعلام می‌شود',
-  /isPlaying/.test(gamesJsx));
+// ── ۳) قواعدِ پایهٔ موبایل دست‌نخورده (آینهٔ اندروید) ──────────
+check('`.grid` تک‌ستون است (قاعدهٔ موبایل حالا همواره‌ای شده)', () => {
+  assert.ok(/\.grid,\.formgrid\{grid-template-columns:1fr\}/.test(css), 'قاعدهٔ تک‌ستون .grid/.formgrid پیدا نشد');
+});
 
-// (ب) دوئل هم باید حالتش را اعلام کند تا چیدمانِ دو‌ستونه ممکن شود.
-const duelJsx = read('src/cardDuelGame.jsx');
-ok('دوئل حالتِ isSetup/isLive را روی duelPageV2 می‌گذارد',
-  /duelPageV2 \$\{activeGame \? 'isLive' : 'isSetup'\}/.test(duelJsx));
+check('`.wide,.card` در عرضِ کامل می‌نشینند', () => {
+  assert.ok(/\.wide,\.card\{width:100%!important\}/.test(css), 'قاعدهٔ width:100% .wide/.card پیدا نشد');
+});
 
-// (ج) چیدمانِ دو‌ستونه فقط باید در media queryِ دسکتاپ باشد. اگر به
-// قواعدِ پایه نشت کند، موبایل دیگر آینهٔ اندروید نیست.
-ok('گریدِ دو‌ستونهٔ پوستهٔ بازی در قواعدِ پایه نیست',
-  !/\.gameShell\.isPlaying\s*\{[^}]*display:\s*grid/.test(base));
-ok('گریدِ دو‌ستونهٔ دوئل در قواعدِ پایه نیست',
-  !/\.duelPageV2\.isSetup\s*\{[^}]*display:\s*grid/.test(base));
-ok('چیدمانِ دو‌ستونهٔ پوستهٔ بازی در بلوکِ دسکتاپ تعریف شده',
-  /\.gameShell\.isPlaying\s*\{[^}]*display:\s*grid/.test(css));
-ok('چیدمانِ دو‌ستونهٔ دوئل در بلوکِ دسکتاپ تعریف شده',
-  /\.duelPageV2\.isSetup\s*\{[^}]*display:\s*grid/.test(css));
+check('پوستهٔ بازی همچنان ۶۴۰px (آینهٔ اندروید) است', () => {
+  assert.ok(/\.gameShell\s*\{\s*max-width:\s*640px/.test(css), 'قاعدهٔ .gameShell max-width:640px پیدا نشد');
+});
 
-// (د) گریدِ جفت‌یاب باید نسبت به ارتفاعِ نما هم بسته شود، وگرنه ردیفِ
-// آخرِ کارت‌ها زیرِ نوارِ شناور می‌رود و بازی غیرقابلِ تمام‌کردن می‌شود.
-// این باگ روی گوشی هم بود (۳۹۰×۸۴۴: کفِ گرید ۷۸۸ > نوار ۷۶۹).
-ok('عرضِ گریدِ جفت‌یاب به vh مقید شده (ردیفِ آخر زیرِ نوار نرود)',
-  /\.memGrid\s*\{[^}]*vh/.test(css));
+check('نوارِ ناوبریِ موبایل (دکِ پایین) دست‌نخورده است', () => {
+  assert.ok(/\.mobileNav\s*\{\s*position: fixed;/.test(css), 'دکِ پایینِ mobileNav پیدا نشد');
+});
 
-// (ه) نوارِ تحلیلِ ترکیب کلاسِ عمومیِ `card` را هم دارد و `.card` عرضِ
-// صریحِ min(560px,95vw) می‌دهد. در ستونِ ۵۲۳pxیِ دسکتاپ این یعنی ۳۷px
-// بیرون‌زدگی از لبهٔ ستون (اندازه‌گیری‌شده: L=93 در برابرِ ستون L=130).
-// روی گوشی رخ نمی‌داد چون مدیا کوئریِ ۹۰۰px با !important عرض را ۱۰۰٪
-// می‌کند. پس در بلوکِ دسکتاپ حتماً باید width:100% خنثی‌اش کند.
-ok('نوارِ تحلیلِ دوئل در دسکتاپ عرضِ ۵۶۰pxِ .card را خنثی می‌کند',
-  /\.duelPageV2\.isSetup\s*>\s*\.duelIntelCompact\s*\{[^}]*width:\s*100%/.test(css));
+check('هیچ min-width دیگری در growth.css باقی نمانده', () => {
+  const growth = fs.readFileSync(path.join(root, 'userweb/src/growth.css'), 'utf8');
+  assert.ok(!/@media[^{]*min-width/.test(growth), 'growth.css هنوز بلاک min-width دارد');
+});
 
-// (و) ریلِ کناریِ بازیِ زنده باید ارتفاعِ ستون را پر کند. اندازه‌گیری:
-// تخته ۷۲۴px و ریل ۱۴۳px ⇒ ۳۳۹px حفرهٔ خالی که نما را ناتمام نشان می‌داد.
-ok('ریلِ کناریِ بازیِ زنده کلِ ارتفاعِ ستون را می‌گیرد و وسط‌چین می‌شود',
-  /\.gameShellScore\s*\{[^}]*grid-area:\s*2\s*\/\s*2\s*\/\s*-1\s*\/\s*3[^}]*align-self:\s*center/.test(css));
+check('theme.css (تولیدشده) بلاک min-width ندارد', () => {
+  const theme = fs.readFileSync(path.join(root, 'userweb/src/theme.css'), 'utf8');
+  assert.ok(!/@media[^{]*min-width/.test(theme), 'theme.css هنوز بلاک min-width دارد');
+});
 
-// (ز) لپ‌تاپِ ۱۳۶۶×۷۶۸: تختهٔ زندهٔ دوئل تا y=۷۳۴ کشیده می‌شد ولی نوارِ
-// شناور از y=۶۶۵ شروع می‌شود ⇒ ۶۹px همپوشانی و **هر پنج کارتِ دست** زیرِ
-// نوار. یعنی روی رایج‌ترین رزولوشنِ لپ‌تاپ نوبت قابلِ بازی نبود.
-// محافظِ padding-bottom:84px فقط در @media (max-width:520px) بود.
-// درمان: جمع‌شدنِ تخته در همان بلوکِ max-height که penPitch/memGrid دارند.
-const shortDesk = css.match(
-  /@media\s*\(min-width:\s*1100px\)\s*and\s*\(max-height:\s*820px\)\s*\{([\s\S]*?)\n\}/);
-ok('بلوکِ لپ‌تاپِ کوتاه (min-width:1100px و max-height:820px) وجود دارد',
-  !!shortDesk);
-ok('در لپ‌تاپِ کوتاه، ارتفاعِ کارت‌های دستِ دوئل مهار شده (زیرِ نوار نروند)',
-  !!shortDesk && /\.duelPageV2\.isLive\s+\.duelHandV2\s+\.ggCardArt\s*\{[^}]*max-height/
-    .test(shortDesk[1]));
-ok('در لپ‌تاپِ کوتاه، پنلِ انتخابِ کارتِ دوئل هم جمع می‌شود',
-  !!shortDesk && /\.duelPageV2\.isLive\s+\.duelChoicePanel\s*\{[^}]*padding/
-    .test(shortDesk[1]));
-
-console.log(`\n✅ ${checks} تست چیدمانِ دسکتاپ موفق بود\n`);
+console.log(`\n${passed} check(s) passed`);
