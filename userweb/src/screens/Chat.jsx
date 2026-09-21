@@ -386,7 +386,10 @@ export default function Chat({ token, openProfile, meId }) {
       {/* Categorized Canned Messages & Emoji bar */}
       <div style={{ background: '#0F172A', borderTop: '1px solid rgba(255,255,255,0.12)', padding: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', flex: 1, paddingBottom: '2px' }}>
+          {/* تب‌ها می‌پیچند، نه اینکه افقی اسکرول بخورند: با پک‌های ویژهٔ
+              ادمین تعداد تب‌ها از عرضِ قاب بیشتر می‌شود و اسکرولِ چپ‌وراست
+              در چت خواستهٔ مالک (۳۰ شهریور) نبود. آینهٔ اندروید: `Wrap`. */}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', flex: 1, paddingBottom: '2px' }}>
             {categories.map((cat, i) => (
               <button
                 key={i}
@@ -415,9 +418,18 @@ export default function Chat({ token, openProfile, meId }) {
           {cdLeft > 0 && <span style={{ color: '#EF4444', fontSize: '11px', fontWeight: 'bold' }}>صبر کنید ({fa(cdLeft)} ثانیه)</span>}
         </div>
 
-        <div style={{ height: '96px', overflowX: 'auto', overflowY: 'hidden', paddingBottom: '4px' }}>
+        {/* ═══ قراردادِ «بدونِ اسکرولِ افقی» در چت (خواستِ مالک، ۳۰ شهریور) ═══
+            قبلاً این قاب `height:96px` + `overflowX:auto` بود و فهرستِ پیام‌های
+            آماده یک گریدِ ستونیِ عریض (~۸۸۰px) می‌ساخت که فقط با اسکرولِ
+            چپ‌وراست دیده می‌شد — همان نوارِ افقیِ زیرِ دکمه‌ها که مالک
+            گزارش کرد. حالا هر سه تب (پیامِ آماده / ایموجی / استیکر) و نوارِ
+            تب‌ها **می‌پیچند** (`flex-wrap`) و قاب فقط **عمودی** اسکرول می‌خورد
+            (`overflowY:auto` با سقفِ ۱۳۲px ≈ سه‌ونیم ردیف). هیچ عنصری در چت
+            `overflowX:auto` ندارد — گاردِ `chat-parity.mjs` همین را می‌بندد
+            و اندروید هم با `Wrap` همان قرارداد را اجرا می‌کند. */}
+        <div style={{ maxHeight: '132px', overflowX: 'hidden', overflowY: 'auto', overscrollBehavior: 'contain', paddingBottom: '4px' }}>
           {categories[tab]?.isSticker ? (
-            <div style={{ display: 'flex', gap: '8px', height: '100%', overflowX: 'auto', alignItems: 'center', paddingBottom: '2px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', alignContent: 'flex-start', paddingBottom: '2px' }}>
               {stickers.length === 0 && (
                 <span style={{ color: '#64748B', fontSize: '12px' }}>استیکری در دسترس نیست.</span>
               )}
@@ -448,7 +460,10 @@ export default function Chat({ token, openProfile, meId }) {
               ))}
             </div>
           ) : categories[tab]?.isEmoji ? (
-            <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, 1fr)', gridAutoFlow: 'column', gap: '6px', height: '100%', gridAutoColumns: 'minmax(60px, auto)' }}>
+            /* ایموجی‌ها هم می‌پیچند: گریدِ ستونیِ قبلی (`gridAutoFlow:column`)
+               ذاتاً افقی اسکرول می‌شد. کاشیِ ثابتِ ۴۸×۴۴ نگه داشته می‌شود تا
+               ردیف‌ها منظم بمانند و دکمه‌ها با عرضِ قاب کش نیایند. */
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignContent: 'flex-start' }}>
               {EMOJIS.map((em, idx) => (
                 <button
                   key={idx}
@@ -460,6 +475,8 @@ export default function Chat({ token, openProfile, meId }) {
                     border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: '12px',
                     fontSize: '22px',
+                    width: '48px',
+                    height: '44px',
                     cursor: cdLeft > 0 ? 'not-allowed' : 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     userSelect: 'text',
@@ -470,19 +487,18 @@ export default function Chat({ token, openProfile, meId }) {
               ))}
             </div>
           ) : (
-            /* ⚠️ این گرید باید اسکرولِ افقی داشته باشد — آینهٔ اندروید.
-               ریشهٔ باگِ «تب‌های ناقص» که مالک گزارش کرد همین‌جا هم بود:
-               `gridAutoFlow: column` + `gridAutoColumns: max-content` یعنی
-               ‏۱۴ پیامِ آماده در ۷ ستون کنار هم می‌نشینند (~۸۸۰px) و عرضِ
-               قابِ چت ۵۱۶px است. چون `.tabPane` هم `content-visibility:auto`
-               دارد (که paint containment می‌سازد)، سرریز **بریده** می‌شد و
-               کاربر فقط ~۴ دکمهٔ اول را می‌دید و بقیه عملاً ناپدید بودند.
-               قبلاً کسی متوجه نمی‌شد چون کارتِ چت خودش تا ۸۹۵px پف می‌کرد و
-               تصادفاً این ۸۸۰px را جا می‌داد؛ با مهارِ ستون، خودِ سرریز
-               رو شد. در اندروید همین فهرست `GridView(scrollDirection:
-               Axis.horizontal, crossAxisCount: 2)` است، یعنی قابل‌اسکرول —
-               پس وب هم همان می‌شود، نه بریده. */
-            <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, 1fr)', gridAutoFlow: 'column', gap: '8px', height: '100%', gridAutoColumns: 'max-content', overflowX: 'auto', overflowY: 'hidden', paddingBottom: '4px', WebkitOverflowScrolling: 'touch' }}>
+            /* پیام‌های آماده می‌پیچند، نه اسکرولِ افقی. قبلاً اینجا گریدِ
+               ستونی بود (`gridAutoFlow:column` + `gridAutoColumns:max-content`)
+               یعنی ۱۴ دکمه در ~۸۸۰px کنار هم، و چون در قابِ ~۵۱۶px جا
+               نمی‌شدند یک نوارِ اسکرولِ چپ‌وراست زیرِ چت می‌نشست — همان که
+               مالک خواست حذفش کند (۳۰ شهریور). با `flex-wrap` هر ردیف پر
+               می‌شود و دکمهٔ بعدی به ردیفِ پایین می‌رود؛ اگر تعدادِ ردیف‌ها
+               از سقفِ ۱۳۲pxِ قاب بیشتر شد، خودِ قاب عمودی اسکرول می‌خورد
+               (نه افقی). اندروید همین قرارداد را با `Wrap` در
+               `chat_page.dart` اجرا می‌کند و گاردِ `chat-parity.mjs`
+               نبودِ `Axis.horizontal` و `overflowX:auto` را در هر دو کلاینت
+               می‌بندد تا این رفتار هرگز بی‌صدا برنگردد. */
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignContent: 'flex-start', paddingBottom: '4px' }}>
               {(categories[tab]?.items || []).map((txt, idx) => (
                 <button
                   key={idx}

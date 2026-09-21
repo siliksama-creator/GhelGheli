@@ -790,8 +790,9 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
     ];
   }
 
-  /// گریدِ افقیِ استیکرها — فایل SVG از شبکه (بدون آپدیت برای استیکرِ
-  /// جدید). آینهٔ تبِ «استیکر» در Chat.jsx وب.
+  /// استیکرها می‌پیچند، افقی اسکرول نمی‌خورند — قراردادِ «بدونِ اسکرولِ
+  /// افقی در چت» (خواستِ مالک، ۳۰ شهریور). آینهٔ وب: `flex-wrap` در
+  /// تبِ «استیکر»ِ Chat.jsx. فایل SVG از شبکه (بدون آپدیت برای استیکرِ جدید).
   Widget _stickerGrid(bool disabled) {
     final stickers = widget.stickers.whereType<Map>().toList();
     if (stickers.isEmpty) {
@@ -802,13 +803,10 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
         ),
       );
     }
-    return ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      itemCount: stickers.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 8),
-      itemBuilder: (ctx, i) {
-        final st = stickers[i];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: stickers.map((st) {
         final url = widget.stickerUrl(st['url']);
         return InkWell(
           onTap: disabled ? null : () => widget.onSendSticker('${st['id'] ?? ''}'),
@@ -839,7 +837,7 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
             ),
           ),
         );
-      },
+      }).toList(),
     );
   }
 
@@ -870,37 +868,38 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
           Row(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(children: [
+                // تب‌ها می‌پیچند، نه اسکرولِ افقی: با پک‌های ویژهٔ ادمین تعدادِ
+                // تب‌ها از عرضِ قاب بیشتر می‌شود و نوارِ چپ‌وراست در چت خواستهٔ
+                // مالک (۳۰ شهریور) نبود. آینهٔ وب: `flexWrap:'wrap'` در Chat.jsx.
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
                     for (int i = 0; i < categories.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(10),
-                          onTap: () => setState(() => _tab = i),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: _tab == i ? const Color(0xFF38BDF8).withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.04),
-                              border: Border.all(color: _tab == i ? const Color(0xFF38BDF8) : Colors.white12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                UiIcon(categories[i].$1, size: 13,
-                                  color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70),
-                                const SizedBox(width: 5),
-                                Text(categories[i].$2,
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
-                                    color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70)),
-                              ],
-                            ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => setState(() => _tab = i),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            color: _tab == i ? const Color(0xFF38BDF8).withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.04),
+                            border: Border.all(color: _tab == i ? const Color(0xFF38BDF8) : Colors.white12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              UiIcon(categories[i].$1, size: 13,
+                                color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70),
+                              const SizedBox(width: 5),
+                              Text(categories[i].$2,
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
+                                  color: _tab == i ? const Color(0xFF38BDF8) : Colors.white70)),
+                            ],
                           ),
                         ),
                       ),
-                  ]),
+                  ],
                 ),
               ),
               if (disabled)
@@ -921,74 +920,76 @@ class _CannedMessagesPanelState extends State<_CannedMessagesPanel> {
           const SizedBox(height: 8),
 
           // لیست پیام‌ها یا ایموجی‌ها یا استیکرها
-          SizedBox(
-            height: 96,
-            child: _tab == categories.length - 1
-                ? _stickerGrid(disabled)
-                : _tab == categories.length - 2
-                    ? GridView.builder(
-                    scrollDirection: Axis.horizontal,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 6,
-                      crossAxisSpacing: 6,
-                    ),
-                    itemCount: _emojis.length,
-                    itemBuilder: (ctx, i) {
-                      final em = _emojis[i];
-                      return InkWell(
-                        onTap: disabled ? null : () => widget.onSend(em),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: disabled ? Colors.white.withValues(alpha: 0.02) : const Color(0xFF1E293B),
-                            border: Border.all(color: Colors.white10),
-                          ),
-                          child: Text(em, style: const TextStyle(fontSize: 22)),
+          // ── قراردادِ «بدونِ اسکرولِ افقی» در چت (خواستِ مالک، ۳۰ شهریور) ──
+          // قبلاً این قاب `SizedBox(height:96)` بود و هر سه تب افقی اسکرول
+          // می‌خوردند (`GridView`/`ListView` با `Axis.horizontal`) — همان نوارِ
+          // چپ‌وراست زیرِ دکمه‌ها که مالک گزارش کرد و در وب هم زیرِ گریدِ
+          // ستونیِ ~۸۸۰px دیده می‌شد. حالا همه‌چیز می‌پیچد (`Wrap`) و قاب فقط
+          // وقتی ردیف‌ها از سقفِ ۱۳۲ (≈ سه‌ونیم ردیف) بیشتر شدند **عمودی**
+          // اسکرول می‌خورد. آینهٔ وب: `flex-wrap` + `overflowY:auto` با همین
+          // سقف در Chat.jsx؛ گاردِ `chat-parity.mjs` نبودِ `Axis.horizontal`
+          // و تساویِ سقفِ ۱۳۲ را در هر دو کلاینت می‌بندد.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 132),
+            child: SingleChildScrollView(
+              child: _tab == categories.length - 1
+                  ? _stickerGrid(disabled)
+                  : _tab == categories.length - 2
+                      ? Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final em in _emojis)
+                              InkWell(
+                                onTap: disabled ? null : () => widget.onSend(em),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  width: 48,
+                                  height: 44,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: disabled ? Colors.white.withValues(alpha: 0.02) : const Color(0xFF1E293B),
+                                    border: Border.all(color: Colors.white10),
+                                  ),
+                                  child: Text(em, style: const TextStyle(fontSize: 22)),
+                                ),
+                              ),
+                          ],
+                        )
+                      : Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final text in categories[_tab].$3)
+                              InkWell(
+                                onTap: disabled ? null : () => widget.onSend(text),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: disabled ? Colors.white.withValues(alpha: 0.03) : const Color(0xFF1E293B),
+                                    border: Border.all(
+                                      color: disabled ? Colors.white10 : const Color(0xFF38BDF8).withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    text,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: disabled ? Colors.white38 : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      );
-                    },
-                  )
-                    : GridView.builder(
-                    scrollDirection: Axis.horizontal,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: 0.30,
-                    ),
-                    itemCount: categories[_tab].$3.length,
-                    itemBuilder: (ctx, i) {
-                      final text = categories[_tab].$3[i];
-                      return InkWell(
-                        onTap: disabled ? null : () => widget.onSend(text),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: disabled ? Colors.white.withValues(alpha: 0.03) : const Color(0xFF1E293B),
-                            border: Border.all(
-                              color: disabled ? Colors.white10 : const Color(0xFF38BDF8).withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Text(
-                            text,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: disabled ? Colors.white38 : Colors.white,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+            ),
           ),
         ],
       ),

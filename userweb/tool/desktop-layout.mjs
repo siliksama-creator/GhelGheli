@@ -175,13 +175,23 @@ check('ستونِ گریدِ `.clubWrap` مهار شده است (minmax(0,1fr))'
     'clubWrap بدونِ مهارِ ستون، با max-contentِ چت تا ۸۹۵px پف می‌کند و نوار را با خودش می‌برد');
 });
 
-check('گریدِ پیام‌های آمادهٔ چت اسکرولِ افقی دارد (آینهٔ GridView اندروید)', () => {
+check('چت هیچ اسکرولِ افقی ندارد و picker می‌پیچد (خواستِ مالک ۳۰ شهریور)', () => {
+  // نوارِ اسکرولِ چپ‌وراست زیرِ دکمه‌های چت (وب و اندروید) خواستهٔ مالک بود
+  // که حذف شود. قراردادِ تازه: تب‌ها و هر سه تبِ picker (پیامِ آماده/ایموجی/
+  // استیکر) می‌پیچند و قاب فقط عمودی اسکرول می‌خورد. این چک جلوی برگشتِ
+  // بی‌صدای گریدِ ستونیِ عریض (~۸۸۰px) یا هر `overflowX:auto` در چت را می‌گیرد.
   const chat = fs.readFileSync(path.join(root, 'userweb/src/screens/Chat.jsx'), 'utf8');
-  const gridAt = chat.indexOf("gridAutoColumns: 'max-content'");
-  assert.ok(gridAt > -1, 'گریدِ پیام‌های آماده پیدا نشد');
-  const after = chat.slice(gridAt, gridAt + 260);
-  assert.ok(/overflowX:\s*'auto'/.test(after),
-    'گریدِ پیام‌های آماده در قابِ ۵۱۶px جا نمی‌شود؛ بدونِ اسکرول، سرریزش توسطِ paint containment بریده می‌شود');
+  assert.ok(!/gridAutoColumns:\s*'max-content'/.test(chat),
+    'گریدِ ستونیِ پیام‌های آماده برگشته — با آن نوارِ اسکرولِ افقی هم برمی‌گردد');
+  assert.ok(!/overflowX:\s*'auto'/.test(chat),
+    'عنصری در چت هنوز افقی اسکرول می‌خورد — نوارِ چپ‌وراست زیرِ دکمه‌ها برمی‌گردد');
+  const paneAt = chat.indexOf("maxHeight: '132px'");
+  assert.ok(paneAt > -1, 'قابِ picker با سقفِ ۱۳۲px پیدا نشد');
+  const pane = chat.slice(paneAt, paneAt + 220);
+  assert.ok(/overflowY:\s*'auto'/.test(pane) && /overflowX:\s*'hidden'/.test(pane),
+    'قابِ picker باید فقط عمودی اسکرول بخورد (overflowY:auto + overflowX:hidden)');
+  assert.ok((chat.match(/flexWrap:\s*'wrap'/g) || []).length >= 4,
+    'تب‌ها، استیکرها، ایموجی‌ها و پیام‌های آماده باید بپیچند (چهار flexWrap)');
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

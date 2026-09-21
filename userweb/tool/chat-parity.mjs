@@ -265,4 +265,23 @@ const andMissing = [...serverCanned].filter(t => !andCanned.has(t));
 ok(`هیچ پیامِ مجازی در اندروید جا نمانده — یافت: [${andMissing.join(' | ')}]`,
   andMissing.length === 0);
 
+// ── ۸. بدونِ اسکرولِ افقی در چت ─────────────────────────────────────────
+// خواستهٔ مالک (۳۰ شهریور): نوارِ اسکرولِ چپ‌وراست زیرِ دکمه‌های چت در وب و
+// اندروید حذف شود. قبلاً وب یک گریدِ ستونیِ ~۸۸۰px با `overflowX:auto` داشت و
+// اندروید `GridView(scrollDirection: Axis.horizontal)`؛ حالا هر دو کلاینت
+// می‌پیچند (وب `flex-wrap`، اندروید `Wrap`) و قابِ picker با سقفِ ارتفاعِ
+// یکسان فقط عمودی اسکرول می‌خورد. این چهار تست قرارداد را می‌بندند تا اگر
+// کسی در یکی از دو کلاینت اسکرولِ افقی را برگرداند، CI قرمز شود.
+console.log('\n== بدونِ اسکرولِ افقی در چت ==');
+
+ok('وب در چت هیچ عنصرِ افقی‌اسکرول ندارد',
+  !/overflowX:\s*'auto'/.test(web));
+ok('اندروید در چت هیچ محورِ افقی ندارد',
+  !/Axis\.horizontal/.test(android));
+ok('هر دو کلاینت picker را می‌پیچند (وب flexWrap / اندروید Wrap)',
+  (web.match(/flexWrap:\s*'wrap'/g) || []).length >= 4
+  && (android.match(/Wrap\(/g) || []).length >= 4);
+ok('قابِ picker در هر دو کلاینت سقفِ ارتفاعِ یکسان (۱۳۲) دارد',
+  /maxHeight:\s*'132px'/.test(web) && /maxHeight:\s*132/.test(android));
+
 console.log(`\n✅ ${checks} تست همسانیِ چت موفق بود\n`);
