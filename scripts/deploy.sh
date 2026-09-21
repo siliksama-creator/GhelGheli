@@ -187,35 +187,22 @@ fi
 # ── include اسنیپتِ ضدِاسکنر ────────────────────────────────────────────────
 # فایلِ کانفیگِ سایت روی سرور زندگی می‌کند (در مخزن نیست) و certbot هم
 # دستش به آن است؛ پس به‌جای «بازنویسیِ» فایل، فقط یک خط به آن اضافه می‌کنیم
-# — آن هم اگر نبود. لنگرِ درج، خطِ `root` هر سایتِ ایستاست (یکتا و بی‌ابهام).
+# — آن هم اگر نبود. کارِ درج در `scripts/nginx-add-include.py` است (تست‌پذیر
+# و اتمیک). ⚠️ بکاپ آن **بیرونِ** /etc/nginx می‌رود: نسخهٔ اول که بکاپ را
+# داخلِ sites-enabled می‌گذاشت، باعثِ خطای `duplicate upstream` و شکستِ
+# `nginx -t` شد (nginx همهٔ فایل‌های آن پوشه را می‌خواند).
 ensure_scanner_include() {
   local file=/etc/nginx/sites-enabled/ghelgheli
   [ -f "$file" ] || return 0
-  grep -q 'ghelgheli-scanner-block.conf' "$file" && return 0
-  # include فقط وقتی معنا دارد که خودِ اسنیپت نصب شده باشد؛ وگرنه nginx -t
-  # می‌شکند و کلِ سایت پایین می‌آید. صریح بررسی می‌کنیم.
+  # include فقط وقتی معنا دارد که خودِ اسنیپت نصب شده باشد.
   if [ ! -f /etc/nginx/snippets/ghelgheli-scanner-block.conf ]; then
     printf '  \033[1;33mهشدار: اسنیپتِ ضدِاسکنر نصب نشده — include اضافه نشد\033[0m\n' >&2
-    return 1
+    return 0
   fi
-  cp -a "$file" "${file}.bak-$(date +%Y%m%d%H%M%S)"
-  python3 - "$file" <<'PYEOF'
-import io, re, sys
-path = sys.argv[1]
-src = io.open(path, encoding='utf-8').read()
-inc = '  # اسکنرها/مسیرهای نقطه‌دار → ۴۰۴ (خواستهٔ مالک، ۲۹ شهریور)
-' \
-      '  include /etc/nginx/snippets/ghelgheli-scanner-block.conf;
-'
-out, added = [], 0
-for line in src.splitlines(keepends=True):
-    out.append(line)
-    if re.match(r'\s*root\s+/var/www/GhelGheli/(admin|userweb)/dist;', line):
-        out.append(inc)
-        added += 1
-io.open(path, 'w', encoding='utf-8').write(''.join(out))
-sys.stderr.write(f'  scanner-block include added to {added} server block(s)\n')
-PYEOF
+  if ! python3 "$APP_DIR/scripts/nginx-add-include.py" "$file" \
+      "include /etc/nginx/snippets/ghelgheli-scanner-block.conf;"; then
+    printf '  \033[1;33mهشدار: include ضدِاسکنر اضافه نشد (کانفیگ دست‌نخورده)\033[0m\n' >&2
+  fi
 }
 if ! grep -q 'ghelgheli-scanner-block.conf' /etc/nginx/sites-enabled/ghelgheli 2>/dev/null; then
   log "Adding scanner-block include to nginx site config"
