@@ -33,4 +33,19 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Widget tests
-        run: flutter test
+        run: |
+          set -o pipefail
+          flutter test 2>&1 | tee /tmp/flutter-test.log
+      # ⚠️ چرا این گام وجود دارد: لاگِ job در این مخزن از بیرون خوانده
+      # نمی‌شود — `GET /actions/jobs/<id>/logs` بی‌توکن 403 می‌دهد («Must
+      # have admin rights»). نتیجه این بود که بعد از هر شکستِ تست باید
+      # حدس می‌زدیم کدام تست افتاده. این گام خط‌های خطا را به annotation
+      # تبدیل می‌کند و آن‌ها از طریق `commits/<sha>/check-runs/.../annotations`
+      # بی‌توکن خوانده می‌شوند.
+      - name: Failure digest (annotations)
+        if: failure()
+        run: |
+          grep -E "\[E\]|Expected:|Actual:|Which:|Failed to load" /tmp/flutter-test.log \
+            | head -n 25 | while IFS= read -r line; do
+                echo "::error title=flutter-test::$line"
+              done || true
