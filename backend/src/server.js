@@ -1370,7 +1370,7 @@ app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
   // ⚠️ خالی/null یعنی «نامم را عوض نکن» (همان رفتارِ COALESCE)، پس
   //    `allowEmpty` روشن است؛ ولی اگر چیزی فرستاد و نامردود بود، صریحاً
   //    ۴۰۰ با پیامِ فارسی برمی‌گردد (نه سکوت و نه کوتاه‌شدنِ خودکار).
-  const nickCheck = nicknamePolicy.validate(b.nickname, { allowEmpty: true });
+  const nickCheck = await nicknamePolicy.validateWithSettings(b.nickname, { allowEmpty: true });
   if (!nickCheck.ok) {
     return res.status(400).json({ message: nickCheck.error, code: nickCheck.code });
   }
@@ -2901,6 +2901,29 @@ app.patch('/api/admin/settings/sms', adminAuth, requireRole(), asyncHandler(asyn
   await pool.query(`INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at) VALUES('sms_config',$1,$2,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`, [JSON.stringify(cfg), req.admin.id]);
   await audit(req.admin.id, 'update_sms_settings', 'app_settings', null, null, { ...cfg, apiKey: maskSecret(cfg.apiKey) });
   res.json({ message: 'تنظیمات پیامک ذخیره شد', ...cfg, apiKey: undefined, apiKeyMasked: maskSecret(cfg.apiKey) });
+}));
+
+// ── فیلترِ نامِ مستعار (فهرستِ رکیکِ پنل) ──────────────────────────────────
+// دو فیلدِ جدا (فارسی / انگلیسی) که کلمات با فاصله (Space) جدا می‌شوند +
+// کلیدِ روشن/خاموش. کلمات اینجا «اضافه» می‌شوند به فهرستِ داخلیِ
+// nicknamePolicy؛ کشِ هر پروسه ۶۰ ثانیه است.
+app.get('/api/admin/settings/nickname-filter', adminAuth, asyncHandler(async (req, res) => {
+  const { rows } = await pool.query("SELECT value FROM app_settings WHERE key='nickname_filter' LIMIT 1");
+  const v = rows[0]?.value || {};
+  res.json({ enabled: v.enabled !== false, fa: v.fa || '', en: v.en || '' });
+}));
+app.patch('/api/admin/settings/nickname-filter', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  const body = req.body || {};
+  const clean = v => String(v || '').split(/\s+/).filter(Boolean).join(' ');
+  const cfg = {
+    enabled: body.enabled !== false,
+    fa: clean(body.fa),
+    en: clean(body.en),
+  };
+  await pool.query(`INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at) VALUES('nickname_filter',$1,$2,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`, [JSON.stringify(cfg), req.admin.id]);
+  await audit(req.admin.id, 'update_nickname_filter', 'app_settings', null, null, cfg);
+  require('./lib/nicknamePolicy').loadFilter(true).catch(() => {});
+  res.json({ message: 'فیلتر نام مستعار ذخیره شد', ...cfg });
 }));
 
 // فقط فهرستِ کارت‌های کلکسیونی برای انتخابگرهای پنل (جوایز).

@@ -28,17 +28,12 @@ class _ProfilePageState extends State<ProfilePage> {
   final _age = TextEditingController();
   final _city = TextEditingController();
   final _province = TextEditingController();
-  final _currentPassword = TextEditingController();
-  final _newPassword = TextEditingController();
   String _selectedAvatar = avatarFiles.first;
   bool _loaded = false;
   String? _loadError;
   bool _saving = false;
-  bool _changingPassword = false;
   String? _message;
   bool _messageIsError = false;
-  String? _passwordMessage;
-  bool _passwordMessageIsError = false;
   List _myClubs = const [];
   List _leagueHistory = const [];
   Map<String, dynamic> _cosmetics = const {};
@@ -59,8 +54,6 @@ class _ProfilePageState extends State<ProfilePage> {
     _age.dispose();
     _city.dispose();
     _province.dispose();
-    _currentPassword.dispose();
-    _newPassword.dispose();
     super.dispose();
   }
 
@@ -143,43 +136,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _changePassword() async {
-    setState(() {
-      _changingPassword = true;
-      _passwordMessage = null;
-    });
-    try {
-      final res = await widget.api.post('/api/profile/change-password', {
-        'currentPassword': _currentPassword.text,
-        'newPassword': _newPassword.text,
-      });
-      // ═══════════════════════════════════════════════════════════════════════
-      // تغییرِ رمز، بقیهٔ دستگاه‌ها را از حساب بیرون می‌کند (session_epoch) و
-      // سرور برای *همین* دستگاه یک توکنِ تازه می‌فرستد. اگر اینجا ذخیره
-      // نشود، کاربر بلافاصله با اولین درخواستِ بعدی ۴۰۱ می‌خورد و از حساب
-      // پرت می‌شود — دقیقاً خلافِ خواستهٔ مالک («همیشه وارد بماند»).
-      // ═══════════════════════════════════════════════════════════════════════
-      if (res is Map && res['token'] is String && (res['token'] as String).isNotEmpty) {
-        await widget.api.saveToken(res['token'] as String);
-      }
-      _currentPassword.clear();
-      _newPassword.clear();
-      if (!mounted) return;
-      setState(() {
-        _passwordMessage = (res is Map && res['message'] is String)
-            ? res['message'] as String
-            : 'رمز عبور با موفقیت تغییر کرد';
-        _passwordMessageIsError = false;
-      });
-    } catch (e) {
-      setState(() {
-        _passwordMessage = apiError(e);
-        _passwordMessageIsError = true;
-      });
-    } finally {
-      if (mounted) setState(() => _changingPassword = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -436,64 +392,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
 
-        Gaps.vSm,
-
-        // ── Password Change Section ──
-        AppCard(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.lock_reset_rounded, size: 18, color: Color(0xFF38BDF8)),
-                  Gaps.hXs,
-                  Text('تغییر رمز عبور', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _currentPassword,
-                      obscureText: true,
-                      decoration: const InputDecoration(labelText: 'رمز فعلی', isDense: true),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _newPassword,
-                      obscureText: true,
-                      decoration: const InputDecoration(labelText: 'رمز جدید', isDense: true),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: _changingPassword ? null : _changePassword,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white.withValues(alpha: 0.12),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: Text(_changingPassword ? 'در حال تغییر...' : 'ثبت رمز عبور جدید',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-              ),
-              if (_passwordMessage != null) ...[
-                const SizedBox(height: 4),
-                Text(_passwordMessage!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: _passwordMessageIsError ? theme.colorScheme.error : const Color(0xFF34D399))),
-              ],
-            ],
-          ),
-        ),
       ],
     ));
   }

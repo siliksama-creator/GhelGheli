@@ -142,10 +142,17 @@ const NORMALIZED_BAD_LONG = NORMALIZED_BAD.filter(w => w.length >= 5);
 const NORMALIZED_RESERVED = RESERVED.map(normalize);
 
 /** آیا متن (نرمال‌شده) کلمهٔ رکیک دارد؟ */
-function containsBadWord(normalized) {
+function containsBadWord(normalized, extraWords = []) {
   if (!normalized) return false;
   if (NORMALIZED_BAD_SHORT.includes(normalized)) return true;
-  return NORMALIZED_BAD_LONG.some(w => normalized.includes(w));
+  if (NORMALIZED_BAD_LONG.some(w => normalized.includes(w))) return true;
+  // کلماتِ افزوده‌شده از پنلِ ادمین (فارسی/انگلیسی، جدا شده با فاصله):
+  // همان نرمال‌سازی روی خودِ کلمه اعمال می‌شود تا «K1R» و «کیر» یکی برسند.
+  for (const raw of extraWords) {
+    const w = normalize(String(raw));
+    if (w && normalized.includes(w)) return true;
+  }
+  return false;
 }
 
 function isReserved(normalized) {
@@ -161,7 +168,7 @@ function isReserved(normalized) {
  *        اختیاری است (کاربر نامش را عوض نمی‌کند).
  * @returns {{ok: boolean, value: string|null, error: string|null, code: string|null}}
  */
-function validate(raw, { allowEmpty = true } = {}) {
+function validate(raw, { allowEmpty = true, filterEnabled = true, extraWords = [] } = {}) {
   const value = String(raw ?? '')
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .trim();
@@ -189,7 +196,7 @@ function validate(raw, { allowEmpty = true } = {}) {
     };
   }
   const norm = normalize(value);
-  if (containsBadWord(norm)) {
+  if (filterEnabled && containsBadWord(norm, extraWords)) {
     return {
       ok: false, value: null, code: 'profanity',
       error: 'انتخابِ این نام موردِ قبول نیست — لطفاً نامِ دیگری انتخاب کنید',
@@ -204,4 +211,41 @@ function validate(raw, { allowEmpty = true } = {}) {
   return { ok: true, value, error: null, code: null };
 }
 
-module.exports = { MAX_LEN, validate, normalize, containsBadWord, isReserved, BAD_WORDS, RESERVED };
+// ═══════════════════════════════════════════════════════════════════════════
+//  فهرستِ پنلِ ادمین (کلیدِ `nickname_filter` در app_settings)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ مالک (۳۰ مهر): کلماتِ رکیکِ فارسی و انگلیسی در دو فیلدِ جدا در پنل
+// ادمین، با فاصله (Space) از هم، و یک کلیدِ روشن/خاموش. کلماتِ پنل «اضافه»
+// می‌شوند به فهرستِ داخلی (که نرمال‌سازیِ قوی دارد)؛ با کلیدِ خاموش، کلِ
+// بررسیِ فحش غیرفعال می‌شود. کشِ ۶۰ ثانیه‌ای: پنج پروسهٔ pm2 هر کدام کشِ
+// خودشان را دارند و بعد از ذخیره در پنل، حداکثر یک دقیقه طول می‌کشد تا
+// همه ببینند — برای فیلترِ نام این تأخیر بی‌خطر است.
+const { pool } = require('../config/db');
+
+let filterCache = { at: 0, enabled: true, words: [] };
+
+async function loadFilter(force = false) {
+  const now = Date.now();
+  if (!force && now - filterCache.at < 60_000) return filterCache;
+  try {
+    const { rows } = await pool.query(
+      "SELECT value FROM app_settings WHERE key='nickname_filter' LIMIT 1");
+    const v = rows[0]?.value || {};
+    const fa = String(v.fa || '').split(/\s+/).filter(Boolean);
+    const en = String(v.en || '').split(/\s+/).filter(Boolean);
+    filterCache = { at: now, enabled: v.enabled !== false, words: [...fa, ...en] };
+  } catch {
+    // دیتابیس پایین: فیلترِ داخلی همچنان کار می‌کند (شکستِ امنیتی باز نمی‌شود).
+    filterCache = { ...filterCache, at: now };
+  }
+  return filterCache;
+}
+
+/** همان `validate` ولی با فهرستِ پنل؛ مسیرهای auth/profile این را صدا می‌زنند. */
+async function validateWithSettings(raw, opts = {}) {
+  const f = await loadFilter();
+  return validate(raw, { ...opts, filterEnabled: f.enabled, extraWords: f.words });
+}
+
+module.exports = { MAX_LEN, validate, normalize, containsBadWord, isReserved, BAD_WORDS, RESERVED, loadFilter, validateWithSettings };

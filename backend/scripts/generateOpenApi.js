@@ -35,6 +35,7 @@ const publicRoutes = new Set([
   'POST /api/auth/request-otp',
   'POST /api/auth/verify-otp',
   'POST /api/auth/register',
+  'POST /api/auth/login-otp',
   'POST /api/auth/register-password',
   'POST /api/auth/login',
   'POST /api/auth/forgot-password/reset',

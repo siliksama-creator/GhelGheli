@@ -226,6 +226,11 @@ async function testAuth() {
 
   group('مسیر OTP بدون رمز عبور');
   const otpMobile = `9${Date.now().toString().slice(-9)}`;
+  // قراردادِ جدید: شمارهٔ ثبت‌نام‌نشده از مسیرِ «ورود» ۴۰۴ می‌گیرد و
+  // باید اول ثبت‌نام کند — حتی وقتی پیامک خاموش است (گیت قبل از SMS است).
+  const loginBefore = await POST('/api/auth/request-otp', { mobile: otpMobile, purpose: 'login' });
+  ok(loginBefore.status === 404, 'ورود با کد برای شمارهٔ ثبت‌نام‌نشده ۴۰۴ می‌دهد',
+    `status=${loginBefore.status}`);
   const reqOtp = await POST('/api/auth/request-otp', { mobile: otpMobile, purpose: 'register' });
   ok(reqOtp.status === 200, 'درخواست کد یک‌بارمصرف پذیرفته می‌شود', `status=${reqOtp.status}`);
   const devCode = reqOtp.data?.devCode;
@@ -233,11 +238,34 @@ async function testAuth() {
   if (devCode) {
     const ver = await POST('/api/auth/verify-otp', { mobile: otpMobile, code: devCode, purpose: 'register' });
     ok(ver.status === 200, 'تأیید کد موفق است', `status=${ver.status}`);
-    const otpReg = await POST('/api/auth/register', { mobile: otpMobile });
-    ok(otpReg.status === 200 && otpReg.data?.token, 'عضویت/ورود با OTP بدون هیچ رمزی',
+    // نام مستعار دیگر اختیاری نیست.
+    const noNick = await POST('/api/auth/register', { mobile: otpMobile });
+    ok(noNick.status === 400, 'ثبت‌نام بدون نام مستعار رد می‌شود (اجباری است)',
+      `status=${noNick.status}`);
+    const badNick = await POST('/api/auth/register', { mobile: otpMobile, nickname: 'kir' });
+    ok(badNick.status === 400, 'نام مستعار با کلمهٔ رکیک رد می‌شود',
+      `status=${badNick.status}`);
+    const otpReg = await POST('/api/auth/register', { mobile: otpMobile, nickname: `کاربر${uniq().slice(0, 3)}` });
+    ok(otpReg.status === 200 && otpReg.data?.token, 'عضویت با OTP + نام مستعارِ اجباری و بدون هیچ رمزی',
       `status=${otpReg.status} ${otpReg.data?.message || ''}`);
     const prof = await GET('/api/profile', otpReg.data?.token);
     ok(prof.status === 200, 'توکن مسیر OTP معتبر است');
+    // شمارهٔ عضو دیگر مسیرِ «ثبت‌نام» را ۴۰۹ می‌گیرد...
+    const dupReq = await POST('/api/auth/request-otp', { mobile: otpMobile, purpose: 'register' });
+    ok(dupReq.status === 409, 'درخواست کد ثبت‌نام برای شمارهٔ عضو ۴۰۹ می‌دهد',
+      `status=${dupReq.status}`);
+    // ...و از مسیرِ «ورود با کد» توکن می‌گیرد.
+    const loginReq = await POST('/api/auth/request-otp', { mobile: otpMobile, purpose: 'login' });
+    ok(loginReq.status === 200 && loginReq.data?.devCode, 'ورود با کد برای عضو پذیرفته می‌شود',
+      `status=${loginReq.status}`);
+    if (loginReq.data?.devCode) {
+      const ver2 = await POST('/api/auth/verify-otp',
+        { mobile: otpMobile, code: loginReq.data.devCode, purpose: 'login' });
+      ok(ver2.status === 200, 'تأیید کد ورود موفق است', `status=${ver2.status}`);
+      const loginOtp = await POST('/api/auth/login-otp', { mobile: otpMobile });
+      ok(loginOtp.status === 200 && loginOtp.data?.token, 'login-otp به عضو توکن می‌دهد',
+        `status=${loginOtp.status} ${loginOtp.data?.message || ''}`);
+    }
   }
 
   group('ورود');

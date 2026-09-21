@@ -141,6 +141,14 @@ module.exports = function createClientConfigRoutes(deps) {
     const wallet = ws.rows[0]?.value
       && typeof ws.rows[0].value === 'object' ? ws.rows[0].value : {};
 
+    // پرچمِ زندهٔ پیامک: کلاینت‌ها (صفحهٔ ورود) با این تصمیم می‌گیرند که
+    // «ورود با کد» فعال است یا فعلاً فقط رمزِ مدیر — بدون آپدیت و بدون حدس.
+    let smsEnabled = false;
+    try {
+      const smsRow = await pool.query("SELECT value FROM app_settings WHERE key='sms_config' LIMIT 1");
+      smsEnabled = Boolean(smsRow.rows[0]?.value?.enabled);
+    } catch { /* config نباید به‌خاطر این پرچم بشکند */ }
+
     let gamePoints = null;
     try {
       if (deps.gameRewards?.getGameRewardSettings) {
@@ -258,6 +266,7 @@ module.exports = function createClientConfigRoutes(deps) {
       },
     };
     res.json({
+      smsEnabled,
       ...cfg,
       app,
       wallet: { enabled: wallet.enabled !== false },

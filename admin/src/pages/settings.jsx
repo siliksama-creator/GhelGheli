@@ -20,6 +20,20 @@ export function SettingsPage({ request }) {
   });
   const [savingChat, setSavingChat] = useState(false);
   const [savingSms, setSavingSms] = useState(false);
+  // فیلترِ نامِ مستعار: دو فهرستِ جدا (فارسی / انگلیسی) با فاصله + کلیدِ فعال
+  const [nickFilter, setNickFilter] = useState({ enabled: true, fa: '', en: '' });
+  const [savingNickFilter, setSavingNickFilter] = useState(false);
+
+  async function saveNickFilter(e) {
+    e.preventDefault();
+    setSavingNickFilter(true);
+    try {
+      await request('/api/admin/settings/nickname-filter', { method: 'PATCH', body: nickFilter });
+      notify('فیلتر نام مستعار ذخیره شد');
+    } finally {
+      setSavingNickFilter(false);
+    }
+  }
 
   // ── تنظیمات اپ (بدون آپدیت) ────────────────────────────────────────
   const [client, setClient] = useState({
@@ -48,6 +62,7 @@ export function SettingsPage({ request }) {
       .then(c => setChat({ ...c, badWordsText: (c.badWords || []).join('\n') }));
     request('/api/admin/settings/sms')
       .then(s => setSms({ ...s, apiKey: s.apiKeyMasked || '' }));
+    request('/api/admin/settings/nickname-filter').then(setNickFilter).catch(() => {});
     request('/api/admin/settings/client-config').then(setClient);
     request('/api/admin/signup-gift').then(setGift).catch(() => {});
   }, [request]);
@@ -184,6 +199,30 @@ export function SettingsPage({ request }) {
           <Button type="submit" icon={Save} loading={savingSms}
             className="btn-block" style={{ marginTop: 8 }}>
             ذخیره SMS
+          </Button>
+        </form>
+      </Card>
+
+      <Card title="فیلتر نام مستعار"
+        subtitle="کلمات رکیک فارسی و انگلیسی که کاربر نمی‌تواند به‌عنوان نام مستعار انتخاب کند">
+        <form onSubmit={saveNickFilter}>
+          <label className="checkbox-row">
+            <input type="checkbox" checked={!!nickFilter.enabled}
+              onChange={e => setNickFilter({ ...nickFilter, enabled: e.target.checked })} />
+            فعال بودنِ فیلتر کلمات رکیک
+          </label>
+          <Field label="کلمات رکیک فارسی — با فاصله (Space) از هم جدا کنید"
+            hint="این کلمات علاوه بر فهرست داخلیِ سرور بررسی می‌شوند؛ مقایسه روی متنِ نرمال‌شده است پس «ک.ی.ر» و «k1r» هم گیر می‌افتند.">
+            <Textarea value={nickFilter.fa || ''} dir="rtl"
+              onChange={e => setNickFilter({ ...nickFilter, fa: e.target.value })} rows={3} />
+          </Field>
+          <Field label="کلمات رکیک انگلیسی — با فاصله (Space) از هم جدا کنید"
+            hint="شکلِ لیت‌شده (@، 0، 1) در نرمال‌سازی به حرف برمی‌گردد؛ نوشتنِ شکلِ ساده کافی است.">
+            <Textarea value={nickFilter.en || ''} dir="ltr"
+              onChange={e => setNickFilter({ ...nickFilter, en: e.target.value })} rows={3} />
+          </Field>
+          <Button type="submit" icon={Save} loading={savingNickFilter} className="btn-block">
+            ذخیره فیلتر نام مستعار
           </Button>
         </form>
       </Card>

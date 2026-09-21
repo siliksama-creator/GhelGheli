@@ -76,6 +76,7 @@ const PUBLIC_OK = new Map([
   ['POST /api/auth/login', 'ورود — توکن اینجا ساخته می‌شود'],
   ['POST /api/auth/request-otp', 'درخواستِ کدِ یک‌بارمصرف'],
   ['POST /api/auth/verify-otp', 'تأییدِ کد'],
+  ['POST /api/auth/login-otp', 'ورود با کدِ تأییدشده — توکن اینجا ساخته می‌شود'],
   ['POST /api/admin/auth/login', 'ورودِ مدیر'],
 
   // ── سه موردی که خودِ همین ابزار پیدا کرد ──

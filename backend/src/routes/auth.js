@@ -26,6 +26,17 @@ router.post('/auth/request-otp', otpLimiter, otpMobileLimiter, otpDailyLimiter, 
   const mobile = normalizeMobile(req.body.mobile);
   const purpose = req.body.purpose || 'register';
   if (!/^\+?\d{10,15}$/.test(mobile) || !['register','login','reset_password'].includes(purpose)) return res.status(400).json({ message: 'شماره یا نوع درخواست معتبر نیست' });
+  // ── جدا بودنِ ورود و ثبت‌نام (قراردادِ ۳۰ مهر) ─────────────────────────
+  // ورود: شماره باید از قبل ثبت‌نامِ کامل شده باشد (نامِ مستعار دارد) وگرنه
+  //   همان اول می‌گوییم «اول ثبت‌نام کن» — نه بعد از مصرفِ کد.
+  // ثبت‌نام: شمارهٔ کامل‌شده دوباره نمی‌تواند ثبت‌نام کند؛ می‌فرستیمش به ورود.
+  const existingRow = await pool.query('SELECT nickname FROM users WHERE mobile=$1', [mobile]);
+  if (purpose === 'login' && (!existingRow.rows[0] || !existingRow.rows[0].nickname)) {
+    return res.status(404).json({ message: 'این شماره ثبت‌نام نشده است؛ اول ثبت‌نام کنید' });
+  }
+  if (purpose === 'register' && existingRow.rows[0]?.nickname) {
+    return res.status(409).json({ message: 'این شماره قبلاً ثبت‌نام شده است؛ از صفحهٔ ورود وارد شوید' });
+  }
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const hash = await bcrypt.hash(code, 10);
   const ttl = Number(process.env.OTP_TTL_MINUTES || 5);
@@ -62,6 +73,42 @@ router.post('/auth/verify-otp', otpVerifyLimiter, asyncHandler(async (req, res) 
   res.json({ message: 'شماره موبایل تایید شد' });
 }));
 
+// کدِ تاییدشده را به بلیطِ یک‌بارمصرف تبدیل می‌کند: فقط کدی که در پنجرهٔ
+// OTP_TTL_MINUTES اخیر verify شده و هنوز مصرفِ توکن نشده. DELETE اتمیک است.
+async function consumeOtpTicket(mobile, purpose) {
+  const ttl = Number(process.env.OTP_TTL_MINUTES || 5);
+  const r = await pool.query(
+    `DELETE FROM otp_codes WHERE id=(
+       SELECT id FROM otp_codes
+       WHERE mobile=$1 AND purpose=$2 AND consumed_at IS NOT NULL
+         AND consumed_at > NOW() - ($3::text||' minutes')::interval
+       ORDER BY consumed_at DESC LIMIT 1)
+     RETURNING id`,
+    [mobile, purpose, ttl]);
+  return r.rows[0] || null;
+}
+
+// ورود با کد یک‌بارمصرف برای شماره‌ای که قبلاً ثبت‌نام شده (بدون رمز، بدون
+// نامِ مستعار — فقط شماره و کد). ثبت‌نام نکرفته‌ها را request-otp همان اول
+// با ۴۰۴ برگردانده است.
+router.post('/auth/login-otp', otpVerifyLimiter, asyncHandler(async (req, res) => {
+  const mobile = normalizeMobile(req.body.mobile);
+  const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1', [mobile]);
+  const user = rows[0];
+  if (!user || !user.nickname) return res.status(404).json({ message: 'این شماره ثبت‌نام نشده است؛ اول ثبت‌نام کنید' });
+  if (user.status !== 'active') return res.status(403).json({ message: 'حساب شما مسدود شده است' });
+  // ── بلیطِ یک‌بارمصرف ─────────────────────────────────────────────────────
+  // پرچمِ mobile_verified به‌تنهایی دلیلِ صدورِ توکن نیست: از لحظهٔ
+  // ثبت‌نام تا ابد true می‌ماند و هرکس شمارهٔ ثبت‌شده را می‌دانست می‌توانست
+  // بدونِ کد، حساب را بگیرد (نفوذِ تصاحبِ حساب — در ممیزیِ زنده پیدا شد).
+  // اثباتِ ورود یعنی کدِ OTPای که **همین الان** تایید شده (purpose=login)
+  // و هنوز مصرف نشده. DELETE..RETURNING اتمیک است: دو درخواستِ همزمان
+  // نمی‌توانند از یک کد دو توکن بگیرند.
+  const ticket = await consumeOtpTicket(mobile, 'login');
+  if (!ticket) return res.status(400).json({ message: 'ابتدا کد یک‌بارمصرف را تایید کنید' });
+  res.json({ token: signUser(user), user: safeUser(user) });
+}));
+
 router.post('/auth/register', asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
   // قراردادِ تازه (درخواستِ مالک): مسیرِ OTP **بدون رمز عبور** است؛ ورود و
@@ -70,18 +117,27 @@ router.post('/auth/register', asyncHandler(async (req, res) => {
   const { firstName, lastName, nickname } = req.body;
   const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1 AND mobile_verified=true', [mobile]);
   if (!rows[0]) return res.status(400).json({ message: 'ابتدا شماره موبایل را با OTP تایید کنید' });
-  // نامِ مستعار اینجا هم باید از همان قانونِ پروفایل بگذرد؛ وگرنه کاربر
-  // می‌توانست با ثبت‌نامِ دوباره، نامِ رکیک/بلندِ ردشده را بنشاند.
-  const nick = nicknamePolicy.validate(nickname, { allowEmpty: true });
+  // ثبت‌نام یک‌بار مصرف است: شمارهٔ کامل‌شده (نامِ مستعار دارد) باید از مسیر
+  // ورود بیاید، نه اینکه هر بار نامش بازنویسی شود.
+  if (rows[0].nickname) return res.status(409).json({ message: 'این شماره قبلاً ثبت‌نام شده است؛ از صفحهٔ ورود وارد شوید' });
+  // نامِ مستعار در ثبت‌نام **اجباری** است (قراردادِ ۳۰ مهر) و از فیلترِ
+  // رکیکِ داخلی + فهرستِ پنل ادمین می‌گذرد.
+  const nick = await nicknamePolicy.validateWithSettings(nickname, { allowEmpty: false });
   if (!nick.ok) return res.status(400).json({ message: nick.error, code: nick.code });
+  // همان درسِ login-otp: پرچمِ mobile_verified ماندگار است؛ توکن فقط در
+  // قبالِ کدی داده می‌شود که همین الان verify شده و یک‌بار مصرف می‌شود.
+  // بعد از اعتبارسنجیِ نام مستعار است تا خطای ۴۰۰ بلیط را نسوزاند.
+  const ticket = await consumeOtpTicket(mobile, 'register');
+  if (!ticket) return res.status(400).json({ message: 'ابتدا شماره موبایل را با OTP تایید کنید' });
+
   // فیلدهای اختیاری فقط وقتی نوشته می‌شوند که مقدار داشته باشند
   // (COALESCE) تا ورودِ دوبارهٔ یک کاربرِ قدیمی نامِ مستعار او را پاک نکند.
   // `session_epoch=session_epoch+1` عمداً سرِ جایش ماند (قراردادِ امنیتیِ
   // migration 092 و آزمونِ testSessionLongLived): لحظهٔ تأییدِ OTP یعنی
   // اثباتِ مالکیتِ شماره، پس توکن‌های کهنهٔ همان حساب باید بمیرند.
   const updated = await pool.query(
-    'UPDATE users SET mobile_verified=true, first_name=COALESCE($1, first_name), last_name=COALESCE($2, last_name), nickname=COALESCE($3, nickname), session_epoch=session_epoch+1, updated_at=NOW() WHERE mobile=$4 RETURNING *',
-    [firstName ?? null, lastName ?? null, nick.value ?? null, mobile]
+    'UPDATE users SET mobile_verified=true, first_name=COALESCE($1, first_name), last_name=COALESCE($2, last_name), nickname=$3, session_epoch=session_epoch+1, updated_at=NOW() WHERE mobile=$4 RETURNING *',
+    [firstName ?? null, lastName ?? null, nick.value, mobile]
   );
 
   // همان منطق مسیر ثبت‌نام مستقیم — این مسیر (OTP) وقتی درگاه پیامک وصل
@@ -199,7 +255,7 @@ router.post('/auth/register-password', userLoginLimiter, asyncHandler(async (req
   // Keep an already-set nickname when re-registering to change the password
   // (don't clobber it with a fresh random placeholder); only fall back to
   // an anonymous placeholder for a brand-new account with no nickname.
-  const nick = nicknamePolicy.validate(nickname, { allowEmpty: true });
+  const nick = await nicknamePolicy.validateWithSettings(nickname, { allowEmpty: true });
   if (!nick.ok) return res.status(400).json({ message: nick.error, code: nick.code });
   const finalNickname = nick.value || existing.rows[0]?.nickname || anonymousNickname();
 
