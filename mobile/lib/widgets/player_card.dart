@@ -79,6 +79,9 @@ class PlayerCard extends StatelessWidget {
     final rarity = cardRarityOf(card);
     final art = cardArtOf(card);
     final qty = cardQtyOf(card);
+    // نشانِ تعداد (حتی ×۱) فقط برای نماهای کلکسیونی است که خودِ آیتم فیلدِ
+    // quantity/registered_count دارد؛ کارتِ نبرد این فیلد را ندارد.
+    final hasQty = card?['quantity'] != null || card?['registered_count'] != null;
     final radius = compact ? 16.0 : 20.0;
     final child = AnimatedScale(
       scale: selected ? 1.035 : 1,
@@ -91,7 +94,7 @@ class PlayerCard extends StatelessWidget {
           rarity: rarity,
           borderRadius: radius,
           padding: compact ? 3 : 4,
-          cornerText: qty > 1 ? '×${faNum(qty)}' : null,
+          cornerText: hasQty ? '×${faNum(qty)}' : null,
           child: Material(
             color: const Color(0xFF050A12),
             child: InkWell(

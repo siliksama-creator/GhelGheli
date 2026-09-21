@@ -99,14 +99,18 @@ export default function PlayerCard({
   const [artFailed, setArtFailed] = React.useState(false);
   React.useEffect(() => { setArtReady(false); setArtFailed(false); }, [art]);
   const qty = cardQtyOf(item);
+  // نشانِ تعداد (حتی ×۱) فقط برای نماهای «کلکسیونی» است که خودِ آیتم
+  // فیلدِ quantity/registered_count دارد؛ کارتِ صحنهٔ نبرد این فیلد را
+  // ندارد و نباید ×۱ بگیرد.
+  const hasQty = item?.quantity != null || item?.registered_count != null;
   const power = cardPowerOf(item);
   const pointValue = cardPointValueOf(item);
 
   return (
     <CardRarityFrame
       rarity={rarity}
-      className={`ggPlayerCardFrame ${compact ? 'compact' : ''} ${qty > 1 ? 'qtyCorner' : ''} ${className}`}
-      corner={qty > 1 ? <span className="rarityQtyCorner">×{fa(qty)}</span> : null}
+      className={`ggPlayerCardFrame ${compact ? 'compact' : ''} ${hasQty ? 'qtyCorner' : ''} ${className}`}
+      corner={hasQty ? <span className="rarityQtyCorner">×{fa(qty)}</span> : null}
     >
       <button type="button"
         className={[

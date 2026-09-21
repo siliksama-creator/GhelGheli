@@ -56,7 +56,9 @@ console.log('\n== تعدادِ کارت: نگینِ گوشه، نه چیپِ ب�
 
 ok('وب: چیپِ بالای کارت (ggCardQty) حذف شده است', !/ggCardQty/.test(webCard));
 ok('وب: تعداد در نگینِ گوشه رندر می‌شود (corner به قاب می‌رود)',
-  /rarityQtyCorner/.test(webCard) && /corner=\{qty > 1/.test(webCard));
+  /rarityQtyCorner/.test(webCard) && /corner=\{hasQty \?/.test(webCard));
+ok('وب: کارتِ تکی هم ×۱ می‌گیرد، به‌شرطِ داشتنِ فیلدِ تعداد (hasQty)',
+  /const hasQty = item\?\.quantity != null \|\| item\?\.registered_count != null;/.test(webCard));
 ok('وب: قابِ CardRarityFrame پراپِ corner را می‌پذیرد و می‌کارد',
   /corner = null/.test(webFrame) && /\{corner\}/.test(webFrame));
 ok('وب CSS: قاعدهٔ .rarityQtyCorner در گوشهٔ پایینِ قاب نشسته است',
@@ -67,7 +69,9 @@ ok('وب CSS: نگینِ کمیابیِ پرمیوم/گلد وقتی عدد هس
 ok('اندروید: چیپِ بالای کارت (_MiniChip با ×) حذف شده است',
   !/_MiniChip\(text:\s*'×/.test(andCard));
 ok('اندروید: تعداد با cornerText به قاب داده می‌شود',
-  /cornerText: qty > 1 \? '×\$\{faNum\(qty\)\}' : null/.test(andCard));
+  /cornerText: hasQty \? '×\$\{faNum\(qty\)\}' : null/.test(andCard));
+ok('اندروید: کارتِ تکی هم ×۱ می‌گیرد، با همان شرطِ وب (hasQty)',
+  /final hasQty = card\?\['quantity'\] != null \|\| card\?\['registered_count'\] != null;/.test(andCard));
 ok('اندروید: قاب cornerText را در گوشهٔ پایین می‌کارد و نگین را کنار می‌برد',
   /widget\.cornerText != null/.test(andFrame)
   && /bottom: -6/.test(andFrame)
