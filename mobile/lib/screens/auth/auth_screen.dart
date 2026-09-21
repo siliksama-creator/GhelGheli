@@ -109,8 +109,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
   String get _cleanMobile => normalizeMobileInput(_mobile.text);
 
-  bool get _loginOtp => _tab == _Tab.login && _smsEnabled;
-
   void _switchTab(_Tab next) {
     setState(() {
       _tab = next;
@@ -300,6 +298,18 @@ class _AuthScreenState extends State<AuthScreen> {
                   color: Colors.white70, fontWeight: FontWeight.w700),
             ),
             Gaps.vMd,
+            const Wrap(
+              alignment: WrapAlignment.center,
+              spacing: Gaps.xs,
+              runSpacing: Gaps.xs,
+              children: [
+                FeaturePill(icon: Icons.style_rounded, text: 'کارت فیزیکی'),
+                FeaturePill(
+                    icon: Icons.emoji_events_rounded, text: 'لیگ ماهانه'),
+                FeaturePill(icon: Icons.chat_bubble_rounded, text: 'چت روم'),
+              ],
+            ),
+            Gaps.vXl,
             // ── تب‌های ورود / ثبت‌نام ─────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(4),
