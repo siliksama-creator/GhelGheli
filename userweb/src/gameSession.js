@@ -69,7 +69,8 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       return undefined;
     }
     let disposed = false;
-    const s = externalSocket || io(api, {
+    // `api` با APIِ هم‌مبدأ رشتهٔ تهی است؛ io(undefined) یعنی originِ خودِ صفحه.
+    const s = externalSocket || io(api || undefined, {
       auth: { token }, transports: ['websocket', 'polling'], forceNew: true,
       reconnection: true, reconnectionAttempts: 20, reconnectionDelay: 800,
       reconnectionDelayMax: 5000, timeout: 10000,

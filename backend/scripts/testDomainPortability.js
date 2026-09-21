@@ -132,11 +132,15 @@ console.log('\n══ ۲) بک‌اند: هیچ آدرسی در منطقِ کا�
     offenders.length === 0, `\n      ${offenders.join('\n      ')}`);
 }
 
-console.log('\n══ ۳) وب و پنل: آدرس در زمانِ بیلد تعیین می‌شود ══');
+console.log('\n══ ۳) وب و پنل: APIِ هم‌مبدأ — بدونِ وابستگی به دامنهٔ دوم ══');
 {
+  // پیش‌فرض باید رشتهٔ تهی (هم‌مبدأ) باشد: اگر دامنهٔ api. در شبکهٔ کاربری
+  // بمیرد (کشِ منفیِ DNS، VPN، فیلترینگ) اپِ وب نباید از کار بیفتد — nginx
+  // روی همان vhost وب `/api/` را پروکسی می‌کند. VITE_API_BASE راهِ فرارِ
+  // توسعهٔ لوکال است.
   for (const [name, file] of [['وب (کاربر)', 'userweb/src/lib/api.js'], ['پنلِ ادمین', 'admin/src/lib/api.js']]) {
     const s = read(file);
-    ok(`${name}: آدرس از VITE_API_BASE با پیش‌فرضِ سالم`, /import\.meta\.env\.VITE_API_BASE/.test(s) && /https:\/\//.test(s));
+    ok(`${name}: پیش‌فرضِ هم‌مبدأ (رشتهٔ تهی) با راهِ فرارِ VITE_API_BASE`, /import\.meta\.env\.VITE_API_BASE\s*\|\|\s*''/.test(s));
   }
 }
 

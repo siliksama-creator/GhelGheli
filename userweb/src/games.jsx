@@ -155,7 +155,7 @@ export default function Games({ api, token, externalLaunch = null }) {
 
   const prepareLobbySocket = (onConnect) => {
     lobbySocketRef.current?.disconnect();
-    const s = io(api, {
+    const s = io(api || undefined, {
       auth: { token }, transports: ['websocket', 'polling'],
       forceNew: true, reconnection: true,
     });
@@ -235,7 +235,7 @@ export default function Games({ api, token, externalLaunch = null }) {
 
   useEffect(() => {
     if (mode !== -1) return;
-    const s = io(api, { auth: { token }, transports: ['websocket', 'polling'] });
+    const s = io(api || undefined, { auth: { token }, transports: ['websocket', 'polling'] });
     s.on('connect', () => s.emit('game:lobby_list'));
     s.on('game:lobby_list', list => setLobbies(list || []));
     s.on('game:lobby_updated', () => s.emit('game:lobby_list'));

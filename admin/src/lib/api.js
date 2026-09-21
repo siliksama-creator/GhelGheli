@@ -1,12 +1,18 @@
 // Thin fetch-based API client shared by every admin page.
 // Behavior is unchanged from the legacy implementation: same base URL
 // resolution, same auth header injection, same error shape.
-// Falls back to the production API instead of http://localhost:4000: a
-// production build made without VITE_API_BASE used to silently ship a
-// localhost URL, so the deployed panel called the *visitor's own* machine
-// and every request failed with a connection error. Override with
-// VITE_API_BASE=http://localhost:4000 for local development.
-export const API_BASE = import.meta.env.VITE_API_BASE || 'https://api.ghelghelishop.com';
+//
+// ── APIِ هم‌مبدأ (اصلاحِ پس از مهاجرتِ .com) ──
+//
+// پیش‌فرض قبلاً `https://api.ghelghelishop.com` بود؛ همان وابستگیِ دامنهٔ دوم
+// که در سمتِ وبِ کاربر باعثِ گزارشِ «اتصال اینترنت برقرار نیست» شد (DNS/مسیرِ
+// api. در شبکهٔ کاربر می‌مرد در حالی که خودِ صفحه سالم لود می‌شد). حالا nginx
+// روی vhostِ پنل هم `/api/` و `/uploads/` را به بک‌اند پروکسی می‌کند و پیش‌فرض
+// رشتهٔ تهی است = هم‌مبدأ. باگِ تاریخیِ «localhostِ بازدیدکننده» هم با این
+// تغییر غیرممکن می‌شود: رشتهٔ تهی یعنی همان مبدأیی که پنل از آن سرو می‌شود،
+// نه ماشینِ بازدیدکننده. برای توسعهٔ لوکال:
+// VITE_API_BASE=http://localhost:4000
+export const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 // The admin JWT expires after 12h server-side, but the panel previously had
 // no way to notice — every request after expiry just failed silently with a

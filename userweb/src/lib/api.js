@@ -2,8 +2,26 @@
 //
 // Extracted from main.jsx so every screen speaks to the backend the same way
 // and error handling lives in exactly one place.
+//
+// ── APIِ هم‌مبدأ (اصلاحِ پس از مهاجرتِ .com) ──
+//
+// پیش‌فرض قبلاً آدرسِ مطلقِ `https://api.ghelghelishop.com` بود. گزارشِ مالک
+// بعد از مهاجرت: در مرورگرِ او (شبکهٔ ISP/VPN) صفحه از
+// `user.ghelghelishop.com` بالا می‌آمد ولی `fetch` به **دامنهٔ دوم** (api.)
+// خطای شبکه می‌خورد و کارتِ «اتصال اینترنت برقرار نیست» می‌نشست — در لاگِ
+// nginx هیچ درخواستی از سمت او به api. نرسیده بود، یعنی حلِ نامِ آن دامنه در
+// شبکهٔ او مشکل داشت (کشِ منفیِ DNS یا مسیرِ VPN)، در حالی که همهٔ تست‌های
+// بیرونی ۲۰۰ می‌گرفتند.
+//
+// درس: اپِ وب نباید به دامنهٔ دومی وابسته باشد که اگر از دسترسِ یک کاربر
+// خارج شد، کلِ اپ برایش بمیرد. حالا nginx روی همان vhostِ وب مسیرهای
+// `/api/`، `/socket.io/` و `/uploads/` را به همان بک‌اند پروکسی می‌کند، پس
+// پیش‌فرض رشتهٔ تهی است = درخواستِ هم‌مبدأ: بدونِ DNSِ دوم، بدونِ CORS،
+// بدونِ preflight. `VITE_API_BASE` هنوز برای توسعهٔ لوکال (مثلاً
+// `http://localhost:3000`) راهِ فرار است. دامنه‌های api.ghelghelishop.com و
+// alias تاریخیِ api.ghelghelishop.ir برای اپِ موبایل سرِ جایشان زنده‌اند.
 export const API =
-  import.meta.env.VITE_API_BASE || 'https://api.ghelghelishop.com';
+  import.meta.env.VITE_API_BASE || '';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // کشِ شرطیِ داده با ETag

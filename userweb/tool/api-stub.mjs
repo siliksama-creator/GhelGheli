@@ -38,6 +38,11 @@ export const API_HOSTS = [
 ];
 export const API_HOST = API_HOSTS[0];
 
+// از اصلاحِ «APIِ هم‌مبدأ» به بعد، بیلدِ تولید با BASEِ تهی ساخته می‌شود و
+// صفحهٔ پیش‌نمایشِ لوکال درخواست‌های **نسبی** می‌فرستد
+// (`http://localhost:4173/api/...`). الگوهای نسبیِ `installApiStub` هر دو
+// دنیا (مطلقِ قدیم و نسبیِ نو) را پوشش می‌دهند.
+
 /** BASE روی پیش‌نمایشِ لوکال است؟ (نه دامنهٔ زنده) */
 export const isLocalBase = base =>
   /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/)/.test(base);
@@ -47,7 +52,15 @@ export async function installApiStub(page) {
   const handler = async route => {
     if (live) {
       try {
-        await route.fulfill({ response: await route.fetch({ timeout: 10000 }) });
+        // درخواستِ هم‌مبدأِ پیش‌نمایشِ لوکال به خودِ localhost می‌خورد و آنجا
+        // بک‌اندی نیست؛ برای GG_LIVE_API=1 مقصد را به دامنهٔ تولید بازنویسی
+        // می‌کنیم تا «تستِ زنده» معنایش را حفظ کند.
+        const u = new URL(route.request().url());
+        if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+          u.protocol = 'https:';
+          u.host = new URL(API_HOSTS[1]).host;
+        }
+        await route.fulfill({ response: await route.fetch({ url: u.toString(), timeout: 10000 }) });
         return;
       } catch {
         // آفلاین — می‌افتیم روی همان استاب تا آفلاین‌بودن، تست را قرمز نکند.
@@ -60,4 +73,7 @@ export async function installApiStub(page) {
     });
   };
   for (const host of API_HOSTS) await page.route(`${host}/**`, handler);
+  // بیلدِ هم‌مبدأ: `/api/...` و `/socket.io/...` روی originِ خودِ صفحه.
+  await page.route('**/api/**', handler);
+  await page.route('**/socket.io/**', handler);
 }
