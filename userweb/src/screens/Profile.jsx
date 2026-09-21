@@ -61,6 +61,41 @@ export default function Profile({ token, p, load, setMsg, onToken }) {
           </div>
         </section>
       )}
+      <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'16px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'10px' }}>
+          <CosmeticAvatarFrame frame={p.cosmetics?.frame} style={{ width:62, height:62 }}>
+            <img src={avatarUrl(edit.profileAvatarKey)} alt="آواتار فعلی" style={{ width:'100%', height:'100%', borderRadius:'50%', objectFit:'cover', border:'2px solid #071522' }}/>
+          </CosmeticAvatarFrame>
+          <div><h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 4px' }}>پروفایل من</h2>
+            <DisplayName name={u.nickname || u.first_name || 'کاربر'} cosmetics={p.cosmetics} level={p.level?.level} showTitle />
+          </div>
+        </div>
+        <p style={{ color:'#D7DEE8', fontSize:'11px', margin:'0 0 12px' }}>این اطلاعات فقط برای مدیر است. در چت فقط نام مستعار و عکس دیده می‌شود.</p>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'10px' }}>
+          <Field label="نام" value={edit.firstName} onChange={v=>setEdit({...edit, firstName:v})} />
+          <Field label="نام خانوادگی" value={edit.lastName} onChange={v=>setEdit({...edit, lastName:v})} />
+          <Field label="نام مستعار" value={edit.nickname} maxLength={8}
+            hint="حداکثر ۸ نویسه — حرف، عدد و کاراکتر خاص"
+            onChange={v=>setEdit({...edit, nickname:v})} />
+          <Field label="سن" value={edit.age} onChange={v=>setEdit({...edit, age:v})} type="number" />
+          <Field label="استان" value={edit.province} onChange={v=>setEdit({...edit, province:v})} />
+          <Field label="شهر" value={edit.city} onChange={v=>setEdit({...edit, city:v})} />
+          <Field label="شماره کارت" value={edit.bankAccount} onChange={v=>setEdit({...edit, bankAccount:v})} />
+        </div>
+        <div style={{ marginTop:'16px' }}>
+          <b style={{ color:'#FFF', fontSize:'12px', display:'block', marginBottom:'8px' }}>{text('avatars.countLabel', `انتخاب آواتار پروفایل (${fa(avatarCount(avatars.length))} مدل اختصاصی):`, { count: avatarCount(avatars.length) })}</b>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:'8px' }}>
+            {avatars.map(a=>(
+              <img key={a} src={avatarUrl(a)} alt="آواتار" width="62" height="62" loading="lazy" style={{ width:'100%', aspectRatio:'1', borderRadius:'12px', border: edit.profileAvatarKey===a?'2.5px solid #38BDF8':'1px solid rgba(255,255,255,0.1)', cursor:'pointer', objectFit:'cover' }} onClick={()=>setEdit({...edit, profileAvatarKey:a})} />
+            ))}
+            {(clubs.data||[]).map(c=>(
+              <img key={c.slug} src={clubImg(c.slug)} alt={c.name} width="62" height="62" loading="lazy" title={`نشان ${c.name}`} style={{ width:'100%', aspectRatio:'1', borderRadius:'12px', border: edit.profileAvatarKey===`club:${c.slug}`?'2.5px solid #38BDF8':'1px solid rgba(255,255,255,0.1)', cursor:'pointer', objectFit:'contain', background:'rgba(255,255,255,0.04)' }} onClick={()=>setEdit({...edit, profileAvatarKey:`club:${c.slug}`})} />
+            ))}
+          </div>
+        </div>
+        <button onClick={save} disabled={saving} style={{ marginTop:'16px', width:'100%', padding:'12px', borderRadius:'12px', border:'none', background: saving?'#334155':'#38BDF8', color: saving?'#64748B':'#000', fontWeight:'900', cursor:'pointer' }}>{saving?'در حال ذخیره...':'ذخیره پروفایل'}</button>
+      </div>
+
     </div>
   );
 }
