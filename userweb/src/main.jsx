@@ -294,7 +294,19 @@ function isPhoneViewport() {
 
 function App() {
   const [token, setToken] = useState(() => {
-    try { return localStorage.token || ''; } catch { return ''; }
+    try {
+      // ── دستِ‌به‌دستیِ توکن از فروشگاه (هروی دوتکه) ───────────────────────
+      // کارتِ ورودِ ghelghelishop.com بعد از ورودِ موفق کاربر را با توکن در
+      // fragment می‌فرستد (تصمیمِ مالک). fragment به سرور ارسال نمی‌شود و
+      // همان لحظه از URL پاک می‌شود تا در تاریخچه/لاگ نماند.
+      const m = /[#&]token=([^&]+)/.exec(window.location.hash || '');
+      if (m && m[1]) {
+        localStorage.token = decodeURIComponent(m[1]);
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+        return localStorage.token;
+      }
+      return localStorage.token || '';
+    } catch { return ''; }
   });
   useDarkOnly();
   // پیکربندی کلاینت (بنر اطلاعیه و…) — از /api/config، بدون نیاز به آپدیت.
