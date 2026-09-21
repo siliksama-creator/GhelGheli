@@ -56,6 +56,21 @@ HEARTBEAT_S="${HEARTBEAT_S:-600}"
 DISK_WARN_PCT="${DISK_WARN_PCT:-85}"     # بالای ۸۵٪ استفادهٔ دیسک
 MEM_WARN_PCT="${MEM_WARN_PCT:-92}"       # بالای ۹۲٪ مصرفِ رم
 NODE_TIMEOUT="${NODE_TIMEOUT:-5}"        # مهلتِ پاسخِ /health هر گره (ثانیه)
+NODE_RETRY_DELAY="${NODE_RETRY_DELAY:-2}"  # فاصلهٔ تلاشِ دوم پس از یک بارِ بی‌جواب (ثانیه)
+NODE_PROBE_BUDGET="${NODE_PROBE_BUDGET:-15}"  # سقفِ زمانِ سنجشِ همهٔ گره‌ها در یک دور (ثانیه)
+
+# ── چرا «تلاشِ دوم» لازم شد (۲۹ شهریور) ───────────────────────────────
+#
+# ساعتِ ۰۰:۲۱:۴۶ هشدارِ «گرهِ ۴۰۰۳ جواب نمی‌دهد» به تلگرام رفت و یک ثانیه
+# بعد هم برای ۴۰۰۴ — ولی هیچ‌کدام ری‌استارت نشده بودند، هیچ خطایی در لاگِ
+# اپ نبود، و سنجشِ بعدی (۹۰ ثانیه بعد) گفت «۵ نود روشن». یعنی یک وقفهٔ
+# لحظه‌ای در پاسخِ /health بود (مهلتِ ۵ ثانیه در یک لحظهٔ پرمشغلهٔ کوتاه).
+#
+# هشدارِ نادرست از هشدارِ واقعی بدتر است: مالک نیمه‌شب بیدار می‌شود و
+# اعتمادش به نگهبان از بین می‌رود. پس حالا هر گره دو بار سنجیده می‌شود
+# (با ۲ ثانیه فاصله) و فقط اگر **هر دو** بی‌جواب بودند هشدار می‌رود.
+# گرهِ واقعاً مرده در همان ثانیهٔ اول هم جواب نمی‌دهد؛ پس خبر دادنِ حادثهٔ
+# واقعی کند نشده است.
 
 # کلیدِ تلگرام بیرونِ مخزن است تا راز هرگز داخلِ گیت نرود و دیپلوی
 # (`git clean`) هم پاکش نکند.
@@ -122,12 +137,42 @@ PORTS="$(cat "$PORTS_FILE" 2>/dev/null | tr -s '[:space:]' ' ' || true)"
 NODES_OK=0
 NODES_TOTAL=0
 NODES_DOWN=""
+PROBE_START="$(date +%s)"
+# یک گره = دو تلاش. خروجی: بدنهٔ پاسخ؛ کدِ خروج: ۰ اگر ok بود.
+#
+# ⚠️ سقفِ بودجه: اگر چند گره هم‌زمان مرده باشند، دو تلاشِ ۵ ثانیه‌ای برای هر
+# کدام می‌تواند از فاصلهٔ ۳۰ ثانیه‌ایِ تایمر بلندتر شود و دورِ بعدی را عقب
+# بیندازد. پس تا وقتی بودجهٔ این دور (۱۵ ثانیه) تمام نشده تلاشِ دوم انجام
+# می‌شود؛ بعد از آن «جواب نداد» قطعی گرفته می‌شود (یک گرهٔ واقعاً مرده از
+# همان تلاشِ اول هم خبر می‌دهد).
+probe_node() {
+  local port="$1" attempt body=""
+  for attempt in 1 2; do
+    body="$(curl -sS --max-time "$NODE_TIMEOUT" "http://127.0.0.1:${port}/health" 2>/dev/null || true)"
+    if printf '%s' "$body" | grep -q '"ok":true'; then
+      [ "$attempt" = "2" ] && log "گذرا [node_${port}] تلاشِ اول بی‌جواب بود، تلاشِ دوم سالم — هشدار نرفت"
+      printf '%s' "$body"
+      return 0
+    fi
+    if [ "$attempt" = "1" ]; then
+      if [ $(( $(date +%s) - PROBE_START )) -ge "$NODE_PROBE_BUDGET" ]; then
+        log "بودجهٔ ۱۵ ثانیه‌ایِ سنجش تمام شد — تلاشِ دوم برای پورت ${port} انجام نشد"
+        break
+      fi
+      sleep "$NODE_RETRY_DELAY"
+    fi
+  done
+  printf '%s' "$body"
+  return 1
+}
+
 for PORT in $PORTS; do
   NODES_TOTAL=$((NODES_TOTAL + 1))
-  BODY="$(curl -sS --max-time "$NODE_TIMEOUT" "http://127.0.0.1:${PORT}/health" 2>/dev/null || true)"
-  if printf '%s' "$BODY" | grep -q '"ok":true'; then
+  if probe_node "$PORT" > /tmp/.gg-probe 2>/dev/null; then
+    BODY="$(cat /tmp/.gg-probe)"
     NODES_OK=$((NODES_OK + 1))
   else
+    BODY="$(cat /tmp/.gg-probe)" 
     NODES_DOWN="${NODES_DOWN}${NODES_DOWN:+, }${PORT}"
     # آلارمِ هر پورت جدا نگه داشته می‌شود تا اگر دو گره افتاد، هر دو خبر داده شود.
     alarm "node_${PORT}" "1" "گرهِ API روی پورت ${PORT} جواب نمی‌دهد (${BODY:-بدونِ پاسخ}). اگر خودش بالا نیامد، وضعیتِ PM2 را ببینید."

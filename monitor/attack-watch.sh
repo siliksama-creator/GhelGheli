@@ -108,6 +108,18 @@ collect_stats() {
   '
 }
 
+# پرتکرارترین مسیرهای یک آی‌پی در پنجرهٔ جاری — برای «چه می‌خواست؟».
+# قالبِ لاگ: `IP - - [تاریخ] "GET /مسیر HTTP/1.1" 200 ...` — استخراج با sed،
+# بدونِ پارسِ سنگین. سه ردیفِ اول، با شمارش.
+top_paths() {
+  local ip="$1" limit="${2:-3}"
+  [ -s "${WIN_FILE:-}" ] || return 0
+  grep -F -- "$ip " "$WIN_FILE" 2>/dev/null \
+    | sed -nE 's/.*"(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) ([^ ]*)[^"]*".*/\1 \2/p' \
+    | sort | uniq -c | sort -rn | head -n "$limit" \
+    | sed -E 's/^[[:space:]]*([0-9]+)[[:space:]]+/\1× /'
+}
+
 main() {
   [ -r "$LOG_FILE" ] || { log "log not readable: $LOG_FILE"; exit 0; }
 
@@ -116,8 +128,15 @@ main() {
   # چرا tail: لاگ می‌تواند صدها مگابایت باشد؛ پنجرهٔ ۶۰ ثانیه‌ای همیشه در
   # انتهای فایل است. ۴۰۰ هزار خط = سقفِ امنی که یک حملهٔ سنگین هم از آن رد
   # نمی‌شود بی‌آنکه دیده شود.
+  # خطوطِ پنجره یک‌بار در فایلِ موقت می‌نشیند: هم آمار از آن درمی‌آید و هم
+  # (اگر هشدار لازم شد) پرتکرارترین مسیرهای همان آی‌پی. قبلاً یک پاسِ واحد
+  # بود و «چه می‌خواست؟» جوابی نداشت — مالک باید خودش لاگ را می‌گشت.
+  WIN_FILE="$(mktemp -t gg-attack.XXXXXX 2>/dev/null || echo /tmp/gg-attack-window)"
+  trap 'rm -f "$WIN_FILE"' EXIT
+  tail -n 400000 "$LOG_FILE" 2>/dev/null | grep -F -f <(printf '%s\n' "$stamps") -- 2>/dev/null > "$WIN_FILE" || true
+
   local stats
-  stats=$(tail -n 400000 "$LOG_FILE" 2>/dev/null | grep -F -f <(printf '%s\n' "$stamps") -- 2>/dev/null | collect_stats || true)
+  stats=$(collect_stats < "$WIN_FILE" || true)
   stats="${stats:-0 0 0 0 -}"
   read -r total c429 c5xx top_count top_ip <<<"$stats"
 
@@ -165,10 +184,33 @@ main() {
   fi
 
   # ── نشانهٔ ۳: موجِ متمرکز از یک آی‌پی ──
+  #
+  # پیام عمداً «چه می‌خواست؟» را هم می‌گوید. تجربهٔ ۲۹ شهریور: هشدارِ «۲۶۳
+  # درخواست از یک آی‌پی» بدونِ این خط، سؤالِ «چرا به اپی که عمومی نشده حمله
+  # شده؟» را بی‌جواب می‌گذاشت؛ با فهرستِ مسیرها یک نگاه کافی است تا معلوم
+  # شود اسکنرِ خودکارِ وردپرس/PHP است یا چیزِ جدی‌تر.
   if [ "$top_count" -ge "$TH_ONE_IP" ] && can_fire "$K_IP"; then
     fired=1; mark_fired "$K_IP"
-    msg+="<b>یک منبعِ پرترافیک</b>\nآی‌پیِ <code>${top_ip}</code> در یک دقیقه <b>${top_count}</b> درخواست فرستاده.\n\n"
-    log "ALERT single-ip ip=$top_ip count=$top_count"
+    local paths scanner=1
+    paths=$(top_paths "$top_ip" 3 || true)
+    msg+="<b>یک منبعِ پرترافیک</b>\nآی‌پیِ <code>${top_ip}</code> در یک دقیقه <b>${top_count}</b> درخواست فرستاده.\n"
+    if [ -n "$paths" ]; then
+      # `$paths` خودش خط‌به‌خط است و خطِ خالیِ انتهایی ندارد؛ همان را داخل
+      # <code> می‌گذاریم (نسخهٔ اول با sed خطِ اضافه می‌ساخت و پیام شلخته شد).
+      msg+="پرتکرارترین درخواست‌هایش:\n<code>${paths}</code>\n"
+      # اگر همهٔ مسیرها الگویِ اسکنِ CMS/فایل‌های حساس داشتند، صریح بگو.
+      while IFS= read -r line; do
+        case "$line" in
+          *".env"*|*".git"*|*"wp-"*|*"wordpress"*|*".php"*|*"phpinfo"*|*"zend"*|*"yii"*|*"/vendor/"*|*"composer"*|*"xmlrpc"*) : ;;
+          *) scanner=0 ;;
+        esac
+      done <<<"$paths"
+      if [ "$scanner" = "1" ]; then
+        msg+="الگو: <b>اسکنرِ خودکارِ آسیب‌پذیری</b> — دنبالِ فایل‌های وردپرس/PHP و فایل‌های حساس می‌گردد؛ ربطی به این که اپ عمومی شده یا نه ندارد. اگر واژهٔ «اسکنر» در پاسخ‌ها زیاد شد (۴۰۴)، خودش می‌رود.\n"
+      fi
+    fi
+    msg+="\n"
+    log "ALERT single-ip ip=$top_ip count=$top_count paths=$(printf '%s' "$paths" | tr '\n' ';')"
   fi
 
   # ── نشانهٔ ۴: خطای سرور ──

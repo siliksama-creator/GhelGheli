@@ -156,6 +156,10 @@ log "Installing nginx snippets (rate limit)"
 RATELIMIT_SNIPPETS=(
   "deploy/ghelgheli-ratelimit.conf:ghelgheli-ratelimit.conf"
   "deploy/ghelgheli-ratelimit-location.conf:ghelgheli-ratelimit-location.conf"
+  # بستنِ راهِ اسکنرها (۲۹ شهریور): اسکنرِ خودکار ۲۶۳ درخواست زد و چون
+  # SPA هر مسیرِ ناشناس را با ۲۰۰ جواب می‌داد، همه «موفق» شمرده شد.
+  # این اسنیپت مسیرهای نقطه‌دار و نشانه‌های CMS/PHP را ۴۰۴ می‌کند.
+  "deploy/ghelgheli-scanner-block.conf:ghelgheli-scanner-block.conf"
 )
 for pair in "${RATELIMIT_SNIPPETS[@]}"; do
   src="${pair%%:*}"; dst="/etc/nginx/snippets/${pair##*:}"
@@ -170,6 +174,39 @@ done
 #    نصب می‌شوند ولی کاری نمی‌کنند — پس صریح هشدار می‌دهیم، نه بی‌صدا.
 if ! grep -q 'ghelgheli-ratelimit.conf' /etc/nginx/sites-enabled/ghelgheli 2>/dev/null; then
   printf '  \033[1;33mهشدار: include سقفِ درخواست در کانفیگِ nginx نیست — سقف اعمال نمی‌شود\033[0m\n' >&2
+fi
+
+# ── include اسنیپتِ ضدِاسکنر ────────────────────────────────────────────────
+# فایلِ کانفیگِ سایت روی سرور زندگی می‌کند (در مخزن نیست) و certbot هم
+# دستش به آن است؛ پس به‌جای «بازنویسیِ» فایل، فقط یک خط به آن اضافه می‌کنیم
+# — آن هم اگر نبود. لنگرِ درج، خطِ `root` هر سایتِ ایستاست (یکتا و بی‌ابهام).
+ensure_scanner_include() {
+  local file=/etc/nginx/sites-enabled/ghelgheli
+  [ -f "$file" ] || return 0
+  grep -q 'ghelgheli-scanner-block.conf' "$file" && return 0
+  grep -q 'ghelgheli-scanner-block.conf' /etc/nginx/snippets/ghelgheli-scanner-block.conf 2>/dev/null || true
+  cp -a "$file" "${file}.bak-$(date +%Y%m%d%H%M%S)"
+  python3 - "$file" <<'PYEOF'
+import io, re, sys
+path = sys.argv[1]
+src = io.open(path, encoding='utf-8').read()
+inc = '  # اسکنرها/مسیرهای نقطه‌دار → ۴۰۴ (خواستهٔ مالک، ۲۹ شهریور)
+' \
+      '  include /etc/nginx/snippets/ghelgheli-scanner-block.conf;
+'
+out, added = [], 0
+for line in src.splitlines(keepends=True):
+    out.append(line)
+    if re.match(r'\s*root\s+/var/www/GhelGheli/(admin|userweb)/dist;', line):
+        out.append(inc)
+        added += 1
+io.open(path, 'w', encoding='utf-8').write(''.join(out))
+sys.stderr.write(f'  scanner-block include added to {added} server block(s)\n')
+PYEOF
+}
+if ! grep -q 'ghelgheli-scanner-block.conf' /etc/nginx/sites-enabled/ghelgheli 2>/dev/null; then
+  log "Adding scanner-block include to nginx site config"
+  ensure_scanner_include
 fi
 
 log "Reloading nginx"
