@@ -92,10 +92,16 @@ LOOKBACK="${LOOKBACK:-86400}"                # پنجرهٔ آمارِ خالص�
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 chmod 700 "$STATE_DIR" 2>/dev/null || true
 
-# فقط یک نمونه در هر لحظه (تایمر + اجرای دستی)
-exec 9>"$STATE_DIR/lock" 2>/dev/null || true
-if command -v flock >/dev/null 2>&1; then
-  flock -n 9 || exit 0
+# فقط یک نمونه در هر لحظه (تایمر + اجرای دستی).
+# ⚠️ حالتِ آزمایشی هرگز قفل نمی‌گیرد: dry-run هیچ‌چیز نمی‌نویسد، پس قفل لازم
+# ندارد — و اگر بگیرد، یک اجرای دستی می‌تواند بی‌صدا هیچ کاری نکند (همین
+# اتفاق روزِ نصب افتاد و خروجیِ خالیِ گمراه‌کننده داد).
+if [ "$DRY_RUN" = "0" ] && command -v flock >/dev/null 2>&1; then
+  exec 9>"$STATE_DIR/lock" 2>/dev/null || true
+  if ! flock -n 9; then
+    log "skip: نمونهٔ دیگری از نگهبان در حالِ اجراست (این دور رد شد)"
+    exit 0
+  fi
 fi
 BANS_FILE="$STATE_DIR/bans.recent"
 LAST_BAN_FILE="$STATE_DIR/last-ban-epoch"
