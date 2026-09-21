@@ -754,6 +754,8 @@ class _LiveBattle extends StatelessWidget {
     // الگوی راندهای دو‌امتیازی (دوئل طوفان) از بک‌اند.
     final storm = (state['storm'] as List?)?.cast<dynamic>();
     final roundMod = '${state['roundMod'] ?? ''}';
+    // شمارهٔ راندِ جاری — همان فرمولی که اعلانِ سینمایی و بک‌اند می‌گویند.
+    final roundNumber = NumberParser.toInt(state['roundIndex']) + 1;
     final modAnnounce = state['roundModAnnounce'] is Map
         ? Map<String, dynamic>.from(state['roundModAnnounce'] as Map)
         : const <String, dynamic>{};
@@ -831,12 +833,16 @@ class _LiveBattle extends StatelessWidget {
             ),
           ),
         Gaps.vXs,
-        // ── چرا بنرِ افقی حذف شد ──
+        // ── چرا بنرِ افقیِ تمام‌عرض حذف شد ──
         //
-        // `_FocusBanner` همین اطلاعات را می‌داد ولی ~۹۰ پیکسل ارتفاع
-        // می‌گرفت و باعثِ اسکرول می‌شد. جایش را `_RoundIntroOverlay`
-        // گرفته که وسطِ صفحه و روی همه‌چیز می‌آید، ۲.۸ ثانیه می‌ماند و
-        // **هیچ ارتفاعی از چیدمان نمی‌گیرد**.
+        // نسخهٔ اولِ `_FocusBanner` ~۹۰ پیکسل ارتفاع می‌گرفت و صفحه را
+        // اسکرول‌دار می‌کرد. جایش را `_RoundIntroOverlay` گرفته که وسطِ
+        // صفحه و روی همه‌چیز می‌آید، ۲.۸ ثانیه می‌ماند و **هیچ ارتفاعی از
+        // چیدمان نمی‌گیرد**.
+        // ⚠️ در دورِ ۲۹ شهریور، خودِ `_FocusBanner` با حالتِ `dense` برگشت —
+        //    ولی این بار داخلِ **ردیفِ ساعت** (بالا) و بدونِ خطِ راهنما، پس
+        //    همان قراردادِ «بدونِ ارتفاعِ اضافه» نقض نمی‌شود. مالک خواست
+        //    معیارِ راند درشت و همیشه‌در‌چشم باشد، نه فقط ۲.۸ ثانیه.
         //
         // اطلاعاتِ همیشگی (کدام ویژگی مهم است) از بین نرفت: روی تک‌تکِ
         // کارت‌های دست با `_FocusStatRibbon` دیده می‌شود و در نوارِ
@@ -861,52 +867,33 @@ class _LiveBattle extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    // نشانِ همیشگیِ ویژگیِ راند — جایگزینِ فشردهٔ بنرِ حذف‌شده.
-                    // اعلانِ وسطِ صفحه ۲.۸ ثانیه‌ای است؛ این تا آخرِ راند می‌ماند
-                    // تا کسی که اعلان را از دست داد هم بداند دنبالِ چه عددی بگردد.
+                    // ── کادرِ «معیارِ این راند» ──
+                    // قبلاً یک قرصِ ۱۲پیکسلی با نامِ ویژگی بود («سرعت»).
+                    // مالک: «اونجا که نشون می‌ده هر راند سر چی قراره بازی بشه،
+                    // اون رو یه کادر و زیباسازی کن که خیلی تو چشم باشه» —
+                    // حالا همان کادرِ درشتِ وب است (شمارهٔ راند + نامِ معیارِ
+                    // رنگ‌آمیزی‌شده + نشانِ ×۲ در راندِ طوفانی) و چون داخلِ
+                    // همین ردیف می‌نشیند، ارتفاعِ صفحه بالا نمی‌رود.
                     if ('${(state['roundFocus'] as Map?)?['stat'] ?? ''}'
                         .isNotEmpty) ...[
-                      Builder(
-                        builder: (_) {
-                          final fs =
-                              '${(state['roundFocus'] as Map?)?['stat'] ?? ''}';
-                          final t = _FocusBannerState._statColors[fs] ?? color;
-                          return Container(
-                            margin: const EdgeInsetsDirectional.only(end: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: t.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: t.withValues(alpha: 0.6),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _FocusBannerState._statIcons[fs] ??
-                                      Icons.stars_rounded,
-                                  size: 15,
-                                  color: t,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  _FocusBannerState._statNames[fs] ?? '',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w900,
-                                    color: t,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                      Expanded(
+                        flex: 3,
+                        child: _FocusBanner(
+                          key: ValueKey(
+                            'focus-${roundNumber}-${state['roundFocus']?['stat']}',
+                          ),
+                          focus: state['roundFocus'] is Map
+                              ? Map<String, dynamic>.from(
+                                  state['roundFocus'] as Map,
+                                )
+                              : null,
+                          fallbackTitle: '',
+                          roundNumber: roundNumber,
+                          dense: true,
+                          storm: roundMod == 'storm',
+                        ),
                       ),
+                      const SizedBox(width: 8),
                     ],
                     Expanded(
                       child: Text(
@@ -915,8 +902,10 @@ class _LiveBattle extends StatelessWidget {
                             : state['opponentLocked'] == true
                                 ? 'حریف آماده‌ست'
                                 : 'کارت را بزن',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -3200,18 +3189,36 @@ class _FocusBanner extends StatefulWidget {
     required this.focus,
     required this.fallbackTitle,
     required this.roundNumber,
+    this.dense = false,
+    this.storm = false,
   });
 
   final Map<String, dynamic>? focus;
   final String fallbackTitle;
   final int roundNumber;
 
+  /// حالتِ فشرده: همان کادرِ درشت، ولی داخلِ ردیفِ ساعتِ نبرد زنده جا می‌شود
+  /// (خطِ راهنمای «عدد نهایی = …» پنهان می‌شود تا ارتفاع اضافه نشود).
+  /// خواستهٔ مالک ۲۹ شهریور: «اونجا که نشون می‌ده هر راند سر چی قراره بازی بشه،
+  /// اون رو یه کادر و زیباسازی کن که خیلی تو چشم باشه» — نشانِ قبلی یک قرصِ
+  /// ۱۲پیکسلی بود که فقط نامِ ویژگی را می‌گفت (بدونِ راند، بدونِ همانندی با وب).
+  final bool dense;
+
+  /// راندِ دو‌امتیازیِ «دوئل طوفان» ⇒ نشانِ نارنجیِ ×۲ کنارِ متن.
+  final bool storm;
+
   @override
   State<_FocusBanner> createState() => _FocusBannerState();
 }
 
 class _FocusBannerState extends State<_FocusBanner>
-    with SingleTickerProviderStateMixin {
+    // ⚠️ `TickerProviderStateMixin` و نه `SingleTickerProviderStateMixin`:
+    // این ویجت **دو** کنترلر دارد (`_c` برای ورود، `_pulse` برای درخششِ
+    // بی‌پایان). با نسخهٔ Single، لحظه‌ای که ویجت واقعاً ساخته شود assertِ
+    // فریم‌ورک می‌پرد («can only be used as a TickerProvider once»).
+    // دلیلِ اینکه کسی این را ندیده بود: `_FocusBanner` تا قبل از دورِ
+    // ۲۹ شهریور هیچ‌جا استفاده نمی‌شد و فقط نگاشت‌های static‌اش مصرف داشت.
+    with TickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 900),
@@ -3270,9 +3277,17 @@ class _FocusBannerState extends State<_FocusBanner>
     final label = '${widget.focus?['label'] ?? widget.fallbackTitle}';
     final text = '${widget.focus?['text'] ?? ''}';
     if (label.trim().isEmpty) return const SizedBox.shrink();
-    final tint = _statColors[stat] ?? const Color(0xFF38BDF8);
+    final tint = widget.storm
+        ? const Color(0xFFFF7A1A)
+        : _statColors[stat] ?? const Color(0xFF38BDF8);
     final icon = _statIcons[stat] ?? Icons.stars_rounded;
     final statName = _statNames[stat] ?? '';
+    // اندازه‌های حالتِ فشرده — هیچ فونتی زیرِ ۱۱.۵ نیست (نگهبانِ خوانایی:
+    // mobile/test/duel_focus_and_speed_test.dart).
+    final iconSize = widget.dense ? 34.0 : 44.0;
+    // ⚠️ `const`: وگرنه لینتِ `prefer_const_declarations` رویش گیر می‌دهد.
+    const roundFont = 11.5;
+    final labelFont = widget.dense ? 16.5 : 21.0;
 
     return AnimatedBuilder(
       animation: Listenable.merge([_c, _pulse]),
@@ -3287,12 +3302,12 @@ class _FocusBannerState extends State<_FocusBanner>
               scale: 0.92 + 0.08 * t,
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 11,
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.dense ? 9 : 14,
+                  vertical: widget.dense ? 6 : 11,
                 ),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(widget.dense ? 16 : 18),
                   gradient: LinearGradient(
                     colors: [
                       tint.withValues(alpha: 0.26),
@@ -3314,8 +3329,8 @@ class _FocusBannerState extends State<_FocusBanner>
                   children: [
                     // آیکونِ ویژگی، با هالهٔ نبض‌دار.
                     Container(
-                      width: 44,
-                      height: 44,
+                      width: iconSize,
+                      height: iconSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: tint.withValues(alpha: 0.18),
@@ -3332,28 +3347,67 @@ class _FocusBannerState extends State<_FocusBanner>
                       ),
                       child: Transform.scale(
                         scale: 0.9 + 0.14 * _pulse.value,
-                        child: Icon(icon, color: tint, size: 24),
+                        child: Icon(
+                          icon,
+                          color: tint,
+                          size: widget.dense ? 19 : 24,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: widget.dense ? 8 : 12),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'راند ${faNum(widget.roundNumber)} — نبرد بر سر',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white.withValues(alpha: 0.72),
-                            ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'راند ${faNum(widget.roundNumber)} — نبرد بر سر',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: roundFont,
+                                    fontWeight: FontWeight.w700,
+                                    color:
+                                        Colors.white.withValues(alpha: 0.72),
+                                  ),
+                                ),
+                              ),
+                              if (widget.storm) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(999),
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFFFF7A1A),
+                                        Color(0xFFFF4D2E),
+                                      ],
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    '×۲ دوامتیازی',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFFFFF6E8),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 1),
                           Text(
                             statName.isEmpty ? label : '$statName!',
                             style: TextStyle(
-                              fontSize: 21,
+                              fontSize: labelFont,
                               fontWeight: FontWeight.w900,
                               color: tint,
                               height: 1.25,
@@ -3365,7 +3419,7 @@ class _FocusBannerState extends State<_FocusBanner>
                               ],
                             ),
                           ),
-                          if (text.isNotEmpty)
+                          if (text.isNotEmpty && !widget.dense)
                             Text(
                               text,
                               maxLines: 2,

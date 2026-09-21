@@ -1044,6 +1044,10 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
     const resolved = resolveRound(userCards[i], opponentCards[i], i, previousWinner, random, roundSeed, { mayhem, mod });
     const entry = {
       round: resolved.round, title: resolved.title, text: resolved.text,
+      // ⚠️ `focusKey` (ویژگیِ داوریِ همین راند: speed/technique/…) از راندِ
+      // ۲۹ شهریور به history اضافه شد. قبلاً فقط `focusLabel` بود و کلاینت
+      // برای رنگ/آیکونِ چیپِ معیار باید رشتهٔ فارسی را تطبیق می‌داد.
+      focusKey: resolved.focusKey,
       focusLabel: resolved.focusLabel,
       focusStatX: resolved.focusStatX,
       focusStatO: resolved.focusStatO,

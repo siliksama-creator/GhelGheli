@@ -359,6 +359,10 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
   // در وقت اضافه عملاً مساویِ کارتی رخ داده ولی برنده دارد؛ پس رنگ outcome
   // از برندهٔ نهایی می‌آید.
   const outcome = draw && !inOvertime ? 'draw' : mineWon ? 'won' : 'lost';
+  // رنگِ چیپِ معیار: اولویت با طوفان/وقت اضافه است، وگرنه رنگِ خودِ ویژگی.
+  const clashStat = focusStatOfRound(round);
+  const clashMeta = FOCUS_META[clashStat] || {};
+  const clashTint = inOvertime ? '#7DD3FC' : isStorm ? '#FFB066' : (clashMeta.color || '#8BA1B8');
   const showNumbers = phase === 'numbers' || phase === 'verdict';
   const showVerdict = phase === 'verdict';
   const awardVal = mineWon ? myAward : theirAward;
@@ -401,7 +405,13 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
       </div>
 
       <div className="duelClashCore">
-        <span>{fa(round.round)} • {inOvertime ? 'وقت اضافه' : (round.focusLabel || round.title)}</span>
+        {/* ⚠️ این خط قبلاً ۱۱.۵پیکسلی و خاکستری بود و مالک گفت «اصلاً دیده
+            نمی‌شود». حالا چیپی هم‌رنگِ ویژگیِ همان راند است — همان چیزی که
+            در لحظهٔ انتخاب هم بالای کارت‌ها نشسته بود. */}
+        <span className="duelClashFocus" style={{ '--focus-color': clashTint }}>
+          <i aria-hidden="true"><SvgIcon name={clashMeta.icon || 'star'} size={13} /></i>
+          {fa(round.round)} • {inOvertime ? 'وقت اضافه' : (round.focusLabel || round.title)}
+        </span>
         <strong className="duelPowerDuel" aria-live="polite">
           <span className={`duelPowerOwner mine ${showVerdict && mineWon ? 'lead' : ''}`}>
             <small>{inOvertime ? 'ترکیب تو' : 'تو'}</small>
@@ -576,6 +586,77 @@ function FocusStatRibbon({ card, stat, roundIndex = 0, previousRoundWon = false 
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// کادرِ «معیارِ این راند» — آینهٔ مو‌به‌مویِ اندروید
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ مالک (۲۹ شهریور، با اسکرین‌شاتِ راندِ طوفان):
+//
+//   «توی بازی دوئل کارت معمولی و طوفان، اونجا که نشون می‌ده هر راند سر چی
+//    قراره بازی بشه (مثلاً ضدحمله سرعتی) اون رو یه کادر و زیباسازی کن که
+//    خیلی تو چشم باشه که بازیکن‌ها متوجه بشن. هم اندروید هم وب.»
+//
+// ── چرا «قرصِ ۱۲پیکسلی» کافی نبود ─────────────────────────────────────────
+//
+// نسخهٔ قبلی یک قرصِ کوچک با نامِ ویژگی («سرعت») بود؛ یعنی حتی کسی که
+// می‌دیدش هم نمی‌فهمید *قانونِ این راند* چیست. کادرِ تازه سه چیز را می‌گوید:
+//   ۱) شمارهٔ راند         → «راند ۱»
+//   ۲) معیارِ داوری        → «ضدحمله سرعتی»  (درشت، هم‌رنگِ ویژگی، با هاله)
+//   ۳) قانونِ عددِ نهایی   → «عدد نهایی = سرعت + افکت آشکار…» (راهنمای کودکانه)
+//
+// ── چرا ارتفاعِ صفحه را زیاد نمی‌کند ───────────────────────────────────────
+//
+// همان دلیلی که بنرِ ۹۰پیکسلیِ اندروید حذف شد (کاربر را به اسکرول می‌انداخت).
+// این کادر داخلِ همان ردیفی می‌نشیند که ساعتِ ۵۲پیکسلی هست، پس ارتفاعِ
+// ردیف عوض نمی‌شود. روی نمایشگرِ باریک، خطِ راهنما (hint) پنهان می‌شود تا
+// شکستنِ خط، ارتفاع را بالا نبرد — قانونِ صفحهٔ بازی: «بدونِ اسکرول».
+const FOCUS_STAT_BY_LABEL = {
+  'ضدحمله سرعتی': 'speed',
+  'نبرد تکنیکی': 'technique',
+  'فشار حمله': 'attack',
+  'دیوار دفاعی': 'defense',
+  'ضربه نهایی': 'goalChance',
+};
+
+/** ویژگیِ راند را از payload بیرون می‌کشد (کلیدِ تازه یا نگاشتِ برچسب). */
+function focusStatOfRound(round) {
+  if (!round) return '';
+  if (round.focusKey) return round.focusKey;
+  return FOCUS_STAT_BY_LABEL[round.focusLabel] || '';
+}
+
+function DuelFocusBox({ focus, roundNumber, storm = false }) {
+  if (!focus?.stat) return null;
+  const meta = FOCUS_META[focus.stat] || {};
+  const tint = storm ? '#FF7A1A' : (meta.color || '#38BDF8');
+  const label = focus.label || meta.name || '';
+  // ⚠️ عمداً `section` است نه `div`: قانونِ قدیمیِ `.duelChoicePrompt>div`
+  // آن را به `flex-direction:column` می‌بُرد و آیکون می‌رفت بالای متن.
+  // ⚠️ و کامنتِ JSX (`{/* */}`) نباید اینجا بنشیند: کنارِ عنصرِ ریشه،
+  // دو فرزند حساب می‌شود و کلِ فایل خطای سینتکس می‌دهد.
+  return (
+    <section className={`duelFocusBox${storm ? ' isStorm' : ''}`}
+      style={{ '--focus-color': tint }}
+      role="status"
+      aria-label={`راند ${fa(roundNumber)} — نبرد بر سر ${label}. ${focus.hint || ''}`}>
+      <i className="duelFocusBoxIcon" aria-hidden="true">
+        <SvgIcon name={meta.icon || 'star'} size={22} />
+      </i>
+      <span className="duelFocusBoxText">
+        <small>راند {fa(roundNumber)} — نبرد بر سر</small>
+        <b>{label}</b>
+        {focus.hint ? <em>{focus.hint}</em> : null}
+      </span>
+      {storm && (
+        <span className="duelFocusBoxStorm">
+          <SvgIcon name="flame" size={12} />
+          راند دو‌امتیازی
+        </span>
+      )}
+    </section>
+  );
+}
+
 function DuelIdentity({ player, fallback }) {
   const p = player || {};
   const imageUrl = p.profileImageUrl || p.profile_image_url;
@@ -689,19 +770,11 @@ function LiveArena({ session }) {
         {/* نشانِ ماندگارِ ویژگیِ راند: اعلانِ وسطِ صفحه دو ثانیه‌ای است،
             این تا آخرِ راند می‌ماند تا کسی که اعلان را ندید هم بداند
             دنبالِ کدام عدد بگردد. */}
-        {state.roundMod === 'storm' && (
-          <span className="duelFocusPill duelStormPill" style={{ '--focus-color': '#FF7A1A' }}>
-            <i aria-hidden="true"><SvgIcon name="flame" size={13} /></i>
-            راند دو‌امتیازی
-          </span>
-        )}
-        {state.roundFocus?.stat && FOCUS_META[state.roundFocus.stat] && (
-          <span className="duelFocusPill"
-            style={{ '--focus-color': FOCUS_META[state.roundFocus.stat].color }}>
-            <i aria-hidden="true">{FOCUS_META[state.roundFocus.stat].icon}</i>
-            {FOCUS_META[state.roundFocus.stat].name}
-          </span>
-        )}
+        <DuelFocusBox
+          key={`focus-${num(state.roundIndex)}-${state.roundFocus?.stat || ''}-${state.roundMod || ''}`}
+          focus={state.roundFocus}
+          roundNumber={Math.min(num(state.totalRounds) || 5, num(state.roundIndex) + 1)}
+          storm={state.roundMod === 'storm'} />
         <div><b>{state.iChose ? 'قفل شد' : state.opponentLocked ? 'حریف آماده‌ست' : 'کارت را بزن'}</b></div>
         {/* عددِ یخ‌زده بدونِ نشانه شبیهِ «هنگ» است؛ آیکنِ مکث می‌گوید
             عمدی است. */}

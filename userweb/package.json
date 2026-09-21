@@ -21,6 +21,7 @@
     "test:desktop-layout": "node tool/desktop-layout.mjs",
     "test:scroll-hint": "node tool/scroll-hint.mjs",
     "test:round-intro-parity": "node tool/round-intro-parity.mjs",
+    "test:duel-focus-and-sides": "node tool/duel-focus-and-sides.mjs",
     "test:club-tabs": "node tool/club-tabs-parity.mjs",
     "test:reward-parity": "node tool/reward-parity.mjs",
     "test:no-emoji": "node tool/no-emoji.mjs",

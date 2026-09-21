@@ -237,6 +237,7 @@ jobs:
       # so the mobile layout -- which Android mirrors -- cannot drift.
       - run: npm run test:desktop-layout
       - run: npm run test:round-intro-parity
+      - run: npm run test:duel-focus-and-sides
       # راهنمای اسکرول — یک قرارداد، سه کلاینت (وب/پنل/اندروید):
       # جملهٔ هر تب باید حرف‌به‌حرف یکی باشد، لنگرِ نشانه‌ها ستون/قابِ
       # محتوا باشد (نه لبهٔ نمایشگر)، و هیچ `key` تکراری روی
