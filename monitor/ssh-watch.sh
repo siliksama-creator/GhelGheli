@@ -37,6 +37,18 @@
 # نمی‌کند جز دو فایلِ حالتِ خودش در /var/lib/ghelgheli-ssh-watch.
 set -Eeuo pipefail
 
+# ⚠️ دو درسِ واقعیِ همان ساعتِ اولِ نصب (۲۹ شهریور):
+#
+#  ۱) locale: اجرا از ترمینالِ من و اجرا از systemd دو locale متفاوت دارند و
+#     `sort` در هر کدام ترتیبِ دیگری می‌سازد. نتیجه: دو فایلِ **یکسان** در
+#     `diff` کاملاً متفاوت دیده می‌شدند و نگهبان برای هر ۴۷ فایل هشدارِ
+#     «کسی روی سرور دست برده» داد — هشدارِ کاذبِ نصبِ اولیه. حالا locale
+#     ثابت است (C)، پس ترتیبِ همیشه یکی است.
+#  ۲) هم‌زمانی: تایمرِ ۶۰ ثانیه‌ای و اجرای دستی می‌توانند روی هم بیفتند و
+#     فایلِ اثرِ انگشت را وسطِ نوشتن بخوانند (همان هشدارِ کاذب از سمتِ دیگر).
+#     حالا اجرای دوم با flock بی‌صدا کنار می‌رود.
+export LC_ALL=C LANG=C
+
 # کمکیِ مشترکِ تلگرام (خواندنِ تنظیمات با تحملِ کوتیشن)
 # shellcheck source=lib/telegram.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/telegram.sh"
@@ -70,6 +82,12 @@ LOOKBACK="${LOOKBACK:-86400}"                # پنجرهٔ آمارِ خالص�
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
 chmod 700 "$STATE_DIR" 2>/dev/null || true
+
+# فقط یک نمونه در هر لحظه (تایمر + اجرای دستی)
+exec 9>"$STATE_DIR/lock" 2>/dev/null || true
+if command -v flock >/dev/null 2>&1; then
+  flock -n 9 || exit 0
+fi
 BANS_FILE="$STATE_DIR/bans.recent"
 LAST_BAN_FILE="$STATE_DIR/last-ban-epoch"
 DIGEST_FILE="$STATE_DIR/last-digest"
@@ -208,7 +226,7 @@ else
   )
 fi
 shopt -s nullglob
-tmp_hash="$STATE_DIR/integrity.new"
+tmp_hash="$STATE_DIR/integrity.$$.new"   # مخصوصِ همین اجرا (بدونِ تداخل)
 : > "$tmp_hash"
 for p in "${ipaths[@]}"; do
   for f in $p; do
