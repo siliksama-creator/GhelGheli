@@ -231,7 +231,7 @@ main() {
     sn=0
     [ -f "$SUPPRESS_FILE" ] && sn="$(cat "$SUPPRESS_FILE" 2>/dev/null || echo 0)"
     case "$sn" in ''|*[!0-9]*) sn=0 ;; esac
-    printf '%s\n' $((sn+1)) > "$SUPPRESS_FILE" 2>/dev/null || true
+    printf '%s\n' $((sn+1)) 2>/dev/null > "$SUPPRESS_FILE" || true
     if [ "$DRY_RUN" -eq 1 ]; then
       log "SUPPRESSED (آزمایشی) wave rps=$rps c429=$c429 top_ip=$top_count"
     else
@@ -265,7 +265,7 @@ main() {
     text="$text
 
 🔇 همچنین از پیامِ مهمِ قبلی تا حالا، $sn رویدادِ بی‌اهمیت (موجی که لایهٔ دفاعی خودش blocked کرد) رخ داد و جداگانه ارسال نشد."
-    printf '0\n' > "$SUPPRESS_FILE" 2>/dev/null || true
+    printf '0\n' 2>/dev/null > "$SUPPRESS_FILE" || true
   fi
 
   local err

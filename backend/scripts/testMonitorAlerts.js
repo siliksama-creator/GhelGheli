@@ -111,6 +111,14 @@ console.log('\n══ ۳) نگهبانِ حمله: روی حمله هشدار ب
   mk(floodLog, flood);
   mk(calmLog, calm);
 
+  // موجِ خطای سرور (۵xx) — تنها نشانه‌ای که هنوز «مهم» است و پیام می‌گیرد.
+  const flood5 = [];
+  for (let i = 0; i < 400; i += 1) {
+    flood5.push(`203.0.113.7 - - [${stamp(i % 50)} +0330] "GET /api/config HTTP/1.1" 500 100 "-" "bot"`);
+  }
+  const flood5Log = path.join(tmp, 'flood5.log');
+  mk(flood5Log, flood5);
+
   const runWatch = (logFile, stateFile) => execFileSync('bash',
     [path.join(ROOT, 'monitor/attack-watch.sh'), '--dry-run'],
     {
@@ -120,20 +128,28 @@ console.log('\n══ ۳) نگهبانِ حمله: روی حمله هشدار ب
         LOG_FILE: logFile,
         STATE_FILE: stateFile,
         STATE_LOG: path.join(tmp, 'watch.log'),
+        SUPPRESS_FILE: path.join(tmp, 'suppressed.count'),
       },
     });
 
+  // قراردادِ تازه (درخواستِ مالک): موجِ ۴۲۹/تک‌آی‌پی را لایهٔ دفاعی خودش
+  // مهار کرده، پس پیامِ جداگانه نمی‌گیرد؛ فقط لاگِ SUPPRESSED + شمارش.
   const outFlood = runWatch(floodLog, path.join(tmp, 'state-flood'));
-  ok('روی موجِ ۴۲۹ هشدار می‌دهد', /سقفِ ضدِربات فعال شد/.test(outFlood));
-  ok('آی‌پیِ پرترافیک را نام می‌برد', /203\.0\.113\.7/.test(outFlood));
+  ok('موجِ ۴۲۹/تک‌آی‌پی بی‌صدا شده (دفاع خودش مهار کرده)', outFlood.trim() === '', JSON.stringify(outFlood.slice(0, 120)));
+  ok('رویدادِ بی‌صدا در لاگ با برچسبِ SUPPRESSED می‌ماند',
+    /SUPPRESSED/.test(fs.readFileSync(path.join(tmp, 'watch.log'), 'utf8')));
+
+  const out5xx = runWatch(flood5Log, path.join(tmp, 'state-5xx'));
+  ok('روی خطای سرور (۵xx) هنوز هشدار می‌دهد', /سرور دارد خطا می‌دهد/.test(out5xx));
+  ok('آی‌پیِ پرترافیک را نام می‌برد', /203\.0\.113\.7/.test(out5xx));
   ok('در متنِ هشدار، «کارِ بعدی» به مالک گفته می‌شود',
-    /کلادفلر را از پنل ادمین روشن کن/.test(outFlood) && /admin\.ghelghelishop\.ir/.test(outFlood));
+    /کلادفلر را از پنل ادمین روشن کن/.test(out5xx) && /admin\.ghelghelishop\.ir/.test(out5xx));
 
   const outCalm = runWatch(calmLog, path.join(tmp, 'state-calm'));
   ok('روی ترافیکِ عادی هیچ پیامی نمی‌دهد', outCalm.trim() === '', JSON.stringify(outCalm.slice(0, 120)));
 
   // سکوتِ ۵ دقیقه‌ای — وگرنه موج به دریای پیام تبدیل می‌شود.
-  const outAgain = runWatch(floodLog, path.join(tmp, 'state-flood'));
+  const outAgain = runWatch(flood5Log, path.join(tmp, 'state-5xx'));
   ok('هشدارِ تکراری در بازهٔ سکوت فرستاده نمی‌شود', outAgain.trim() === '');
 
   fs.rmSync(tmp, { recursive: true, force: true });

@@ -128,7 +128,7 @@ suppress_note() {
   local key="$1" msg="$2" n=0
   [ -f "$SUPPRESS_FILE" ] && n="$(cat "$SUPPRESS_FILE" 2>/dev/null || echo 0)"
   case "$n" in ''|*[!0-9]*) n=0 ;; esac
-  state_write bash -c "printf '%s\n' '$((n+1))' > '$SUPPRESS_FILE' 2>/dev/null || true"
+  state_write bash -c "printf '%s\n' '$((n+1))' 2>/dev/null > '$SUPPRESS_FILE' || true"
   if [ "$DRY_RUN" = "1" ]; then
     log "SUPPRESSED (آزمایشی) [$key] ${msg//$'\n'/ }"
   else
@@ -144,7 +144,7 @@ with_suppress_footer() {
     msg="$msg
 
 🔇 همچنین از پیامِ مهمِ قبلی تا حالا، $n رویدادِ بی‌اهمیت (موجِ حمله‌ای که لایهٔ دفاعی خودش blocked کرد) رخ داد و جداگانه ارسال نشد."
-    state_write bash -c "printf '0\n' > '$SUPPRESS_FILE' 2>/dev/null || true"
+    state_write bash -c "printf '0\n' 2>/dev/null > '$SUPPRESS_FILE' || true"
   fi
   printf '%s' "$msg"
 }
@@ -196,7 +196,7 @@ alert_once() {
   if quiet_key "$key"; then
     if [ $((NOW_EPOCH - last)) -ge "$cooldown" ]; then
       suppress_note "$key" "$msg"
-      state_write bash -c "printf '%s\n' '$NOW_EPOCH' > '$stamp_file' 2>/dev/null || true"
+      state_write bash -c "printf '%s\n' '$NOW_EPOCH' 2>/dev/null > '$stamp_file' || true"
     fi
     return 0
   fi
@@ -209,7 +209,7 @@ alert_once() {
     else
       log "ALERT [$key] ${msg//$'\n'/ }"
     fi
-    state_write bash -c "printf '%s\n' '$NOW_EPOCH' > '$stamp_file' 2>/dev/null || true"
+    state_write bash -c "printf '%s\n' '$NOW_EPOCH' 2>/dev/null > '$stamp_file' || true"
   fi
 }
 
@@ -417,12 +417,12 @@ rm -f "$tmp_hash" 2>/dev/null || true
 # ═══════════════════════════════════════════════════════════════════════════
 F2B_FAIL_FILE="$STATE_DIR/f2b-fail"
 if fail2ban-client ping >/dev/null 2>&1; then
-  state_write bash -c "printf '0\n' > '$F2B_FAIL_FILE' 2>/dev/null || true"
+  state_write bash -c "printf '0\n' 2>/dev/null > '$F2B_FAIL_FILE' || true"
 else
   f2b_f=0
   [ -f "$F2B_FAIL_FILE" ] && f2b_f="$(cat "$F2B_FAIL_FILE" 2>/dev/null || echo 0)"
   case "$f2b_f" in ''|*[!0-9]*) f2b_f=0 ;; esac
-  state_write bash -c "printf '%s\n' '$((f2b_f+1))' > '$F2B_FAIL_FILE' 2>/dev/null || true"
+  state_write bash -c "printf '%s\n' '$((f2b_f+1))' 2>/dev/null > '$F2B_FAIL_FILE' || true"
   if [ $((f2b_f+1)) -ge 2 ]; then
     alert_once fail2ban_down "🚨 لایهٔ دفاعیِ fail2ban پاسخ نمی‌دهد!
 
