@@ -6,18 +6,14 @@ import 'package:flutter/material.dart';
 import '../../api_client.dart';
 import '../../services/image_disk_cache.dart';
 import '../../core/assets.dart';
-import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
-import '../../widgets/app_card.dart';
-import '../../widgets/section_header.dart';
 import '../../widgets/state_views.dart';
 import '../shared/hero_header.dart';
-import 'inventory_page.dart';
 import 'login_streak_card.dart';
-import '../../widgets/photo_card_box.dart';
 
-/// Home / dashboard tab: points header, card-code redemption and card
-/// inventory carousel.
+/// Home / dashboard tab: points header, streak, quick tiles.
+/// (ثبت کارت با عکس و کلکسیون به تبِ «ثبت کارت» منتقل شدند — خواستهٔ مالک،
+/// ۳۱ شهریور؛ هم‌تراز با وب که همان دو بخش را در تبِ cardreg گذاشت.)
 class DashboardPage extends StatefulWidget {
   final ApiClient api;
   final Future<void> Function() reloadProfile;
@@ -50,7 +46,6 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   Map<String, dynamic>? _data;
-  List<Map<String, dynamic>> _rewards = [];
   bool _loading = true;
   String? _error;
 
@@ -116,10 +111,6 @@ class _DashboardPageState extends State<DashboardPage> {
           if (m['cosmetics'] != null) 'cosmetics': m['cosmetics'],
           if (m['pendingGrants'] != null) 'pendingGrants': m['pendingGrants'],
         };
-        _rewards = List<Map<String, dynamic>>.from(
-            ((m['rewards'] as List?) ?? const [])
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e)));
         _error = null;
         _loading = false;
       });
@@ -153,23 +144,10 @@ class _DashboardPageState extends State<DashboardPage> {
     final inventory =
         List<Map<String, dynamic>>.from(_data?['inventory'] ?? []);
     final points = NumberParser.toInt(user?['current_points']);
-    final sorted = [..._rewards]..sort((a, b) =>
-        NumberParser.toInt(a['required_points'])
-            .compareTo(NumberParser.toInt(b['required_points'])));
-    Map<String, dynamic>? nextReward;
-    for (final r in sorted) {
-      if (points < NumberParser.toInt(r['required_points'])) {
-        nextReward = r;
-        break;
-      }
-    }
-    nextReward ??= sorted.isNotEmpty ? sorted.last : null;
 
     // پوسته منبع حقیقت است. اگر خالی بودنِ ویجت را با کش محلی پر کنیم،
     // بعد از باز کردن صندوق دوباره بنر کهنه برمی‌گردد.
     final pendingChests = widget.pendingGrants;
-
-    final theme = Theme.of(context);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -205,7 +183,6 @@ class _DashboardPageState extends State<DashboardPage> {
           HeroHeader(
             points: points,
             nickname: user?['nickname'] ?? 'قهرمان',
-            nextReward: nextReward,
             user: user is Map ? Map<String, dynamic>.from(user) : null,
             cosmetics: _data?['cosmetics'] as Map<String, dynamic>?,
             onOpenProfile: widget.onOpenProfile,
@@ -276,122 +253,6 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           Gaps.vSm,
 
-          // ── بخش ثبت کارت‌های قلقلی ──
-          AppCard(
-            padding: const EdgeInsets.all(Gaps.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: BoxDecoration(
-                        borderRadius: Corners.rLg,
-                        gradient: LinearGradient(
-                          colors: [
-                            BrandColors.emerald.withValues(alpha: 0.22),
-                            BrandColors.blue.withValues(alpha: 0.12),
-                          ],
-                        ),
-                        border: Border.all(color: BrandColors.emerald.withValues(alpha: 0.35)),
-                      ),
-                      child: Image.asset('assets/brand/card_scan_glow.webp', cacheWidth: 150),
-                    ),
-                    Gaps.hSm,
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text('ثبت کارت‌های قلقلی',
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w900, fontSize: 14)),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  borderRadius: Corners.rPill,
-                                  color: BrandColors.amber.withValues(alpha: 0.16),
-                                  border: Border.all(color: BrandColors.amber.withValues(alpha: 0.45)),
-                                ),
-                                child: const Text('ثبت سریع',
-                                    style: TextStyle(
-                                        color: BrandColors.amber,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'عکس کارت و کدش را همین‌جا ثبت کن.',
-                            style: TextStyle(
-                              color: Color(0xFFCBD5E1),
-                              fontSize: 11.5,
-                              height: 1.45,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                Gaps.vSm,
-                PhotoCardBox(
-                  api: widget.api,
-                  embedded: true,
-                  onRegistered: () {
-                    _load();
-                    widget.reloadProfile();
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          Gaps.vXl,
-          SectionHeader(
-            title: 'کلکسیون من',
-            trailing: inventory.length > 6 && widget.onOpenInventory != null
-                ? TextButton(
-                    onPressed: widget.onOpenInventory,
-                    child: Text('همه (${faNum(inventory.length)})'),
-                  )
-                : null,
-          ),
-          if (inventory.isEmpty)
-            const AppCard(
-              child: EmptyState(
-                  icon: Icons.style_outlined,
-                  title: 'هنوز کارتی در کلکسیون شما نیست',
-                  message: 'بعد از ثبت، کارت‌ها اینجا دیده می‌شوند.',
-                  image: 'assets/games/empty_collection.webp'),
-            )
-          else
-            Builder(builder: (_) {
-              final recent =
-                  filterAndSort(inventory, sort: InvSort.recent).take(6).toList();
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.zero,
-                gridDelegate:
-                    const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 200,
-                  mainAxisSpacing: Gaps.sm,
-                  crossAxisSpacing: Gaps.sm,
-                  childAspectRatio: 0.66,
-                ),
-                itemCount: recent.length,
-                itemBuilder: (_, i) => InventoryTile(item: recent[i]),
-              );
-            }),
         ],
       ),
     );

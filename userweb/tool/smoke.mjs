@@ -12,15 +12,15 @@ import { installApiStub, isLocalBase } from './api-stub.mjs';
 const BASE = process.argv[2] || 'http://localhost:4173';
 const TOKEN = process.argv[3] || '';
 const DIRECT = {
-  home: 'خانه', rewards: 'جوایز', league: 'لیگ', club: 'چت و بازی',
+  home: 'خانه', cardreg: 'ثبت کارت', league: 'لیگ', club: 'چت و بازی',
 };
 const MORE = {
-  inventory: 'کلکسیون کارت‌ها', wallet: 'کیف پول', invite: 'دعوت دوستان',
+  wallet: 'کیف پول', invite: 'دعوت دوستان',
   support: 'پشتیبانی', profile: 'پروفایل',
 };
 const HEADER = { pass: 'گذر نبرد فصلی', shop: 'فروشگاه', wheel: 'گردونه' };
 const DESTINATIONS = [
-  'home', 'rewards', 'league', 'club', 'inventory', 'wallet', 'invite',
+  'home', 'cardreg', 'league', 'club', 'wallet', 'invite',
   'support', 'profile', 'pass', 'shop', 'wheel',
 ];
 

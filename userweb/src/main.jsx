@@ -48,7 +48,7 @@ const Ledger = lazy(() => import('./screens/Ledger.jsx'));
 const League = lazy(() => import('./screens/League.jsx'));
 const Chat = lazy(() => import('./screens/Chat.jsx'));
 const PublicProfile = lazy(() => import('./screens/PublicProfile.jsx'));
-const Rewards = lazy(() => import('./screens/Rewards.jsx'));
+const CardReg = lazy(() => import('./screens/CardReg.jsx'));
 const Shop = lazy(() => import('./screens/Shop.jsx'));
 const Wheel = lazy(() => import('./screens/Wheel.jsx'));
 const Referral = lazy(() => import('./screens/Referral.jsx'));
@@ -57,7 +57,6 @@ const GamesHub = lazy(() => import('./games.jsx'));
 const GrowthHub = lazy(() => import('./GrowthHub.jsx'));
 const Support = lazy(() => import('./support.jsx'));
 const Wallet = lazy(() => import('./wallet.jsx'));
-const Inventory = lazy(() => import('./screens/Inventory.jsx'));
 // برنامه‌های پیشنهادی — صفحهٔ مستقل، از «بیشتر» باز می‌شود (خواستهٔ مالک).
 const RecommendedApps = lazy(() => import('./screens/RecommendedApps.jsx'));
 
@@ -69,7 +68,7 @@ function prefetchTabs() {
   const warm = () => {
     import('./games.jsx');
     import('./screens/League.jsx');
-    import('./screens/Rewards.jsx');
+    import('./screens/CardReg.jsx');
     import('./screens/Shop.jsx');
     import('./screens/Chat.jsx');
   };
@@ -131,7 +130,7 @@ import './theme.css';
 // اپ اندروید از قبل همین کار را می‌کرد؛ این وب را با آن هم‌شکل می‌کند.
 const NAV_TABS = [
   ['home', 'خانه', 'home'],
-  ['rewards', 'جوایز', 'gift'],
+  ['cardreg', 'ثبت کارت', 'card'],
   ['league', 'لیگ', 'trophy'],
   ['club', 'چت و بازی', 'game'],
 ];
@@ -155,11 +154,10 @@ const NAV_SAFE_PAD = 84;
 
 const SCROLL_HINTS = {
   home: 'میان‌برها و کارت‌ها پایین‌ترند',
-  rewards: 'جوایز بیشتری پایین‌تر هست',
+  cardreg: 'ثبت کارت و کلکسیون پایین‌ترند',
   league: 'ادامهٔ جدول پایین‌تر است',
   club: 'بازی‌ها و ماموریت‌ها پایین‌ترند',
   wheel: 'جوایز و شرایط پایین‌تر است',
-  inventory: 'کارت‌های بیشتری پایین‌تر است',
   wallet: 'تاریخچهٔ تراکنش‌ها پایین‌تر است',
   ledger: 'ادامهٔ دفتر پایین‌تر است',
   pass: 'پله‌های گذر نبرد پایین‌تر است',
@@ -171,7 +169,7 @@ const SCROLL_HINTS = {
 };
 
 // چیدمانِ سرور-درایوِ تب‌ها: GET /api/config یک آرایهٔ `tabOrder` از
-// idهای قراردادی می‌فرستد (home, rewards, league, social, shop, …).
+// idهای قراردادی می‌فرستد (home, cardreg, league, social, shop, …).
 // idِ وب برای «چت و بازی» club است که با socialِ قرارداد یکی می‌شود.
 // ترتیبِ سرور را اعمال می‌کنیم و تب‌های جاافتاده به انتها می‌روند تا
 // هیچ‌وقت تبی از نوار گم نشود — تغییرِ چیدمان بدون آپدیت.
@@ -197,7 +195,6 @@ const MORE_TABS = [
   // چرا اولِ فهرست: فروشگاه تنها مسیرِ درآمدیِ اپ است؛ ته‌فهرست‌گذاشتنش
   // همان اشتباهِ قبلی با ظاهرِ تازه است.
   ['shop', 'فروشگاه', 'shop'],
-  ['inventory', 'کلکسیون کارت‌ها', 'card'],
   ['wallet', 'کیف پول', 'wallet'],
   // دفتر امتیازات — خواستهٔ مالک (۱۷ شهریور): «این قسمت دفتر امتیازات رو
   // انتقال بده به قسمت بیشتر، در اپلیکیشن اندروید و وب.» قبلاً داخل پروفایل
@@ -670,9 +667,11 @@ function useMomentVisible() {
 
 function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   const sharedRoom = new URLSearchParams(window.location.search).get('room');
-  const [tab, setTab] = useState(sharedRoom ? 'club' : 'home');
+  const [tab, setTabRaw] = useState(sharedRoom ? 'club' : 'home');
+  // idهای میراثی: دیپ‌لینک/نوتیفیکیشن‌های دورانِ «جوایز» و تبِ جداگانهٔ
+  // کلکسیون از این به بعد به همان تبِ «ثبت کارت» می‌رسند — صفحهٔ خالی نه.
+  const setTab = (id) => setTabRaw(id === 'rewards' || id === 'inventory' ? 'cardreg' : id);
   const [p, setP] = useState(null);
-  const [rewards, setRewards] = useState([]);
   const [msg, setMsg] = useState('');
   const [publicUser, setPublicUser] = useState(null);
   const [loadError, setLoadError] = useState(null);
@@ -762,7 +761,6 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
         // خالی می‌ماند — سرور می‌فرستاد و کلاینت دور می‌ریخت.
         pendingGrants: boot.pendingGrants || [],
       });
-      setRewards(boot.rewards || []);
       primeImageCache(boot).catch(() => {});
       // کاربر وارد شده و صفحهٔ اول رندر شده؛ حالا وقتِ گرم‌کردنِ بقیه است.
       prefetchTabs();
@@ -992,16 +990,12 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
         <UserErrorBoundary key={tab} onReset={() => window.location.reload()}>
         <Suspense fallback={<div className="tabLoading" aria-busy="true" />}>
         {tab === 'home' && (
-          <Home token={token} p={p} rewards={rewards} load={load}
+          <Home token={token} p={p} load={load}
             setMsg={setMsg} openProfile={() => setTab('profile')}
             openWallet={() => setTab('wallet')}
             openWheel={() => setTab('wheel')}
             openInvite={() => setTab('invite')}
-            openInventory={() => setTab('inventory')} />
-        )}
-        {tab === 'inventory' && (
-          <Inventory items={p.inventory || []} grants={p.pendingGrants || []}
-            token={token} reload={load} />
+            openCardReg={() => setTab('cardreg')} />
         )}
         {tab === 'ledger' && (
           <Ledger token={token} setMsg={setMsg} />
@@ -1015,8 +1009,9 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
         {tab === 'profile' && (
           <Profile token={token} p={p} load={load} setMsg={setMsg} onToken={onToken} />
         )}
-        {tab === 'rewards' && (
-          <Rewards token={token} setMsg={setMsg} reloadProfile={load} />
+        {tab === 'cardreg' && (
+          <CardReg items={p.inventory || []} grants={p.pendingGrants || []}
+            token={token} reload={load} setMsg={setMsg} />
         )}
         {tab === 'shop' && (
           <Shop token={token} setMsg={setMsg} reloadProfile={load} />

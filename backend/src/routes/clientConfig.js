@@ -16,8 +16,13 @@ const featureFlags = require('../services/featureFlags');
 // روی نوارِ پایین و شیتِ «بیشتر» اعمال می‌کند؛ id ناشناخته نادیده و
 // تب‌های جاافتاده به انتها می‌روند تا هیچ‌وقت تبی گم نشود.
 const TAB_IDS = Object.freeze([
-  'home', 'rewards', 'league', 'social',
-  'shop', 'inventory', 'wallet', 'invite', 'support', 'profile',
+  // 'rewards' → 'cardreg' (۳۱ شهریور، خواستهٔ مالک): بخشِ جوایز از هر سه
+  // سطح حذف شد و تبِ دومِ نوار پایین حالا «ثبت کارت» است (فرمِ ثبتِ کارت
+  // با عکس + کلکسیون). 'inventory' هم حذف شد چون کلکسیون داخلِ همان تبِ
+  // «ثبت کارت» نشست. aliasِ پایین نگهبانیِ tabOrderهای قدیمیِ ذخیره‌شده در
+  // دیتابیس را به عهده دارد تا بی‌صدا خودشان ترمیم شوند.
+  'home', 'cardreg', 'league', 'social',
+  'shop', 'wallet', 'invite', 'support', 'profile',
   // دفتر امتیازات/سکه — خواستهٔ مالک: «از پروفایل به «بیشتر» منتقل شود»
   // (۱۷ شهریور). افزودنِ id یعنی ادمین هم می‌تواند ترتیبش را از پنل عوض
   // کند؛ بدونِ آن، `normalizeTabOrder` نادیده‌اش می‌گرفت و به انتهای
@@ -39,7 +44,12 @@ function normalizeTabOrder(input) {
   const seen = new Set();
   const out = [];
   for (const raw of input) {
-    const id = String(raw ?? '').trim();
+    // idهای منسوخ: 'rewards' همان تبِ «ثبت کارت» امروز است؛ 'inventory'
+    // مقصدِ مستقل ندارد (داخلِ cardreg است) و مثلِ هر idِ ناشناختهٔ دیگر
+    // بی‌صدا دور ریخته می‌شود.
+    const legacy = { rewards: 'cardreg' };
+    const rawId = String(raw ?? '').trim();
+    const id = legacy[rawId] || rawId;
     if (!TAB_IDS.includes(id) || seen.has(id)) continue;
     seen.add(id);
     out.push(id);

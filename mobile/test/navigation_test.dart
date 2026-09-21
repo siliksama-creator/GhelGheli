@@ -110,8 +110,8 @@ void main() {
 
     testWidgets('فروشگاه دیگر زیرتبِ جوایز نیست', (tester) async {
       await _pumpShell(tester);
-      // به تبِ جوایز برو.
-      await tester.tap(find.text('جوایز').last);
+      // به تبِ «ثبت کارت» برو (همان جایگاهِ تبِ قدیمیِ جوایز).
+      await tester.tap(find.text('ثبت کارت').last);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 

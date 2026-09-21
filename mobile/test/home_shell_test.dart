@@ -205,16 +205,16 @@ void main() {
       expect(bar, findsOneWidget);
 
       // هر مقصد نوار پایین را بزن.
-      for (final label in ['جوایز', 'لیگ', 'چت و بازی', 'خانه']) {
+      for (final label in ['ثبت کارت', 'لیگ', 'چت و بازی', 'خانه']) {
         final dest = find.text(label);
         if (dest.evaluate().isEmpty) continue;
         await tester.tap(dest.first, warnIfMissed: false);
         await tester.pump();
         await tester.pump(const Duration(seconds: 1));
         expect(tester.takeException(), isNull, reason: 'تب $label کرش داد');
-        // بخشِ «ثبت کارت با عکس» با هر بازگشت به خانه یک درخواستِ
-        // فرعی می‌فرستد (با `fresh: true` تا شمارِ در انتظار به‌روز
-        // بماند). اگر تست وسطِ آن تمام شود، فریم‌ورک
+        // تبِ «ثبت کارت» بخشِ «ثبت کارت با عکس» را دارد که با هر بازدید
+        // یک درخواستِ فرعی می‌فرستد (با `fresh: true` تا شمارِ در انتظار
+        // به‌روز بماند). اگر تست وسطِ آن تمام شود، فریم‌ورک
         // «A Timer is still pending» می‌دهد — ایرادِ زمان‌بندیِ تست
         // است نه اپ.
         await tester.pump(const Duration(milliseconds: 600));
@@ -240,14 +240,13 @@ void main() {
     testWidgets('۴۰۱ روی یک مسیر بقیهٔ اپ را نمی‌شکند', (tester) async {
       await tester.pumpWidget(_wrap(_fakeApi(failing: {
         '/api/wheel': 401,
-        '/api/rewards': 401,
       })));
       await tester.pump();
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(tester.takeException(), isNull);
       // ── چرا این خط ──
-      // داشبورد حالا بخشِ «ثبت کارت با عکس» را هم دارد که بعد از اولین
+      // تبِ «ثبت کارت» بخشِ «ثبت کارت با عکس» را دارد که بعد از اولین
       // فریم یک درخواستِ فرعی می‌فرستد. تستی که دقیقاً وسطِ آن تمام
       // شود، درخواست را معلق رها می‌کند و فریم‌ورک «A Timer is still
       // pending» می‌دهد — ایرادِ زمان‌بندیِ تست است، نه اپ.
@@ -273,7 +272,7 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       expect(tester.takeException(), isNull);
       // ── چرا این خط ──
-      // داشبورد حالا بخشِ «ثبت کارت با عکس» را هم دارد که بعد از اولین
+      // تبِ «ثبت کارت» بخشِ «ثبت کارت با عکس» را دارد که بعد از اولین
       // فریم یک درخواستِ فرعی می‌فرستد. تستی که دقیقاً وسطِ آن تمام
       // شود، درخواست را معلق رها می‌کند و فریم‌ورک «A Timer is still
       // pending» می‌دهد — ایرادِ زمان‌بندیِ تست است، نه اپ.
@@ -364,7 +363,7 @@ void _stuckSpinnerTests() {
       expect(tester.takeException(), isNull);
       expect(find.byType(CircularProgressIndicator), findsNothing);
       // ── چرا این خط ──
-      // داشبورد حالا بخشِ «ثبت کارت با عکس» را هم دارد که بعد از اولین
+      // تبِ «ثبت کارت» بخشِ «ثبت کارت با عکس» را دارد که بعد از اولین
       // فریم یک درخواستِ فرعی می‌فرستد. تستی که دقیقاً وسطِ آن تمام
       // شود، درخواست را معلق رها می‌کند و فریم‌ورک «A Timer is still
       // pending» می‌دهد — ایرادِ زمان‌بندیِ تست است، نه اپ.

@@ -28,8 +28,8 @@ import { installApiStub, isLocalBase } from './api-stub.mjs';
 
 const BASE = process.argv[2] || 'http://localhost:4173';
 const TOKEN = process.argv[3] || '';
-const DIRECT = { home: 'خانه', rewards: 'جوایز', league: 'لیگ', club: 'چت و بازی' };
-const MORE = { inventory: 'کلکسیون کارت‌ها', wallet: 'کیف پول', support: 'پشتیبانی', profile: 'پروفایل' };
+const DIRECT = { home: 'خانه', cardreg: 'ثبت کارت', league: 'لیگ', club: 'چت و بازی' };
+const MORE = { wallet: 'کیف پول', support: 'پشتیبانی', profile: 'پروفایل' };
 const TABS = [...Object.keys(DIRECT), ...Object.keys(MORE)];
 
 /** Vazirmatn's heaviest real cut. Above this the browser fakes it. */

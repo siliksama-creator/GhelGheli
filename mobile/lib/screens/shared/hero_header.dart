@@ -11,7 +11,6 @@ import '../../core/cosmetics.dart';
 class HeroHeader extends StatelessWidget {
   final int points;
   final String nickname;
-  final Map<String, dynamic>? nextReward;
   final Map<String, dynamic>? user;
   final Map<String, dynamic>? cosmetics;
   final VoidCallback? onOpenProfile;
@@ -21,7 +20,6 @@ class HeroHeader extends StatelessWidget {
     super.key,
     required this.points,
     required this.nickname,
-    this.nextReward,
     this.user,
     this.cosmetics,
     this.onOpenProfile,
@@ -48,9 +46,6 @@ class HeroHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final required = NumberParser.toInt(nextReward?['required_points']);
-    final remaining = required > points ? required - points : 0;
-    final progress = required > 0 ? (points / required).clamp(0.0, 1.0) : 0.0;
     final missing = _missing;
     final done = _required.length - missing.length;
 
@@ -197,32 +192,6 @@ class HeroHeader extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-
-          // ── reward progress ──
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: Corners.rPill,
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 5,
-              color: const Color(0xFF22E7A6),
-              backgroundColor: Colors.white.withValues(alpha: 0.12),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            nextReward == null
-                ? 'هنوز جایزه‌ای تعریف نشده است'
-                : remaining == 0
-                    ? 'به جایزه ${nextReward!['name']} رسیدی!'
-                    : 'تا جایزه ${nextReward!['name']}: ${faNum(remaining)} امتیاز',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w700,
-                fontSize: 10.5),
           ),
 
           // ── ورودی کیف پول ──

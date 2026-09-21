@@ -43,7 +43,7 @@ check(empty.length === 0, 'راهنمای خالی/سفید در پنل وب ه�
 // قاعدهٔ ۳: صفحاتی که ذاتاً فرم دارند نباید بی‌راهنما باشند. این صفحات در فاز
 // ۳.۴ راهنما داشتند؛ اگر یکی صفر شد یعنی پسرفت. (صفحات فقط-نمایشی مثل
 // داشبورد/مانیتورینگ لازم نیست.)
-const FORM_PAGES_WITH_HINTS = ['engine', 'settings', 'shop', 'rewards', 'wheel', 'battle-pass'];
+const FORM_PAGES_WITH_HINTS = ['engine', 'settings', 'shop', 'wheel', 'battle-pass'];
 for (const page of FORM_PAGES_WITH_HINTS) {
   check((webPages[page] || []).length > 0,
     'صفحهٔ ' + page + ' هیچ hintی ندارد — راهنماهای فیلد حذف شده‌اند؟');

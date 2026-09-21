@@ -57,7 +57,7 @@ function check(name, fn) {
 // همین «دستی بودن» جلوی نگاشتِ خاموشِ اشتباه را می‌گیرد.
 const KEY_TO_ANDROID_INDEX = {
   home: 0,
-  rewards: 1,
+  cardreg: 1,
   wallet: 2,
   league: 3,
   club: 4,
@@ -67,7 +67,6 @@ const KEY_TO_ANDROID_INDEX = {
   invite: 8,
   shop: 9,
   pass: 10,
-  inventory: 11,
   ledger: 12,
   apps: 13,
 };

@@ -44,10 +44,7 @@ check(/notifications\/status/.test(webNotifications) && /fcmConfigured/.test(web
 check(/send-segmented/.test(webNotifications),
   'web uses the segmented-notification endpoint');
 
-const webRewards = read('admin/src/pages/rewards.jsx');
 const rewardRoutes = read('backend/src/routes/adminRewards.js');
-check(/rewards\/\$\{cardEditor\.tierId\}\/cards/.test(webRewards),
-  'Web manages required cards on a reward tier');
 check(/AS required_cards/.test(rewardRoutes) && /cardTypeId/.test(rewardRoutes),
   'reward admin API returns persisted card requirements');
 check(/LEFT JOIN reward_tiers/.test(rewardRoutes) && /COALESCE\(c\.reward_name/.test(rewardRoutes),

@@ -1,12 +1,9 @@
 // 1:1 با اندروید dashboard_page.dart — داشبورد دقیقاً مثل اپ
-import React, { useMemo, useState, useEffect } from 'react';
+import React from 'react';
 import { fa, avatarUrl } from '../lib/api.js';
-import { EmptyView } from '../components/states.jsx';
-import PhotoCardBox from '../components/PhotoCardBox.jsx';
 import LoginStreak from '../components/LoginStreak.jsx';
 import { CosmeticAvatarFrame, DisplayName } from '../components/Cosmetics.jsx';
 import CachedImg from '../components/CachedImg.jsx';
-import PlayerCard from '../components/PlayerCard.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
 
 const asInt = v => {
@@ -38,10 +35,7 @@ export function isNewCard(item) {
 }
 const SORTS = [['recent', 'تازه‌ترین'], ['value', 'باارزش‌ترین'], ['name', 'الفبا']];
 
-function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfile, onOpenWallet }) {
-  const required = asInt(nextReward?.required_points);
-  const remaining = required > points ? required - points : 0;
-  const progress = required > 0 ? Math.min(1, points / required) : 0;
+function HeroHeader({ points, nickname, user, cosmetics, onOpenProfile, onOpenWallet }) {
   const requiredFields = { first_name:'نام', last_name:'نام خانوادگی', age:'سن', province:'استان', city:'شهر', bank_account:'شماره کارت' };
   const missing = user ? Object.entries(requiredFields).filter(([k]) => !String(user[k]||'').trim()).map(([,v])=>v) : [];
   const done = Object.keys(requiredFields).length - missing.length;
@@ -66,12 +60,6 @@ function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfi
           <div style={{ color:'#FFE599', fontWeight:'700', fontSize:'9.5px', textAlign:'right' }}>امتیاز کل</div>
         </div>
       </div>
-      <div style={{ height:'5px', background:'rgba(255,255,255,0.12)', borderRadius:'99px', overflow:'hidden', marginTop:'8px' }}>
-        <div style={{ width: `${progress*100}%`, height:'100%', background:'#22E7A6', transition:'width 0.5s' }} />
-      </div>
-      <div style={{ color:'rgba(255,255,255,0.7)', fontWeight:'700', fontSize:'10.5px', marginTop:'4px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-        {nextReward ? (remaining===0 ? `به جایزه ${nextReward.name} رسیدی!` : `تا جایزه ${nextReward.name}: ${fa(remaining)} امتیاز`) : 'هنوز جایزه‌ای تعریف نشده است'}
-      </div>
       {onOpenWallet && (
         <div className="walletEntry" onClick={onOpenWallet} style={{ marginTop:'8px', background:'rgba(0,0,0,0.28)', border:`1px solid ${asInt(user?.wallet_balance)>0?'rgba(255,211,107,0.5)':'rgba(255,255,255,0.15)'}`, borderRadius:'12px', padding:'6px 10px', display:'flex', alignItems:'center', gap:'8px', cursor:'pointer' }}>
           <span style={{ width:'26px', height:'26px', borderRadius:'50%', background: asInt(user?.wallet_balance)>0 ? 'linear-gradient(135deg, #FFE9A8, #D4A227)' : 'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px' }}><SvgIcon name="wallet" size={15} /></span>
@@ -91,33 +79,14 @@ function HeroHeader({ points, nickname, nextReward, user, cosmetics, onOpenProfi
   );
 }
 
-function CardLightbox({ item, close }) {
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, padding:'14px' }} onClick={close}>
-      <div style={{ background:'#0F172A', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'20px', padding:'16px', width:'min(420px,100%)', textAlign:'center', position:'relative' }} onClick={e=>e.stopPropagation()}>
-        <button onClick={close} style={{ position:'absolute', top:'8px', right:'8px', background:'none', border:'none', color:'#FFF', fontSize:'20px', cursor:'pointer' }}>×</button>
-        <PlayerCard item={item} />
-        {item.description && <p style={{ color:'#94A3B8', fontSize:'12px', lineHeight:1.8 }}>{item.description}</p>}
-      </div>
-    </div>
-  );
-}
-
-export default function Home({ token, p, rewards, load, setMsg, openProfile, openWallet, openWheel, openInvite, openInventory }) {
-  const [bigCard, setBigCard] = useState(null);
+export default function Home({ token, p, load, setMsg, openProfile, openWallet, openWheel, openInvite, openCardReg }) {
   const u = p.user;
-  const sorted = [...rewards].sort((a,b)=>a.required_points-b.required_points);
-  const next = sorted.find(r=>u.current_points < r.required_points) || sorted.at(-1);
   const inventory = p.inventory || [];
-  const recentInventory = useMemo(
-    () => filterAndSort(inventory, '', 'recent').slice(0, 6),
-    [inventory],
-  );
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'12px', padding:'0 12px 80px' }}>
       {(p.pendingGrants || []).length > 0 && (
-        <button type="button" onClick={openInventory} style={{
+        <button type="button" onClick={openCardReg} style={{
           background: 'linear-gradient(135deg,#F59E0B22,#2a1140)',
           border: '1.5px solid #FFD166', borderRadius: 16, padding: '12px 14px',
           color: '#FFD166', fontWeight: 900, cursor: 'pointer', textAlign: 'right',
@@ -129,7 +98,7 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
         </button>
       )}
 
-      <HeroHeader points={asInt(u.current_points)} nickname={u.nickname||u.mobile||'قهرمان'} nextReward={next} user={u} cosmetics={p.cosmetics} onOpenProfile={openProfile} onOpenWallet={openWallet} />
+      <HeroHeader points={asInt(u.current_points)} nickname={u.nickname||u.mobile||'قهرمان'} user={u} cosmetics={p.cosmetics} onOpenProfile={openProfile} onOpenWallet={openWallet} />
 
       <LoginStreak token={token} initialData={p.loginStreak} setMsg={setMsg} onClaimed={load} />
 
@@ -144,62 +113,14 @@ export default function Home({ token, p, rewards, load, setMsg, openProfile, ope
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>دعوت و کسب درآمد</b>
           <small style={{ color:'#84CC16', fontSize:'10px', fontWeight:'700' }}>دوستان</small>
         </button>
-        <button onClick={openInventory} style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>
+        <button onClick={openCardReg} style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>
           <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#38BDF822', display:'flex', alignItems:'center', justifyContent:'center' }}><img src="/games/card_duel_glow.webp" alt="" width="30" height="30" style={{ objectFit:'contain' }} /></span>
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>کلکسیون</b>
           <small style={{ color:'#38BDF8', fontSize:'10px', fontWeight:'700' }}>{fa(inventory.length)} نوع</small>
         </button>
       </div>
 
-      <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'12px' }}>
-        <div style={{ display:'flex', gap:'8px', alignItems:'flex-start', marginBottom:'8px' }}>
-          <div style={{ width:'58px', height:'58px', borderRadius:'12px', background:'linear-gradient(135deg, rgba(16,185,129,0.22), rgba(56,189,248,0.12))', border:'1px solid rgba(16,185,129,0.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <img src="/brand/card_scan_glow.png" alt="" style={{ width:'40px', height:'40px' }} onError={e=>e.currentTarget.style.display='none'} />
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <b style={{ color:'#FFF', fontSize:'14px', fontWeight:'900' }}>ثبت کارت‌های قلقلی</b>
-              <span style={{ background:'rgba(245,158,11,0.16)', border:'1px solid rgba(245,158,11,0.45)', color:'#F59E0B', padding:'3px 8px', borderRadius:'99px', fontSize:'10px', fontWeight:'900' }}>ثبت سریع</span>
-            </div>
-            <p style={{ color:'#CBD5E1', fontSize:'11.5px', margin:'4px 0 0', lineHeight:1.45, fontWeight:'600' }}>عکس کارت و کدش را همین‌جا ثبت کن.</p>
-          </div>
-        </div>
-        <PhotoCardBox token={token} setMsg={setMsg} onDone={load} />
-      </div>
 
-      <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'12px' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
-          <h2 style={{ color:'#FFF', fontSize:'16px', fontWeight:'900', margin:0 }}>کلکسیون من</h2>
-          {inventory.length>6 && <button className="ghost" onClick={openInventory}
-            style={{ color:'#38BDF8', fontSize:'12px', fontWeight:'700', margin:0, padding:'4px 8px' }}>
-            همه ({fa(inventory.length)})
-          </button>}
-        </div>
-        {inventory.length ? (
-          <div className="homeInventoryPreview">
-            {/* کارت‌ها داخل PlayerCard با CachedImg رندر می‌شوند؛ همان قرارداد قبلیِ
-                loading="lazy" decoding="async" برای preview حفظ شده است. */}
-            {recentInventory.map(i => (
-              <PlayerCard
-                key={i.id || i.card_type_id}
-                item={i}
-                compact
-                showStats={false}
-                badge={isNewCard(i) ? 'جدید' : ''}
-                onClick={() => setBigCard(i)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div style={{ textAlign:'center', padding:'20px' }}>
-            <div style={{ marginBottom:'8px', display:'flex', justifyContent:'center', color:'#FFD36B', opacity:.75 }}><SvgIcon name="card" size={40} /></div>
-            <b style={{ color:'#FFF' }}>هنوز کارتی در کلکسیون شما نیست</b>
-            <p style={{ color:'#94A3B8', fontSize:'12px', marginTop:'4px' }}>بعد از ثبت، کارت‌ها اینجا دیده می‌شوند.</p>
-            <img src="/games/empty_collection.webp" alt="" style={{ width:'120px', opacity:0.6, marginTop:'12px' }} onError={e=>e.currentTarget.style.display='none'} />
-          </div>
-        )}
-      </div>
-      {bigCard && <CardLightbox item={bigCard} close={()=>setBigCard(null)} />}
     </div>
   );
 }

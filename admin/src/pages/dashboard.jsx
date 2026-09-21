@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  AlertTriangle, BarChart3, CreditCard, Gift, LifeBuoy, ScanLine,
+  AlertTriangle, BarChart3, CreditCard, LifeBuoy, ScanLine,
   UserPlus, Users, Wallet, Coins, CircleDot,
 } from 'lucide-react';
 import { fmtNumber } from '../lib/api.js';
@@ -45,13 +45,6 @@ export function Dashboard({ request, onNavigate }) {
   ];
 
   const queues = [
-    {
-      label: 'جوایز در انتظار',
-      value: data.pendingClaims,
-      page: 'rewards',
-      icon: Gift,
-      warn: data.pendingClaims > 0,
-    },
     {
       label: 'تیکت باز',
       value: data.pendingTickets || 0,

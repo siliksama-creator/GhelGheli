@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  Activity, BarChart3, Bell, BookText, CircleDot, Coins, Gamepad2, Gift, Layers, LifeBuoy, Megaphone, MessageCircle, Package, ScanLine, Settings, Shield, ShieldCheck, Sigma, SlidersHorizontal, Smartphone, Store, Swords, Target, Timer, Trophy, Users, Wallet,
+  Activity, BarChart3, Bell, BookText, CircleDot, Coins, Gamepad2, Layers, LifeBuoy, Megaphone, MessageCircle, Package, ScanLine, Settings, Shield, ShieldCheck, Sigma, SlidersHorizontal, Smartphone, Store, Swords, Target, Timer, Trophy, Users, Wallet,
 } from 'lucide-react';
 
 import './theme.css';
@@ -30,7 +30,6 @@ import { Dashboard } from './pages/dashboard.jsx';
 // هیچ صفحه‌ای حذف نشده — فقط لحظهٔ دانلودش عوض شده.
 const PhotoCardsPage = lazy(() => import('./pages/photo-cards.jsx').then(m => ({ default: m.PhotoCardsPage })));
 const PointsPage = lazy(() => import('./pages/points.jsx').then(m => ({ default: m.PointsPage })));
-const RewardsPage = lazy(() => import('./pages/rewards.jsx').then(m => ({ default: m.RewardsPage })));
 const LeaguePage = lazy(() => import('./pages/league.jsx').then(m => ({ default: m.LeaguePage })));
 const WalletPage = lazy(() => import('./pages/wallet.jsx').then(m => ({ default: m.WalletPage })));
 const UsersPage = lazy(() => import('./pages/users.jsx').then(m => ({ default: m.UsersPage })));
@@ -114,7 +113,7 @@ class AdminErrorBoundary extends Component {
 const NAV_GROUPS = {
   'today': 'امروزِ سیستم',
   'cards': 'کارت و فروشگاه',
-  'rewards': 'جایزه و درآمد',
+  'rewards': 'ماموریت و درآمد',
   'games': 'بازی‌ها',
   'people': 'کاربران',
   'talk': 'گفت‌وگو و اطلاع‌رسانی',
@@ -162,9 +161,6 @@ const NAV = [
     'rewards'],
   ['missions', 'ماموریت‌ها', Target, MissionsPage,
     'ماموریت‌های روزانه و هفتگی، جایزهٔ هر ماموریت و جایزهٔ تکمیلِ همه.',
-    'rewards'],
-  ['rewards', 'جوایز', Gift, RewardsPage,
-    'ساخت و ویرایش جایزه‌ها (نقدی، فروشگاهی، فیزیکی) و تأیید درخواست‌های کاربران.',
     'rewards'],
   ['wallet', 'کیف پول', Wallet, WalletPage,
     'تراکنش‌های کیف پول، درخواست‌های برداشت و واریز/برداشت دستی.',

@@ -21,7 +21,7 @@ import 'dashboard_page.dart';
 import 'inventory_page.dart';
 import 'league_page.dart';
 import 'profile_page.dart';
-import 'rewards_page.dart';
+import 'card_reg_page.dart';
 import 'shop_page.dart';
 import 'pass_page.dart';
 import 'wallet_page.dart';
@@ -267,12 +267,12 @@ class _HomeShellState extends State<HomeShell>
   /// درخت نگه می‌دارد و TickerMode انیمیشنِ تب پنهان را متوقف می‌کند.
   Widget _pageAt(int i) => _pageCache.putIfAbsent(i, () => _buildPage(i));
 
-  /// وقتی bootstrap کلکسیون تازه‌ای آورد، config ویجتِ کلکسیون عوض می‌شود
-  /// ولی slot/key ثابت می‌ماند؛ بنابراین search/sort/scroll State حفظ و فقط
-  /// `widget.items` تازه می‌شود.
-  void _refreshInventoryPageConfig() {
-    if (_pageCache.containsKey(inventoryIndex)) {
-      _pageCache[inventoryIndex] = _buildPage(inventoryIndex);
+  /// وقتی bootstrap کلکسیون تازه‌ای آورد، config ویجتِ «ثبت کارت» (که
+  /// کلکسیون داخلش نشسته) عوض می‌شود ولی slot/key ثابت می‌ماند؛ بنابراین
+  /// search/sort/scroll State حفظ و فقط `widget.items` تازه می‌شود.
+  void _refreshCardRegPageConfig() {
+    if (_pageCache.containsKey(cardRegIndex)) {
+      _pageCache[cardRegIndex] = _buildPage(cardRegIndex);
     }
   }
 
@@ -297,11 +297,20 @@ class _HomeShellState extends State<HomeShell>
           onOpenWallet: () => setState(() => _index = _walletIndex),
           onOpenWheel: () => setState(() => _index = wheelIndex),
           onOpenReferral: () => setState(() => _index = referralIndex),
-          onOpenInventory: () => setState(() => _index = inventoryIndex),
+          onOpenInventory: () => setState(() => _index = cardRegIndex),
           pendingGrants: _pendingGrants,
         );
-      case 1:
-        return RewardsPage(api: widget.api);
+      case cardRegIndex:
+        // تبِ «ثبت کارت» — جایگزینِ تبِ «جوایز» (خواستهٔ مالک، ۳۱ شهریور):
+        // فرمِ ثبتِ کارت با عکس + کلکسیون کامل؛ همان دو بخشی که در وب هم
+        // در تبِ cardreg نشستند. داده از پوسته می‌آید (bootstrap) تا با
+        // بقیهٔ اپ یک منبعِ حقیقت داشته باشد.
+        return CardRegPage(
+          api: widget.api,
+          items: _inventory,
+          grants: _pendingGrants,
+          onRefresh: _loadProfile,
+        );
       case 2:
         return WalletPage(api: widget.api, reloadProfile: _loadProfile);
       case 3:
@@ -375,6 +384,11 @@ class _HomeShellState extends State<HomeShell>
     }
   }
 
+  /// شمارهٔ صفحهٔ «ثبت کارت» (تبِ دومِ نوار پایین). جایگزینِ تبِ قدیمیِ
+  /// «جوایز» شد؛ ایندکس ۱ عمداً همان است تا بقیهٔ شماره‌ها جابه‌جا نشوند
+  /// (همان درسِ RangeError که navigation_test گرفت).
+  static const cardRegIndex = 1;
+
   /// شمارهٔ صفحهٔ گردونه — از آیکون نوار بالا مستقیم به آن پرش می‌شود.
   static const wheelIndex = 7;
   static const referralIndex = 8;
@@ -422,10 +436,10 @@ class _HomeShellState extends State<HomeShell>
   // موجودی واقعی هم دیده می‌شود، پس هم دم‌دست‌تر است و هم اطلاعات بیشتری
   // می‌دهد تا یک آیکون کوچک در نوار پایین.
   /// چهار تبِ نوار پایین — با چیدمانِ سرور (tabOrder) وگرنه پیش‌فرض.
-  /// idهای قراردادیِ این چهار تا: home, rewards, league, social.
+  /// idهای قراردادیِ این چهار تا: home, cardreg, league, social.
   List<int> get _navIndexes {
     const defaultOrder = [0, 1, 3, 4];
-    const idOf = {0: 'home', 1: 'rewards', 3: 'league', 4: 'social'};
+    const idOf = {0: 'home', 1: 'cardreg', 3: 'league', 4: 'social'};
     int pos(int page) {
       final i = _tabOrder.indexOf(idOf[page]!);
       return i < 0 ? 999 : i; // تبِ جاافتاده از ترتیبِ سرور به انتها می‌رود
@@ -463,9 +477,9 @@ class _HomeShellState extends State<HomeShell>
     // «برنامه‌های پیشنهادی» آخرِ فهرست می‌آید (هم‌تراز با وب): ردیفِ محتوایی
     // است که ادمین می‌سازد، نه ابزارِ روزمره‌ای که هر روز باز شود.
     const defaultOrder = [
-      shopIndex, inventoryIndex, 2, referralIndex, ledgerIndex, 5, 6, recommendedAppsIndex];
+      shopIndex, 2, referralIndex, ledgerIndex, 5, 6, recommendedAppsIndex];
     const idOf = {
-      shopIndex: 'shop', inventoryIndex: 'inventory', 2: 'wallet',
+      shopIndex: 'shop', 2: 'wallet',
       referralIndex: 'invite', ledgerIndex: 'ledger', 5: 'support',
       6: 'profile', recommendedAppsIndex: 'apps',
     };
@@ -490,9 +504,9 @@ class _HomeShellState extends State<HomeShell>
       label: 'خانه',
     ),
     NavigationDestination(
-      icon: Icon(Icons.card_giftcard_outlined),
-      selectedIcon: Icon(Icons.card_giftcard_rounded),
-      label: 'جوایز',
+      icon: Icon(Icons.credit_card_outlined),
+      selectedIcon: Icon(Icons.credit_card_rounded),
+      label: 'ثبت کارت',
     ),
     NavigationDestination(
       icon: Icon(Icons.account_balance_wallet_outlined),
@@ -811,7 +825,7 @@ class _HomeShellState extends State<HomeShell>
           _refreshDashboardConfig();
         }
         if (inv is List || pg is List) {
-          _refreshInventoryPageConfig();
+          _refreshCardRegPageConfig();
         }
         final p = m['pass'];
         if (p is Map) {
@@ -857,7 +871,7 @@ class _HomeShellState extends State<HomeShell>
 
   static const List<String> _titles = [
     'خانه',
-    'جوایز',
+    'ثبت کارت',
     'کیف پول',
     'لیگ',
     'چت و بازی',
@@ -890,7 +904,7 @@ class _HomeShellState extends State<HomeShell>
   /// راهنمای خودش را نداشت و متنِ عمومی می‌گرفت.
   static const Map<int, String> _scrollHints = {
     0: 'میان‌برها و کارت‌ها پایین‌ترند',
-    1: 'جوایز بیشتری پایین‌تر هست',
+    1: 'ثبت کارت و کلکسیون پایین‌ترند',
     2: 'تاریخچهٔ تراکنش‌ها پایین‌تر است',
     3: 'ادامهٔ جدول پایین‌تر است',
     4: 'بازی‌ها و ماموریت‌ها پایین‌ترند',
@@ -900,7 +914,6 @@ class _HomeShellState extends State<HomeShell>
     8: 'راهنمای دعوت پایین‌تر است',
     9: 'محصولات بیشتری پایین‌تر است',
     10: 'پله‌های گذر نبرد پایین‌تر است',
-    11: 'کارت‌های بیشتری پایین‌تر است',
     12: 'ادامهٔ دفتر پایین‌تر است',
     13: 'برنامه‌های بیشتری پایین‌تر است',
   };
