@@ -3296,6 +3296,14 @@ class _FocusBannerState extends State<_FocusBanner>
         : _statColors[stat] ?? const Color(0xFF38BDF8);
     final icon = _statIcons[stat] ?? Icons.stars_rounded;
     final statName = _statNames[stat] ?? '';
+    // ⚠️ متنِ درشت = برچسبِ خودِ راند از بک‌اند («ضدحمله سرعتی»)، نه نامِ
+    // خشکِ ویژگی («سرعت»). دلیلش آینه‌گی است: کادرِ وب همین برچسب را نشان
+    // می‌دهد و مالک هم با همین مثال («مثلاً ضدحمله سرعتی») خواسته را گفت.
+    // نامِ ویژگی از بین نمی‌رود: در برچسبِ دسترس‌پذیری و (در حالتِ معمولی)
+    // در خطِ راهنما می‌آید.
+    final bigLabel = label.trim().isNotEmpty
+        ? label
+        : (statName.isEmpty ? '—' : '$statName!');
     // اندازه‌های حالتِ فشرده — هیچ فونتی زیرِ ۱۱.۵ نیست (نگهبانِ خوانایی:
     // mobile/test/duel_focus_and_speed_test.dart).
     final iconSize = widget.dense ? 34.0 : 44.0;
@@ -3303,158 +3311,166 @@ class _FocusBannerState extends State<_FocusBanner>
     const roundFont = 11.5;
     final labelFont = widget.dense ? 16.5 : 21.0;
 
-    return AnimatedBuilder(
-      animation: Listenable.merge([_c, _pulse]),
-      builder: (context, _) {
-        final t = Curves.easeOutBack.transform(_c.value.clamp(0.0, 1.0));
-        final glow = 0.30 + 0.28 * _pulse.value;
-        return Opacity(
-          opacity: _c.value.clamp(0.0, 1.0),
-          child: Transform.translate(
-            offset: Offset(0, 18 * (1 - t)),
-            child: Transform.scale(
-              scale: 0.92 + 0.08 * t,
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  horizontal: widget.dense ? 9 : 14,
-                  vertical: widget.dense ? 6 : 11,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(widget.dense ? 16 : 18),
-                  gradient: LinearGradient(
-                    colors: [
-                      tint.withValues(alpha: 0.26),
-                      const Color(0xFF07111D),
+    return Semantics(
+      label: [
+        'راند ${faNum(widget.roundNumber)} — نبرد بر سر',
+        if (statName.isNotEmpty) statName,
+        if (widget.storm) 'راند دو‌امتیازی',
+        if (text.isNotEmpty) text,
+      ].join('. '),
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_c, _pulse]),
+        builder: (context, _) {
+          final t = Curves.easeOutBack.transform(_c.value.clamp(0.0, 1.0));
+          final glow = 0.30 + 0.28 * _pulse.value;
+          return Opacity(
+            opacity: _c.value.clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(0, 18 * (1 - t)),
+              child: Transform.scale(
+                scale: 0.92 + 0.08 * t,
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: widget.dense ? 9 : 14,
+                    vertical: widget.dense ? 6 : 11,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(widget.dense ? 16 : 18),
+                    gradient: LinearGradient(
+                      colors: [
+                        tint.withValues(alpha: 0.26),
+                        const Color(0xFF07111D),
+                      ],
+                    ),
+                    border: Border.all(
+                      color: tint.withValues(alpha: glow + 0.25),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: tint.withValues(alpha: glow * 0.5),
+                        blurRadius: 24,
+                      ),
                     ],
                   ),
-                  border: Border.all(
-                    color: tint.withValues(alpha: glow + 0.25),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: tint.withValues(alpha: glow * 0.5),
-                      blurRadius: 24,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // آیکونِ ویژگی، با هالهٔ نبض‌دار.
-                    Container(
-                      width: iconSize,
-                      height: iconSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: tint.withValues(alpha: 0.18),
-                        border: Border.all(
-                          color: tint.withValues(alpha: 0.55),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: tint.withValues(alpha: glow * 0.7),
-                            blurRadius: 16,
+                  child: Row(
+                    children: [
+                      // آیکونِ ویژگی، با هالهٔ نبض‌دار.
+                      Container(
+                        width: iconSize,
+                        height: iconSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: tint.withValues(alpha: 0.18),
+                          border: Border.all(
+                            color: tint.withValues(alpha: 0.55),
+                            width: 1.5,
                           ),
-                        ],
-                      ),
-                      child: Transform.scale(
-                        scale: 0.9 + 0.14 * _pulse.value,
-                        child: Icon(
-                          icon,
-                          color: tint,
-                          size: widget.dense ? 19 : 24,
+                          boxShadow: [
+                            BoxShadow(
+                              color: tint.withValues(alpha: glow * 0.7),
+                              blurRadius: 16,
+                            ),
+                          ],
+                        ),
+                        child: Transform.scale(
+                          scale: 0.9 + 0.14 * _pulse.value,
+                          child: Icon(
+                            icon,
+                            color: tint,
+                            size: widget.dense ? 19 : 24,
+                          ),
                         ),
                       ),
-                    ),
-                    SizedBox(width: widget.dense ? 8 : 12),
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  'راند ${faNum(widget.roundNumber)} — نبرد بر سر',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: roundFont,
-                                    fontWeight: FontWeight.w700,
-                                    color:
-                                        Colors.white.withValues(alpha: 0.72),
-                                  ),
-                                ),
-                              ),
-                              if (widget.storm) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 7,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(999),
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFFFF7A1A),
-                                        Color(0xFFFF4D2E),
-                                      ],
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    '×۲ دوامتیازی',
+                      SizedBox(width: widget.dense ? 8 : 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    'راند ${faNum(widget.roundNumber)} — نبرد بر سر',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFFFFF6E8),
+                                      fontSize: roundFont,
+                                      fontWeight: FontWeight.w700,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.72),
                                     ),
                                   ),
                                 ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            statName.isEmpty ? label : '$statName!',
-                            style: TextStyle(
-                              fontSize: labelFont,
-                              fontWeight: FontWeight.w900,
-                              color: tint,
-                              height: 1.25,
-                              shadows: [
-                                Shadow(
-                                  color: tint.withValues(alpha: glow),
-                                  blurRadius: 14,
-                                ),
+                                if (widget.storm) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(999),
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFFFF7A1A),
+                                          Color(0xFFFF4D2E),
+                                        ],
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      '×۲ دوامتیازی',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFFFFF6E8),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
-                          ),
-                          if (text.isNotEmpty && !widget.dense)
+                            const SizedBox(height: 1),
                             Text(
-                              text,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.5,
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w600,
+                              bigLabel,
+                              style: TextStyle(
+                                fontSize: labelFont,
+                                fontWeight: FontWeight.w900,
+                                color: tint,
+                                height: 1.25,
+                                shadows: [
+                                  Shadow(
+                                    color: tint.withValues(alpha: glow),
+                                    blurRadius: 14,
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
+                            if (text.isNotEmpty && !widget.dense)
+                              Text(
+                                text,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -4296,6 +4312,38 @@ class CardDuelRoundIntroForTest extends StatelessWidget {
         focus: focus,
         roundNumber: roundNumber,
         totalRounds: totalRounds,
+      );
+}
+
+/// کادرِ «معیارِ راند» برای تست — همان ویجتی که در نبردِ زنده داخلِ ردیفِ
+/// ساعت می‌نشیند، بی‌واسطه و با ورودیِ ساختگی.
+///
+/// چرا لازم است: `_FocusBanner` خصوصی است و تا دورِ ۲۹ شهریور هیچ‌جا
+/// استفاده نمی‌شد؛ یعنی رفتارش هیچ‌وقت — نه در اپ و نه در تست — اجرا
+/// نمی‌شد و دو باگِ پنهان داشت (key نداشتن و SingleTickerProvider با دو
+/// کنترلر). این قلاب همان مسیر را در تست اجراپذیر می‌کند.
+@visibleForTesting
+class CardDuelFocusBoxForTest extends StatelessWidget {
+  const CardDuelFocusBoxForTest({
+    super.key,
+    required this.focus,
+    this.roundNumber = 1,
+    this.dense = false,
+    this.storm = false,
+  });
+
+  final Map<String, dynamic>? focus;
+  final int roundNumber;
+  final bool dense;
+  final bool storm;
+
+  @override
+  Widget build(BuildContext context) => _FocusBanner(
+        focus: focus,
+        fallbackTitle: '',
+        roundNumber: roundNumber,
+        dense: dense,
+        storm: storm,
       );
 }
 
