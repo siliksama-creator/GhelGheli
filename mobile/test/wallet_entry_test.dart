@@ -36,7 +36,6 @@ HeroHeader _hero({
     HeroHeader(
       points: points,
       nickname: 'قهرمان',
-      nextReward: const {'name': 'جایزه اول', 'required_points': 500},
       user: user ??
           const {
             'first_name': 'علی',
