@@ -47,6 +47,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/telegram.sh"
 
 LOG_FILE="${LOG_FILE:-/var/log/nginx/access.log}"
 STATE_FILE="${STATE_FILE:-/run/ghelgheli-attack-watch.state}"
+# شمارندهٔ مشترکِ رویدادهای بی‌صدا با ssh-watch — همان قراردادِ پانوشت.
+SUPPRESS_FILE="${SUPPRESS_FILE:-/var/lib/ghelgheli-ssh-watch/suppressed.count}"
 STATE_LOG="${STATE_LOG:-/var/log/ghelgheli-attack-watch.log}"
 TG_CONF="${TG_CONF:-/root/ghelgheli-backups/.telegram.conf}"
 ADMIN_URL="${ADMIN_URL:-https://admin.ghelghelishop.ir}"
@@ -142,7 +144,7 @@ main() {
 
   local rps; rps=$(awk -v t="$total" -v w="$WINDOW_SECONDS" 'BEGIN { printf "%d", t / (w > 0 ? w : 60) }')
 
-  local fired=0
+  local fired=0 fired_quiet=0 fired_crit=0
   local msg=""
 
   # ═══════════════════════════════════════════════════════════════════════
@@ -171,14 +173,14 @@ main() {
 
   # ── نشانهٔ ۱: سرعتِ کل ──
   if [ "$rps" -ge "$TH_RPS" ] && can_fire "$K_RPS"; then
-    fired=1; mark_fired "$K_RPS"
+    fired=1; fired_quiet=1; mark_fired "$K_RPS"
     msg+="<b>سرعتِ درخواست‌ها بالا رفته</b>\nدر ۶۰ ثانیهٔ گذشته <b>${total}</b> درخواست رسید (حدودِ <b>${rps} در ثانیه</b>).\nحالتِ عادیِ این سرور چند درخواست در ثانیه است.\n\n"
     log "ALERT rps rps=$rps total=$total"
   fi
 
   # ── نشانهٔ ۲: سقفِ ضدِربات دارد می‌گیرد ──
   if [ "$c429" -ge "$TH_429" ] && can_fire "$K_429"; then
-    fired=1; mark_fired "$K_429"
+    fired=1; fired_quiet=1; mark_fired "$K_429"
     msg+="<b>سقفِ ضدِربات فعال شد</b>\n<b>${c429}</b> درخواست در یک دقیقه با پاسخِ «زیادی درخواست دادی» (۴۲۹) برگشت — یعنی یک منبع دارد پشتِ‌سرهم می‌کوبد و سقفِ ۳۰/ثانیه دارد مهارش می‌کند.\n\n"
     log "ALERT 429 count=$c429"
   fi
@@ -190,7 +192,7 @@ main() {
   # شده؟» را بی‌جواب می‌گذاشت؛ با فهرستِ مسیرها یک نگاه کافی است تا معلوم
   # شود اسکنرِ خودکارِ وردپرس/PHP است یا چیزِ جدی‌تر.
   if [ "$top_count" -ge "$TH_ONE_IP" ] && can_fire "$K_IP"; then
-    fired=1; mark_fired "$K_IP"
+    fired=1; fired_quiet=1; mark_fired "$K_IP"
     local paths scanner=1
     paths=$(top_paths "$top_ip" 3 || true)
     msg+="<b>یک منبعِ پرترافیک</b>\nآی‌پیِ <code>${top_ip}</code> در یک دقیقه <b>${top_count}</b> درخواست فرستاده.\n"
@@ -215,12 +217,28 @@ main() {
 
   # ── نشانهٔ ۴: خطای سرور ──
   if [ "$c5xx" -ge "$TH_5XX" ] && can_fire "$K_5XX"; then
-    fired=1; mark_fired "$K_5XX"
+    fired=1; fired_crit=1; mark_fired "$K_5XX"
     msg+="<b>سرور دارد خطا می‌دهد</b>\n<b>${c5xx}</b> پاسخِ خطای سرور (۵xx) در یک دقیقه. این از بقیه فوری‌تر است — ممکن است فشار از توانِ سرور گذشته باشد یا سرویسِ دیگری خراب شده باشد.\n\n"
     log "ALERT 5xx count=$c5xx"
   fi
 
   [ "$fired" -eq 1 ] || { exit 0; }
+
+  # ── موجِ بی‌اهمیت: فقط سقف/نگهبان‌ها کارشان را کرده‌اند ──
+  # (درخواستِ مالک، ۱۴۰۵-۰۶-۳۰) اگر هیچ نشانهٔ مهمی (خطای سرور) fired نشده،
+  # پیام نفرست؛ لاگ + شمارش کافی است و تعدادش در پانوشتِ پیامِ مهمِ بعدی می‌آید.
+  if [ "$fired_crit" -eq 0 ]; then
+    sn=0
+    [ -f "$SUPPRESS_FILE" ] && sn="$(cat "$SUPPRESS_FILE" 2>/dev/null || echo 0)"
+    case "$sn" in ''|*[!0-9]*) sn=0 ;; esac
+    printf '%s\n' $((sn+1)) > "$SUPPRESS_FILE" 2>/dev/null || true
+    if [ "$DRY_RUN" -eq 1 ]; then
+      log "SUPPRESSED (آزمایشی) wave rps=$rps c429=$c429 top_ip=$top_count"
+    else
+      log "SUPPRESSED wave rps=$rps c429=$c429 top_ip=$top_count"
+    fi
+    exit 0
+  fi
 
   local text
   text="<b>هشدارِ حمله — قلقلی</b>\n\n${msg}این لحظه چه کار کنی:\n۱) اپ و وب را یک بار باز کن و ببین کند نشده (اگر کند شده، موج جدی است).\n۲) اگر ادامه داشت، <b>کلادفلر را از پنل ادمین روشن کن</b>: ${ADMIN_URL}\n۳) پنل ادمین: ${WEB_URL}\n\n(اگر موج ادامه داشت، ۵ دقیقهٔ دیگر دوباره خبر می‌دهم.)"
@@ -239,6 +257,17 @@ main() {
     log "telegram config missing; alert not sent ($TG_CONF)"
     exit 0
   fi
+  # پانوشتِ رویدادهای بی‌صدا — فقط هنگامِ ارسالِ واقعی
+  sn=0
+  [ -f "$SUPPRESS_FILE" ] && sn="$(cat "$SUPPRESS_FILE" 2>/dev/null || echo 0)"
+  case "$sn" in ''|*[!0-9]*) sn=0 ;; esac
+  if [ "$sn" -gt 0 ]; then
+    text="$text
+
+🔇 همچنین از پیامِ مهمِ قبلی تا حالا، $sn رویدادِ بی‌اهمیت (موجی که لایهٔ دفاعی خودش blocked کرد) رخ داد و جداگانه ارسال نشد."
+    printf '0\n' > "$SUPPRESS_FILE" 2>/dev/null || true
+  fi
+
   local err
   if err=$(tg_send_message "$TOKEN" "$CHAT" "$text"); then
     log "telegram alert sent"

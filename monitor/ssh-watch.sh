@@ -110,6 +110,45 @@ INTEGRITY_FILE="$STATE_DIR/integrity.sha256"
 
 log() { printf '[%s] %s\n' "$(date -d "@$NOW_EPOCH" '+%Y-%m-%dT%H:%M:%S%:z')" "$*" >> "$STATE_LOG" 2>/dev/null || true; }
 
+# ── کلاس‌های بی‌صدا (درخواستِ مالک، ۱۴۰۵-۰۶-۳۰) ────────────────────────────
+# موج‌هایی که لایهٔ دفاعی (fail2ban / سقفِ ضدربات) خودش مهارشان کرده برای
+# مالک «خبرِ مهم» نیستند: پیامِ جداگانه نمی‌گیرند. به‌جایش با برچسبِ SUPPRESSED
+# لاگ می‌شوند و شمارش می‌شوند؛ تعدادشان در پانوشتِ پیامِ مهمِ بعدی می‌آید تا
+# هیچ چیزی واقعاً گم نشود. خالصهٔ روزانه هم سرِ جای خودش می‌ماند.
+SUPPRESS_FILE="$STATE_DIR/suppressed.count"
+
+quiet_key() {
+  case "$1" in
+    campaign_*|persist_*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+suppress_note() {
+  local key="$1" msg="$2" n=0
+  [ -f "$SUPPRESS_FILE" ] && n="$(cat "$SUPPRESS_FILE" 2>/dev/null || echo 0)"
+  case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  state_write bash -c "printf '%s\n' '$((n+1))' > '$SUPPRESS_FILE' 2>/dev/null || true"
+  if [ "$DRY_RUN" = "1" ]; then
+    log "SUPPRESSED (آزمایشی) [$key] ${msg//$'\n'/ }"
+  else
+    log "SUPPRESSED [$key] ${msg//$'\n'/ }"
+  fi
+}
+
+with_suppress_footer() {
+  local msg="$1" n=0
+  [ -f "$SUPPRESS_FILE" ] && n="$(cat "$SUPPRESS_FILE" 2>/dev/null || echo 0)"
+  case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  if [ "$n" -gt 0 ]; then
+    msg="$msg
+
+🔇 همچنین از پیامِ مهمِ قبلی تا حالا، $n رویدادِ بی‌اهمیت (موجِ حمله‌ای که لایهٔ دفاعی خودش blocked کرد) رخ داد و جداگانه ارسال نشد."
+    state_write bash -c "printf '0\n' > '$SUPPRESS_FILE' 2>/dev/null || true"
+  fi
+  printf '%s' "$msg"
+}
+
 # ── ارسالِ پیام (یا چاپ در حالتِ آزمایشی) ──────────────────────────────────
 send() {
   local text="$1"
@@ -136,11 +175,13 @@ if [ "$TEST_ALERT" = "1" ]; then
   send "🧪 <b>پیامِ آزمایشی</b>
 
 این پیام فقط برای این است که مطمئن شوی مسیرِ هشدارِ تلگرام سالم است. کاری لازم نیست. پیام‌های واقعیِ زیر از این نگهبان می‌آید:
-• موجِ تلاشِ نفوذ (اسکنِ وب یا رمزِ SSH) از چند آی‌پی
 • ورودِ موفق از آی‌پی‌ای که تلاشِ ناموفق داشته (خطرناک‌ترین)
 • ورودِ موفق با کاربرِ غیرِ root
 • تغییرِ یکی از فایل‌های حساسِ سرور
-• خالصهٔ روزانه (۱ پیام در ۲۴ ساعت)"
+• از کار افتادنِ خودِ لایهٔ دفاعی (fail2ban)
+• خالصهٔ روزانه (۱ پیام در ۲۴ ساعت)
+موج‌های حمله‌ای که fail2ban یا سقفِ ضدربات خودش مهارشان کند پیامِ جداگانه
+نمی‌گیرند؛ تعدادشان در پانوشتِ پیامِ مهمِ بعدی و در خالصهٔ روزانه می‌آید."
   [ "$DRY_RUN" = "1" ] && log "test-alert previewed (آزمایشی)" || log "test-alert sent"
   exit 0
 fi
@@ -150,8 +191,17 @@ alert_once() {
   local key="$1" msg="$2" cooldown="$3" stamp_file="$STATE_DIR/alert-$1" last=0
   [ -f "$stamp_file" ] && last="$(cat "$stamp_file" 2>/dev/null || echo 0)"
   case "$last" in ''|*[!0-9]*) last=0 ;; esac
+  # کلاسِ بی‌اهمیت: فقط لاگ + شمارش؛ تلگرام ساکت می‌ماند.
+  # همان سکویِ کلید هم رعایت می‌شود تا یک موج، یک بار شمرده شود (نه هر دقیقه).
+  if quiet_key "$key"; then
+    if [ $((NOW_EPOCH - last)) -ge "$cooldown" ]; then
+      suppress_note "$key" "$msg"
+      state_write bash -c "printf '%s\n' '$NOW_EPOCH' > '$stamp_file' 2>/dev/null || true"
+    fi
+    return 0
+  fi
   if [ $((NOW_EPOCH - last)) -ge "$cooldown" ]; then
-    send "$msg"
+    send "$(with_suppress_footer "$msg")"
     # در حالتِ آزمایشی، لاگ هم صریحاً «آزمایشی» می‌شود تا بعداً کسی خطِ لاگ را
     # با هشدارِ واقعیِ ارسال‌شده اشتباه نگیرد (و آزمون‌ها هم قابلِ‌اتکا بمانند).
     if [ "$DRY_RUN" = "1" ]; then
@@ -361,6 +411,25 @@ $(printf '%s\n' "$changed" | awk '{print $NF}' | sort -u | sed 's/^/• /' | hea
   fi
 fi
 rm -f "$tmp_hash" 2>/dev/null || true
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  ۳٫۵) زنده‌بودنِ fail2ban — اگر خودِ لایهٔ دفاعی بمیرد، خبرِ مهم است
+# ═══════════════════════════════════════════════════════════════════════════
+F2B_FAIL_FILE="$STATE_DIR/f2b-fail"
+if fail2ban-client ping >/dev/null 2>&1; then
+  state_write bash -c "printf '0\n' > '$F2B_FAIL_FILE' 2>/dev/null || true"
+else
+  f2b_f=0
+  [ -f "$F2B_FAIL_FILE" ] && f2b_f="$(cat "$F2B_FAIL_FILE" 2>/dev/null || echo 0)"
+  case "$f2b_f" in ''|*[!0-9]*) f2b_f=0 ;; esac
+  state_write bash -c "printf '%s\n' '$((f2b_f+1))' > '$F2B_FAIL_FILE' 2>/dev/null || true"
+  if [ $((f2b_f+1)) -ge 2 ]; then
+    alert_once fail2ban_down "🚨 لایهٔ دفاعیِ fail2ban پاسخ نمی‌دهد!
+
+دو بررسیِ پیاپیِ نگهبان، ping به fail2ban جواب نگرفت. یعنی فعلاً بستنِ خودکارِ آی‌پی‌ها اتفاق نمی‌افتد و موج‌های حمله بند نمی‌شوند.
+همین حالا: systemctl restart fail2ban — اگر بالا نیامد، به من بگو تا لاگش را بررسی کنم." 3600
+  fi
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  ۴) خالصهٔ روزانه (یک پیام در ۲۴ ساعت)
