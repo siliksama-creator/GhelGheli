@@ -1706,6 +1706,10 @@ class _ClashStageState extends State<_ClashStage>
             : iWon
                 ? 'کارت تو «${myCard['name'] ?? 'بدون نام'}» با ${faNum(myPower)} در برابر ${faNum(otherPower)} برد${isStorm ? ' و دو امتیاز گرفت' : ' یک امتیاز به تو اضافه شد'}.'
                 : 'کارت $opponentRole «${otherCard['name'] ?? 'بدون نام'}» با ${faNum(otherPower)} در برابر ${faNum(myPower)} برد${isStorm ? ' و دو امتیاز گرفت' : ' یک امتیاز به $opponentRole اضافه شد'}.';
+    // رنگِ برچسبِ معیارِ راند در این صحنه — آینهٔ چیپِ `.duelClashFocus` وب.
+    // اولویت: وقت اضافه ⇒ آبی، طوفان ⇒ نارنجی، وگرنه رنگِ خودِ ویژگی.
+    final focusTint = _FocusBannerState._statColors[
+        '${round['focusKey'] ?? ''}'] ?? Colors.white60;
     final phase = _phase;
     final outcome = draw
         ? _gold
@@ -1830,7 +1834,11 @@ class _ClashStageState extends State<_ClashStage>
                               '${faNum(round['round'])} • ${inOvertime ? 'وقت اضافه' : (round['focusLabel'] ?? round['title'])}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: inOvertime ? const Color(0xFF7DD3FC) : (isStorm ? const Color(0xFFFFB066) : Colors.white60),
+                                color: inOvertime
+                                    ? const Color(0xFF7DD3FC)
+                                    : (isStorm
+                                        ? const Color(0xFFFFB066)
+                                        : focusTint),
                                 fontWeight: FontWeight.w900,
                               ),
                               textAlign: TextAlign.center,
@@ -3185,7 +3193,13 @@ class _History extends StatelessWidget {
 /// را: معیار را بزرگ اعلام می‌کند و `_FocusStatRibbon` روی هر کارت همان
 /// عدد را نشان می‌دهد.
 class _FocusBanner extends StatefulWidget {
+  // ⚠️ `super.key` لازم است: `_LiveBattle` کادر را با کلیدِ مخصوصِ هر راند
+  // می‌سازد تا انیمیشنِ ورود در هر راند تازه اجرا شود. سازندهٔ قبلی این
+  // پارامتر را نداشت (ویجت هیچ‌جا استفاده نمی‌شد و کسی متوجه نشده بود) و
+  // پاس‌دادنِ `key:` خطای کامپایل می‌داد — همان چیزی که Flutter Check را
+  // در رانِ نخستِ این دور قرمز کرد.
   const _FocusBanner({
+    super.key,
     required this.focus,
     required this.fallbackTitle,
     required this.roundNumber,
