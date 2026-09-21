@@ -95,6 +95,18 @@ function normalize(view) {
  * کامل. نسخهٔ کامل (صفحهٔ «مود دوئل کارت») پلکانِ چهارپله‌ای و توضیحِ هر
  * مرحله را هم نشان می‌دهد.
  */
+/**
+ * دکمهٔ پرش به صفحهٔ اختصاصیِ کلید — در داشبورد و «اقتصاد بازی» استفاده
+ * می‌شود تا همهٔ راه‌ها به یک صفحهٔ واحد برسند.
+ */
+export function DuelModesNavCard({ onNavigate, label = 'تنظیمِ کامل و پلکانِ مرحله‌ها' }) {
+  return (
+    <Button variant="ghost" type="button" onClick={() => onNavigate && onNavigate('duel-modes')}>
+      {label}
+    </Button>
+  );
+}
+
 export function MayhemControl({ request, compact = false, onNavigate }) {
   const notify = useToast();
   const [saved, setSaved] = useState(null);

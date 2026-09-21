@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Coins, Gift, Save, Trophy } from 'lucide-react';
+import { Coins, Flame, Gift, Save, Swords, Trophy } from 'lucide-react';
 import { Badge, Button, Card, Field, Input } from '../components/ui.jsx';
+import { MayhemControl, DuelModesNavCard } from '../components/mayhem-control.jsx';
 import { useToast } from '../lib/toast.jsx';
 
 const GAMES = [
@@ -20,7 +21,7 @@ const OUTCOME = { win: 'برد', draw: 'مساوی', loss: 'باخت' };
  * کلاینت‌ها (وب + اندروید، حتی نسخه‌های قدیمی) اعداد را از `/api/config`
  * می‌خوانند — پس نوشته‌های داخلِ اپ بلافاصله بعد از ذخیره عوض می‌شوند.
  */
-export function GameEconomyPage({ request }) {
+export function GameEconomyPage({ request, onNavigate }) {
   const notify = useToast();
   const [cfg, setCfg] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -100,6 +101,20 @@ export function GameEconomyPage({ request }) {
           <Save size={15} /> {saving ? 'در حال ذخیره…' : 'ذخیرهٔ همه'}
         </Button>
       </div>
+
+      {/* ── کلیدِ مودِ دوئل کارت ───────────────────────────────────────────
+          مالک: «کلیدِ مودِ دوئل کارت رو جاش رو یه جای درست قرار بده.» این
+          صفحه همان‌جایی است که مدیر برای تنظیمِ بازی‌ها (از جمله دوئل کارت)
+          می‌آید؛ پس کلیدِ مودش هم باید همین‌جا دیده شود — نه فقط در منو و
+          داشبورد. کارتِ کامل در صفحهٔ «مود دوئل کارت» است و این‌جا خلاصه +
+          پرشِ سریع می‌آید تا سه جای ناهم‌خوان نداشته باشیم. */}
+      <Card
+        title="مودِ دوئل کارت — کلیدِ «دوئل طوفان»"
+        subtitle="«کلاسیک» همیشه روشن است؛ «دوئل طوفان» را از همین‌جا یا از صفحهٔ اختصاصی‌اش روشن کن."
+        action={<DuelModesNavCard onNavigate={onNavigate} />}
+      >
+        <MayhemControl request={request} compact onNavigate={onNavigate} />
+      </Card>
 
       <Card
         title="انتقال سکه بین لیگ‌ها"

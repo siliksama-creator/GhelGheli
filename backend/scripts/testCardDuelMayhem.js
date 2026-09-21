@@ -274,6 +274,20 @@ async function main() {
   ok(/compact/.test(dashboard.slice(dashControlAt, dashControlAt + 80)),
     'نسخهٔ داشبورد فشرده است (وضعیت + دکمهٔ روشن/خاموش + لینکِ تنظیمِ کامل)');
 
+  // ۸٫۵٫۱ سه راهِ رسیدن به کلید، هر سه «جای درست» — اگر یکی برود، قرمز می‌شود.
+  //   (۱) ردیفِ NAV زیرِ «بازی‌ها»   (۲) اولین کارتِ داشبورد   (۳) اقتصاد بازی
+  // موردِ سوم به‌خواستِ مالک اضافه شد: «کلیدِ مودِ دوئل کارت رو جاش رو یه جای
+  // درست قرار بده» — جایی که مدیر برای تنظیمِ خودِ بازی می‌رود.
+  const gameEconomy = readAdmin('pages/game-economy.jsx');
+  ok(/<MayhemControl[^>]*compact/.test(gameEconomy) && /مودِ دوئل کارت/.test(gameEconomy),
+    'کلید در صفحهٔ «اقتصاد بازی» هم سوار است (جای سومِ کلید)');
+  ok(/DuelModesNavCard/.test(gameEconomy) && /export function DuelModesNavCard/.test(control),
+    'دکمهٔ پرش به صفحهٔ کلید یک کامپوننتِ مشترک است (سه نسخهٔ تکراری نداریم)');
+  ok(/export function GameEconomyPage\(\{ request, onNavigate \}\)/.test(gameEconomy),
+    'صفحهٔ «اقتصاد بازی» به onNavigate وصل است (پرش کار می‌کند)');
+  ok(/'game-economy', 'اقتصاد بازی'/.test(adminMain),
+    'ردیفِ NAV «اقتصاد بازی» در گروهِ بازی‌ها هست (جای سوم واقعاً در دسترس است)');
+
   // ۸٫۶ دیگر دو جای ناهم‌خوان: عددهای خام از فهرستِ «متن‌های زنده» برداشته شدند.
   ok(/RULES_MOVED_TO_DUEL_PAGE = new Set\(\['duelMayhem', 'duelMayhemStage'\]\)/.test(liveCopy),
     'در صفحهٔ «متن‌های زنده» این دو عدد از فهرستِ خام کنار گذاشته شده‌اند');
