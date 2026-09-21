@@ -161,9 +161,17 @@ RATELIMIT_SNIPPETS=(
   # این اسنیپت مسیرهای نقطه‌دار و نشانه‌های CMS/PHP را ۴۰۴ می‌کند.
   "deploy/ghelgheli-scanner-block.conf:ghelgheli-scanner-block.conf"
 )
+# ⚠️ باگِ واقعی که ۲۹ شهریور پیدا شد: مسیرِ مبدأ نسبی بود و در این نقطه از
+# اسکریپت، cwd روی `$APP_DIR/backend` است — پس `[ -f deploy/... ]` هیچ‌وقت
+# برقرار نمی‌شد و اسنیپت‌ها **بی‌صدا** نصب نمی‌شدند (سقفِ درخواست و بستنِ
+# اسکنرها هر دو بی‌اثر می‌ماندند بدونِ یک کلمه هشدار). حالا مسیر از
+# `$APP_DIR` ساخته می‌شود و نبودِ فایل هم صریح هشدار می‌دهد.
 for pair in "${RATELIMIT_SNIPPETS[@]}"; do
-  src="${pair%%:*}"; dst="/etc/nginx/snippets/${pair##*:}"
-  [ -f "$src" ] || continue
+  src="${APP_DIR}/${pair%%:*}"; dst="/etc/nginx/snippets/${pair##*:}"
+  if [ ! -f "$src" ]; then
+    printf '  \033[1;33mهشدار: فایلِ اسنیپت پیدا نشد: %s\033[0m\n' "$src" >&2
+    continue
+  fi
   if ! cmp -s "$src" "$dst"; then
     install -m 0644 "$src" "$dst"
     printf '  updated %s\n' "$dst"
@@ -184,7 +192,12 @@ ensure_scanner_include() {
   local file=/etc/nginx/sites-enabled/ghelgheli
   [ -f "$file" ] || return 0
   grep -q 'ghelgheli-scanner-block.conf' "$file" && return 0
-  grep -q 'ghelgheli-scanner-block.conf' /etc/nginx/snippets/ghelgheli-scanner-block.conf 2>/dev/null || true
+  # include فقط وقتی معنا دارد که خودِ اسنیپت نصب شده باشد؛ وگرنه nginx -t
+  # می‌شکند و کلِ سایت پایین می‌آید. صریح بررسی می‌کنیم.
+  if [ ! -f /etc/nginx/snippets/ghelgheli-scanner-block.conf ]; then
+    printf '  \033[1;33mهشدار: اسنیپتِ ضدِاسکنر نصب نشده — include اضافه نشد\033[0m\n' >&2
+    return 1
+  fi
   cp -a "$file" "${file}.bak-$(date +%Y%m%d%H%M%S)"
   python3 - "$file" <<'PYEOF'
 import io, re, sys
