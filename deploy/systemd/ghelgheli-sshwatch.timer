@@ -1,0 +1,11 @@
+[Unit]
+Description=Run GhelGheli SSH/integrity watcher every 60s
+
+[Timer]
+OnBootSec=120
+OnUnitActiveSec=60
+AccuracySec=5
+Persistent=false
+
+[Install]
+WantedBy=timers.target

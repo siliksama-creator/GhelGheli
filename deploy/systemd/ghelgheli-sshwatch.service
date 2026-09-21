@@ -1,0 +1,13 @@
+[Unit]
+Description=GhelGheli SSH/integrity watcher (60s) — هشدارِ ورودِ مشکوک و تغییرِ فایل‌های حساس
+Documentation=file:/var/www/GhelGheli/monitor/ssh-watch.sh
+After=network-online.target
+
+[Service]
+Type=oneshot
+# ⚠️ root لازم است: /etc/shadow و /etc/sudoers و /root/.ssh و فایلِ تنظیماتِ
+#    تلگرام (0600 در /root) برای کاربرِ سرویس خواندنی نیستند. خودِ اسکریپت
+#    هیچ چیزی را تغییر نمی‌دهد؛ فقط می‌خواند و پیام می‌فرستد.
+ExecStart=/bin/bash /var/www/GhelGheli/monitor/ssh-watch.sh
+TimeoutStartSec=50
+Nice=10
