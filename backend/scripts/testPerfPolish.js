@@ -14,6 +14,7 @@ const tapScreen = read('mobile/lib/screens/user/games/tap/tap_screen.dart');
 const tapChar = read('mobile/lib/screens/user/games/tap/tap_character.dart');
 const webTap = read('userweb/src/tapGame.jsx');
 const home = read('userweb/src/screens/Home.jsx');
+const playerCard = read('userweb/src/components/PlayerCard.jsx');
 let css = read('userweb/src/style.css');
 try {
   const stylesDir = path.join(root, 'userweb/src/styles');
@@ -40,7 +41,13 @@ ok(!/playSfx|gameAudio/.test(webTap) && /areaRef\.current\?\.animate/.test(webTa
   'وب Tap بدون صدا و بدون setState انیمیشن ضربه را اجرا می‌کند');
 
 console.log('\n== ۳. وب یوزر و پوستهٔ اندروید: رندر سبک‌تر و کلاس کاری ==');
-ok(/loading="lazy" decoding="async"/.test(home), 'تصاویر کارت‌های کلکسیون lazy + async هستند');
+// تصاویرِ کلکسیون با حذفِ بخشِ جوایز (۳۱ شهریور، خواستهٔ مالک) از Home به
+// تبِ «ثبت کارت» رفتند (CardReg → Inventory → PlayerCard). گارد باید دنبالِ
+// قابلیت برود، نه فایلِ قدیمی: همان lazy+async حالا در PlayerCard با شکلِ
+// `loading={eager ? 'eager' : 'lazy'}` + `decoding="async"` نشسته است.
+ok(/loading=\{eager \? 'eager' : 'lazy'\}/.test(playerCard)
+  && /decoding="async"/.test(playerCard),
+  'تصاویر کارت‌های کلکسیون lazy + async هستند (PlayerCard)');
 ok(/decoding="async"/.test(home), 'آواتار/تصاویر خانه async decode دارند');
 ok(/button:not\(:disabled\):active/.test(css), 'دکمه‌های وب feedback حرکتی دارند');
 ok(/quickTile::after/.test(css), 'کاشی‌های اصلی وب شاین/پولیش دارند');
