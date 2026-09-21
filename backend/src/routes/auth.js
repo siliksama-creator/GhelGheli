@@ -74,12 +74,13 @@ router.post('/auth/register', asyncHandler(async (req, res) => {
   // می‌توانست با ثبت‌نامِ دوباره، نامِ رکیک/بلندِ ردشده را بنشاند.
   const nick = nicknamePolicy.validate(nickname, { allowEmpty: true });
   if (!nick.ok) return res.status(400).json({ message: nick.error, code: nick.code });
-  // بدونِ تغییرِ رمز، پس بدونِ bump کردنِ session_epoch: هر ورودِ OTP نباید
-  // بقیهٔ دستگاه‌های همان کاربر را بیرون بیندازد. فیلدهای اختیاری فقط وقتی
-  // نوشته می‌شوند که مقدار داشته باشند (COALESCE) تا ورودِ دوبارهٔ یک کاربرِ
-  // قدیمی نامِ مستعارِ او را پاک نکند.
+  // فیلدهای اختیاری فقط وقتی نوشته می‌شوند که مقدار داشته باشند
+  // (COALESCE) تا ورودِ دوبارهٔ یک کاربرِ قدیمی نامِ مستعار او را پاک نکند.
+  // `session_epoch=session_epoch+1` عمداً سرِ جایش ماند (قراردادِ امنیتیِ
+  // migration 092 و آزمونِ testSessionLongLived): لحظهٔ تأییدِ OTP یعنی
+  // اثباتِ مالکیتِ شماره، پس توکن‌های کهنهٔ همان حساب باید بمیرند.
   const updated = await pool.query(
-    'UPDATE users SET mobile_verified=true, first_name=COALESCE($1, first_name), last_name=COALESCE($2, last_name), nickname=COALESCE($3, nickname), updated_at=NOW() WHERE mobile=$4 RETURNING *',
+    'UPDATE users SET mobile_verified=true, first_name=COALESCE($1, first_name), last_name=COALESCE($2, last_name), nickname=COALESCE($3, nickname), session_epoch=session_epoch+1, updated_at=NOW() WHERE mobile=$4 RETURNING *',
     [firstName ?? null, lastName ?? null, nick.value ?? null, mobile]
   );
 

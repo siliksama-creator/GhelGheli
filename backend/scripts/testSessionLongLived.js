@@ -91,7 +91,7 @@ console.log('\n══ ۴) هر مسیرِ تغییرِ رمز، مهر را جل
     'ریستِ رمز توسط ادمین/پشتیبانی': /UPDATE users SET password_hash=\$1, session_epoch=session_epoch\+1[\s\S]{0,80}req\.params\.id/,
     'بازیابیِ رمز با کدِ پیامکی': /UPDATE users SET password_hash=\$1, session_epoch=session_epoch\+1 WHERE mobile=\$2/,
     'ثبت‌نام/تغییرِ رمزِ رمزی (upsert)': /session_epoch=users\.session_epoch\+1/,
-    'ثبت‌نامِ تأییدشده با کد (register)': /nickname=\$4, session_epoch=session_epoch\+1/,
+    'ثبت‌نامِ تأییدشده با کد (register)': /nickname=COALESCE\(\$3, nickname\), session_epoch=session_epoch\+1/,
   };
   const haystack = { auth: authSrc, admin: adminUsersSrc, server: serverSrc };
   const where = {

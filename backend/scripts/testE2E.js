@@ -225,7 +225,7 @@ async function testAuth() {
     `status=${adminLogin.status}`);
 
   group('مسیر OTP بدون رمز عبور');
-  const otpMobile = `otp${Date.now().toString().slice(-9)}`;
+  const otpMobile = `9${Date.now().toString().slice(-9)}`;
   const reqOtp = await POST('/api/auth/request-otp', { mobile: otpMobile, purpose: 'register' });
   ok(reqOtp.status === 200, 'درخواست کد یک‌بارمصرف پذیرفته می‌شود', `status=${reqOtp.status}`);
   const devCode = reqOtp.data?.devCode;
