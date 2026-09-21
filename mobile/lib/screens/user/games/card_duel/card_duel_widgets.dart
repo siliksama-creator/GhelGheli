@@ -3421,7 +3421,7 @@ class _FocusBannerState extends State<_FocusBanner>
                                       ),
                                     ),
                                     child: const Text(
-                                      '×۲ دوامتیازی',
+                                      '×۲ دو‌امتیازی',
                                       style: TextStyle(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.w900,

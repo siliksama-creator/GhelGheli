@@ -73,14 +73,18 @@ void main() {
       expect(find.textContaining('عدد نهایی'), findsOneWidget);
     });
 
-    testWidgets('راندِ طوفانی نشانِ «×۲ دوامتیازی» می‌گیرد', (tester) async {
+    testWidgets('راندِ طوفانی نشانِ ×۲ می‌گیرد', (tester) async {
       await tester.pumpWidget(_wrap(const CardDuelFocusBoxForTest(
         focus: _focus,
         dense: true,
         storm: true,
       )));
       await tester.pump(const Duration(milliseconds: 600));
-      expect(find.textContaining('دو‌امتیازی'), findsOneWidget);
+      // ⚠️ درسِ همین دور: با `find.textContaining('دو‌امتیازی')` این تست
+      // قرمز شد، چون کلمهٔ سورس **بدونِ نیم‌فاصله** است (`دوامتیازی`) و
+      // جست‌وجوی من با نیم‌فاصله هیچ‌چیز پیدا نمی‌کرد. برای همین اینجا به
+      // نشانهٔ بی‌ابهامِ همان بَج تکیه می‌کنیم: «×۲».
+      expect(find.textContaining('×۲'), findsOneWidget);
     });
 
     testWidgets('آیکونِ معیار سمتِ راستِ کادر است (قراردادِ RTL مالک)',

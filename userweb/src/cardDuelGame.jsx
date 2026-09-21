@@ -503,7 +503,7 @@ function RoundIntroOverlay({ focus, roundNumber, totalRounds, mod = null, modAnn
     <div className={`duelRoundIntro${isStorm ? ' isStorm' : ''}`} key={`intro-${roundNumber}-${stat}-${mod || 'normal'}`}
       style={{ '--focus-color': color }} aria-live="assertive"
       aria-label={isStorm
-        ? `راند دوامتیازی! ${modAnnounce?.text || 'برنده این راند دو امتیاز می‌برد'}`
+        ? `راند دو‌امتیازی! ${modAnnounce?.text || 'برنده این راند دو امتیاز می‌برد'}`
         : `راند ${roundNumber} از ${totalRounds}، معیار ${meta.name || ''}. ${focus?.hint || ''}`}>
       {/* پرتوهای پس‌زمینه («نورِ استادیوم») + دو موجِ ضربه‌ای که در لحظهٔ
           نشستنِ مدال بیرون می‌زنند. معادلِ `_RoundIntroBackdropPainter`
