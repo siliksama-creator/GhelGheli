@@ -82,9 +82,10 @@ async function call(path, { method = 'GET', body, token } = {}) {
     body: { mobile, password, nickname: 'TstMM', firstName: 'تست', lastName: 'ماموریت' },
   });
   ok(reg.status === 200 || reg.status === 201, `ثبت‌نامِ کاربرِ تستی (${reg.status})`);
-  const userLogin = await call('/api/auth/login', { method: 'POST', body: { mobile, password } });
-  ok(userLogin.status === 200 && userLogin.json?.token, 'ورودِ کاربر');
-  const user = userLogin.json?.token;
+  // قراردادِ مهر ۱۴۰۵: ورود با رمز فقط برای مدیر است؛ کاربرِ عادی دیگر با
+  // رمز وارد نمی‌شود. خودِ ثبت‌نام توکن می‌دهد (مثل مسیرِ OTP) پس همان کافی است.
+  ok(reg.status === 200 && reg.json?.token, 'ورودِ کاربر');
+  const user = reg.json?.token;
 
   // ── چیزی که کاربر می‌بیند ────────────────────────────────────────────────
   const m1 = await call('/api/missions', { token: user });
