@@ -48,6 +48,11 @@ function startFakeCloudflare(opts = {}) {
       { id: 'rec-api', name: 'api.ghelghelishop.ir', type: 'A', content: '5.102.37.87', proxied: false },
       { id: 'rec-web', name: 'ghelghelishop.ir', type: 'A', content: '5.102.37.87', proxied: false },
       { id: 'rec-admin', name: 'admin.ghelghelishop.ir', type: 'A', content: '5.102.37.87', proxied: false },
+      // رکوردهای .com هم مثل واقعیتِ DNS حاضرند (مالک alias ساختها)
+      { id: 'rec-com-api', name: 'api.ghelghelishop.com', type: 'A', content: '5.102.37.87', proxied: false },
+      { id: 'rec-com-web', name: 'ghelghelishop.com', type: 'A', content: '5.102.37.87', proxied: false },
+      { id: 'rec-com-admin', name: 'admin.ghelghelishop.com', type: 'A', content: '5.102.37.87', proxied: false },
+      { id: 'rec-com-user', name: 'user.ghelghelishop.com', type: 'A', content: '5.102.37.87', proxied: false },
     ],
     securityLevel: 'medium',
     calls: [],
@@ -70,8 +75,8 @@ function startFakeCloudflare(opts = {}) {
       const parsed = body ? JSON.parse(body) : {};
       if (req.method === 'GET' && url.pathname.endsWith('/zones')) {
         const name = url.searchParams.get('name');
-        const hit = name === 'ghelghelishop.ir';
-        return send({ success: true, result: hit ? [{ id: 'zone-1', name, status: state.zoneStatus }] : [] });
+        const hit = name === 'ghelghelishop.ir' || name === 'ghelghelishop.com';
+        return send({ success: true, result: hit ? [{ id: 'zone-' + (name.endsWith('.com') ? '2' : '1'), name, status: state.zoneStatus }] : [] });
       }
       if (req.method === 'GET' && url.pathname.endsWith('/dns_records')) {
         return send({ success: true, result: state.records });
@@ -190,7 +195,7 @@ function makeGuard({ base, tmp, store, fetchImpl }) {
 
     await guard.saveConfig({ apiToken: 'cf-token-for-test-1234567890abcdefghij' }, 7);
     const rep = await guard.verify(7);
-    ok('ناحیه پیدا شد و فهرستِ رکوردها خوانده شد', rep.zone === 'ghelghelishop.ir' && rep.verified === 3);
+    ok('ناحیه پیدا شد و فهرستِ رکوردها خوانده شد', rep.zone === 'ghelghelishop.ir' && rep.verified === 7);
     ok('دامنهٔ بی‌رکورد گزارش می‌شود', rep.missing.length === 2, JSON.stringify(rep.missing));
     ok('حالتِ فعلیِ رکوردها (خاکستری) گزارش می‌شود', rep.domains.every(d => d.proxied === false));
   }

@@ -30,7 +30,13 @@
  *   GG_LIVE_API=1 node tool/smoke.mjs http://localhost:4173 "$JWT"
  */
 
-export const API_HOST = 'https://api.ghelghelishop.ir';
+// هر دو دامنهٔ تولید (قدیم و نو) استاب می‌شوند؛ اپ/وب ممکن است به هر کدام
+// اشاره کند و تستِ لوکال نباید به خاطر CORS به API زنده برود.
+export const API_HOSTS = [
+  'https://api.ghelghelishop.ir',
+  'https://api.ghelghelishop.com',
+];
+export const API_HOST = API_HOSTS[0];
 
 /** BASE روی پیش‌نمایشِ لوکال است؟ (نه دامنهٔ زنده) */
 export const isLocalBase = base =>
@@ -38,7 +44,7 @@ export const isLocalBase = base =>
 
 export async function installApiStub(page) {
   const live = process.env.GG_LIVE_API === '1';
-  await page.route(`${API_HOST}/**`, async route => {
+  const handler = async route => {
     if (live) {
       try {
         await route.fulfill({ response: await route.fetch({ timeout: 10000 }) });
@@ -52,5 +58,6 @@ export async function installApiStub(page) {
       contentType: 'application/json',
       body: '{}',
     });
-  });
+  };
+  for (const host of API_HOSTS) await page.route(`${host}/**`, handler);
 }
