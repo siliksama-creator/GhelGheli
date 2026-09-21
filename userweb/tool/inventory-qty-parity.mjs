@@ -70,8 +70,10 @@ ok('اندروید: چیپِ بالای کارت (_MiniChip با ×) حذف شد
   !/_MiniChip\(text:\s*'×/.test(andCard));
 ok('اندروید: تعداد با cornerText به قاب داده می‌شود',
   /cornerText: hasQty \? '×\$\{faNum\(qty\)\}' : null/.test(andCard));
+// `\??` چون پس از رفعِ ایرادهای flutter analyze (کامیتِ 9245c30) در آن دامنه
+// card غیرِ nullable است و `?[` زائد بود؛ شرطِ پاریتی همان است: هر دو فیلد.
 ok('اندروید: کارتِ تکی هم ×۱ می‌گیرد، با همان شرطِ وب (hasQty)',
-  /final hasQty = card\?\['quantity'\] != null \|\| card\?\['registered_count'\] != null;/.test(andCard));
+  /final hasQty = card\??\['quantity'\] != null \|\| card\??\['registered_count'\] != null;/.test(andCard));
 ok('اندروید: قاب cornerText را در گوشهٔ پایین می‌کارد و نگین را کنار می‌برد',
   /widget\.cornerText != null/.test(andFrame)
   && /bottom: -6/.test(andFrame)
