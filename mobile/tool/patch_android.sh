@@ -17,7 +17,7 @@ MANIFEST="android/app/src/main/AndroidManifest.xml"
 # دامنه‌های وبی که به اپ وصل می‌شوند (برای تب‌های باز کردنِ لینکِ اتاق).
 # پیش‌فرض همان دامنهٔ فعلی است؛ برای انتقال به دامنهٔ نو کافی است
 # PUBLIC_WEB_HOSTS="user.ghelghelishop.ir user.ghelghelishop.com" ست شود.
-export PUBLIC_WEB_HOSTS="${PUBLIC_WEB_HOSTS:-user.ghelghelishop.ir}"
+export PUBLIC_WEB_HOSTS="${PUBLIC_WEB_HOSTS:-user.ghelghelishop.com user.ghelghelishop.ir}"
 [ -f "$MANIFEST" ] || { echo "ERROR: $MANIFEST not found (run flutter create first)"; exit 1; }
 
 python3 - "$MANIFEST" <<'PY'
@@ -138,7 +138,7 @@ else:
 # تا انتقالِ وب به یک دامنهٔ نو نیاز به تغییرِ کد نداشته باشد و در فاصلهٔ
 # انتقال، لینک‌های دامنهٔ قدیمی هم همچنان اپ را باز کنند.
 import os
-WEB_HOSTS = [h for h in os.environ.get('PUBLIC_WEB_HOSTS', '').split() if h] or ['user.ghelghelishop.ir']
+WEB_HOSTS = [h for h in os.environ.get('PUBLIC_WEB_HOSTS', '').split() if h] or ['user.ghelghelishop.com', 'user.ghelghelishop.ir']
 HTTPS_DATA = "\n".join(
     f'                <data android:scheme="https" android:host="{h}"/>' for h in WEB_HOSTS
 )

@@ -63,7 +63,7 @@ console.log('\n══ ۱) اپ (Flutter): آدرس‌ها از متغیرِ بی
   const patch = read('mobile/tool/patch_android.sh');
   ok('مانیفستِ اندروید دامنه‌ها را از `PUBLIC_WEB_HOSTS` می‌گیرد',
     /PUBLIC_WEB_HOSTS/.test(patch) && /android:host="\{h\}"/.test(patch));
-  ok('و پیش‌فرضش همان دامنهٔ فعلی است', /PUBLIC_WEB_HOSTS:-user\.ghelghelishop\.ir/.test(patch));
+  ok('و پیش‌فرضش همان دامنهٔ فعلی است', /PUBLIC_WEB_HOSTS:-user\.ghelghelishop\.com/.test(patch));
 
   const apk = read('.github/workflows/build-apk.yml');
   ok('بیلدِ APK هر دو متغیر را از تنظیماتِ مخزن می‌خواند (بدونِ تغییرِ کد)',
@@ -75,7 +75,7 @@ console.log('\n══ ۱) اپ (Flutter): آدرس‌ها از متغیرِ بی
   //    هر APK. این بررسی نمی‌گذارد سه جا (ورک‌فلو، اپ، بک‌اند) از هم
   //    جدا بیفتند.
   ok('پیش‌فرضِ PUBLIC_WEB_URL در ورک‌فلو همان دامنهٔ کارکننده است',
-    /vars\.PUBLIC_WEB_URL \|\| 'https:\/\/user\.ghelghelishop\.ir'/.test(apk));
+    /vars\.PUBLIC_WEB_URL \|\| 'https:\/\/user\.ghelghelishop\.com'/.test(apk));
   // 🔴 کامنت داخلِ یک دستورِ ادامه‌دار (`\` در آخرِ خط) خطرناک است: شل
   //    خطِ بعد را به همان دستور می‌چسباند و `#` بقیهٔ دستور را می‌خورد.
   //    نسخهٔ اولِ همین توضیح‌ها دقیقاً همین‌جا بود و بیلدِ APK را با
@@ -88,7 +88,7 @@ console.log('\n══ ۱) اپ (Flutter): آدرس‌ها از متغیرِ بی
     buildCmd.length > 0 && !/#/.test(buildCmd));
 
   ok('و در `share_invite.dart` هم همان دامنه پیش‌فرض است',
-    /defaultValue: 'https:\/\/user\.ghelghelishop\.ir'/.test(share));
+    /defaultValue: 'https:\/\/user\.ghelghelishop\.com'/.test(share));
 }
 
 console.log('\n══ ۲) بک‌اند: هیچ آدرسی در منطقِ کار هاردکد نیست ══');
