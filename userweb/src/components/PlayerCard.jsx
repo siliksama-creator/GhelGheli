@@ -103,7 +103,11 @@ export default function PlayerCard({
   const pointValue = cardPointValueOf(item);
 
   return (
-    <CardRarityFrame rarity={rarity} className={`ggPlayerCardFrame ${compact ? 'compact' : ''} ${className}`}>
+    <CardRarityFrame
+      rarity={rarity}
+      className={`ggPlayerCardFrame ${compact ? 'compact' : ''} ${qty > 1 ? 'qtyCorner' : ''} ${className}`}
+      corner={qty > 1 ? <span className="rarityQtyCorner">×{fa(qty)}</span> : null}
+    >
       <button type="button"
         className={[
           'ggPlayerCard',
@@ -141,7 +145,6 @@ export default function PlayerCard({
             : null}
           {!!power && <span className="ggCardPower">{fa(power)}</span>}
           {selected && <span className="ggCardCheck">✓</span>}
-          {qty > 1 && <span className="ggCardQty">×{fa(qty)}</span>}
           {badge && <span className="ggCardBadge">{badge}</span>}
           {winner && <span className="ggCardWinnerStamp">برنده</span>}
           {loser && <span className="ggCardLoserVeil" aria-hidden="true" />}

@@ -91,6 +91,7 @@ class PlayerCard extends StatelessWidget {
           rarity: rarity,
           borderRadius: radius,
           padding: compact ? 3 : 4,
+          cornerText: qty > 1 ? '×${faNum(qty)}' : null,
           child: Material(
             color: const Color(0xFF050A12),
             child: InkWell(
@@ -161,14 +162,6 @@ class PlayerCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  if (qty > 1)
-                    Align(
-                      alignment: Alignment.topLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: _MiniChip(text: '×${faNum(qty)}'),
-                      ),
-                    ),
                   if (winner)
                     const Align(
                       alignment: Alignment.center,
@@ -215,26 +208,6 @@ class PlayerCard extends StatelessWidget {
   }
 }
 
-class _MiniChip extends StatelessWidget {
-  const _MiniChip({required this.text});
-  final String text;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-    decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: 0.72),
-      borderRadius: BorderRadius.circular(99),
-    ),
-    child: Text(
-      text,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 10,
-        fontWeight: FontWeight.w900,
-      ),
-    ),
-  );
-}
 
 class _WinnerStamp extends StatelessWidget {
   const _WinnerStamp();

@@ -27,12 +27,23 @@ class RarityCardFrame extends StatefulWidget {
     required this.child,
     this.borderRadius = 20,
     this.padding = 4,
+    this.cornerText,
   });
 
   final String? rarity;
   final Widget child;
   final double borderRadius;
   final double padding;
+
+  /// متنِ نگینِ گوشهٔ پایینِ قاب — جایِ نگینِ کمیابی.
+  ///
+  /// خواستهٔ مالک (۳۰ شهریور): وقتی کاربر چند نسخه از یک کارت دارد، عددِ
+  /// تعداد (مثلِ «×۲») به‌جایِ نشانِ کمیابی داخلِ همان مربعِ گوشه نوشته
+  /// شود و دیگر بالای کارت چیپِ جدا نگردد. وب همان را با کلاسِ
+  /// `.rarityQtyCorner` در `brand-mark.css` پیاده می‌کند و گاردِ
+  /// `inventory-qty-parity.mjs` هر دو کلاینت را به هم می‌دوزد.
+  /// `null` یعنی رفتارِ قبلی (نگینِ کمیابی).
+  final String? cornerText;
 
   @override
   State<RarityCardFrame> createState() => _RarityCardFrameState();
@@ -109,6 +120,9 @@ class _RarityCardFrameState extends State<RarityCardFrame>
         ),
       );
     }
+    // وقتی عددِ تعداد در گوشه می‌نشیند، نگینِ کمیابی کنار می‌رود تا دو
+    // نشان روی هم نیفتند (وب هم pseudo عنصرِ rarity را content:none می‌کند).
+    if (widget.cornerText != null) return const SizedBox.shrink();
     final symbol = rarity == 'gold' ? '★' : rarity == 'premium' ? '◆' : '♛';
     return PositionedDirectional(
       bottom: -6,
@@ -161,6 +175,40 @@ class _RarityCardFrameState extends State<RarityCardFrame>
           ),
         ),
         _ornaments(rarity, colors, pulse),
+        if (widget.cornerText != null)
+          PositionedDirectional(
+            bottom: -6,
+            end: -5,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 21),
+              height: 21,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF22D3EE), Color(0xFF7C3AED)],
+                ),
+                border: Border.all(color: Colors.white54),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF22D3EE).withValues(alpha: .6),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                widget.cornerText!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
         if (energetic)
           Positioned.fill(
             child: IgnorePointer(
