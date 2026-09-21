@@ -403,15 +403,17 @@ router.post('/auth/login', userLoginLimiter, userAccountLimiter, asyncHandler(as
   const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1', [mobile]);
   const user = rows[0];
   if (!user || !user.password_hash || !(await bcrypt.compare(String(req.body.password || ''), user.password_hash))) return res.status(401).json({ message: 'شماره موبایل یا رمز عبور نادرست است' });
-  // ── قراردادِ تازه (درخواستِ مالک، مهر ۱۴۰۵): ورود با رمز فقط برای حسابِ
-  // مدیرِ اصلی. کاربران عادی فقط با کدِ یک‌بارمصرف وارد می‌شوند؛ تا وقتی
-  // درگاه پیامک فعال نشده، عملاً عضویت/ورودِ عادی بسته است — دقیقاً همان
-  // چیزی که مالک خواست. رمزِ درستِ یک کاربرِ عادی فقط این پیام را می‌گیرد
-  // و ورودی اتفاق نمی‌افتد.
-  const adminMobile = String(process.env.MAIN_ADMIN_USERNAME || '');
-  if (adminMobile && String(user.mobile) !== adminMobile && String(user.mobile).toLowerCase() !== adminMobile.toLowerCase()) {
-    return res.status(403).json({ message: 'ورود با رمز عبور فقط برای حساب مدیر است؛ با کد یک‌بارمصرف وارد شوید' });
-  }
+  // ── سیاستِ ورود با رمز (به‌روز ۳۰ شهریور ۱۴۰۵ به دستورِ مالک) ────────
+  // ورود با رمز برای هر حسابی که **از قبل رمز دارد** باز است: اکانت‌های
+  // تستِ قبلی و حسابِ مدیر. دستورِ مالک: «فقط اکانت تست‌های قبلی که پسورد
+  // دارند باید بتونن ورود بزنن». membership در این مجموعه همان بررسیِ
+  // بالاست (password_hash غیرتهی + bcrypt موفق)؛ حسابِ بدونِ رمز همان‌جا
+  // ۴۰۱ می‌گیرد.
+  // چرا این هنوز امن است: **هیچ راهی برای ساختِ حسابِ رمزیِ تازه وجود
+  // ندارد** — /auth/register-password با ALLOW_PASSWORD_REGISTRATION بسته
+  // است و /auth/forgot-password/reset بلیطِ OTP می‌خواهد (پیامک خاموش).
+  // یعنی مجموعهٔ حساب‌های رمزی فقط می‌تواند کوچک شود، هرگز بزرگ‌تر؛
+  // برخلافِ بازکردنِ ثبت‌نام با رمز که مالک صریحاً رد کرد.
   if (user.status !== 'active') return res.status(403).json({ message: 'حساب شما مسدود شده است' });
   res.json({ token: signUser(user), user: safeUser(user) });
 }));

@@ -15,16 +15,17 @@ import '../../core/app_config.dart';
 ///
 /// - ثبت‌نام: شماره + نام مستعارِ *اجباری* + کد دعوت (اختیاری) + کد OTP.
 ///   سرور نام مستعار را با فیلترِ کلمات رکیک (فارسی/انگلیسی) بررسی می‌کند.
-/// - ورود: تا وقتی پیامک خاموش است (smsEnabled=false از /api/config) فقط
-///   ورودِ مدیر با رمز؛ با فعال‌شدن پیامک همان تب به کد یک‌بارمصرف تبدیل
-///   می‌شود و یک درِ کوچکِ «ورود مدیر» پایین صفحه می‌ماند.
+/// - ورود: تا وقتی پیامک خاموش است (smsEnabled=false از /api/config) فرمِ
+///   رمز برای حساب‌های دارای رمزِ قبلی و حساب مدیر است (سیاستِ ۳۰ شهریورِ
+///   ۱۴۰۵ به دستورِ مالک)؛ با فعال‌شدن پیامک همان تب به کد یک‌بارمصرف
+///   تبدیل می‌شود و یک درِ کوچکِ «ورود با رمز» پایین صفحه می‌ماند.
 ///
 /// قراردادهای کاربر:
 /// - request-otp:  POST /api/auth/request-otp  {mobile, purpose:'login'|'register'}
 /// - verify-otp:   POST /api/auth/verify-otp   {mobile, code, purpose}
 /// - login-otp:    POST /api/auth/login-otp    {mobile} → {token,user}
 /// - register:     POST /api/auth/register     {mobile, nickname, referralCode?, profileAvatarKey}
-/// - ورود مدیر:    POST /api/auth/login        {mobile, password}
+/// - ورود با رمز:   POST /api/auth/login        {mobile, password}
 class AuthScreen extends StatefulWidget {
   final ApiClient api;
   final VoidCallback onDone;
@@ -192,7 +193,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _adminLogin() async {
     if (_adminMobile.text.isEmpty || _adminPass.text.isEmpty) {
-      setState(() => _errorMessage = 'نام کاربری و رمز مدیر را وارد کنید');
+      setState(() => _errorMessage = 'نام کاربری و رمز عبور را وارد کنید');
       return;
     }
     await _run(() async {
@@ -349,7 +350,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     style: const TextStyle(color: Color(0xFF7BF1C8))),
               ),
             ],
-            // وقتی پیامک خاموش است، تبِ ورود همان فرمِ مدیر است و دکمهٔ
+            // وقتی پیامک خاموش است، تبِ ورود همان فرمِ رمز است و دکمهٔ
             // اصلیِ OTP بی‌معنا — فرمِ مدیر دکمهٔ خودش را دارد.
             if (!(_tab == _Tab.login && !_smsEnabled)) ...[
             Gaps.vLg,
@@ -414,7 +415,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     ),
             ),
-            // درِ ورود مدیر: وقتی پیامک خاموش است فرمِ اصلیِ تبِ ورود است؛
+            // درِ ورود با رمز: وقتی پیامک خاموش است فرمِ اصلیِ تبِ ورود است؛
             // وقتی روشن شد یک درِ کوچکِ پایین صفحه باقی می‌ماند.
             if (_tab == _Tab.login) ...[
               Gaps.vMd,
@@ -461,11 +462,11 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   List<Widget> _buildStepFields(BuildContext context) {
-    // ── ورود بدون پیامک: فقط مدیر ──────────────────────────────────────
+    // ── ورود بدون پیامک: حساب‌های دارای رمزِ قبلی + مدیر ───────────────
     if (_tab == _Tab.login && !_smsEnabled) {
       return [
         Text(
-          'سامانهٔ پیامک هنوز فعال نشده است؛ فعلاً فقط مدیر می‌تواند با رمز وارد شود.',
+          'سامانهٔ پیامک هنوز فعال نشده است؛ ورود با رمز ویژهٔ حساب‌های دارای رمزِ قبلی و حساب مدیر است.',
           textAlign: TextAlign.center,
           style: Theme.of(context)
               .textTheme
@@ -477,7 +478,7 @@ class _AuthScreenState extends State<AuthScreen> {
           controller: _adminMobile,
           style: const TextStyle(color: Colors.white),
           decoration:
-              _fieldDecoration(icon: Icons.person_rounded, label: 'نام کاربری / شماره مدیر'),
+              _fieldDecoration(icon: Icons.person_rounded, label: 'نام کاربری یا شمارهٔ حساب'),
         ),
         Gaps.vSm,
         TextFormField(
@@ -485,7 +486,7 @@ class _AuthScreenState extends State<AuthScreen> {
           obscureText: true,
           style: const TextStyle(color: Colors.white),
           decoration:
-              _fieldDecoration(icon: Icons.lock_rounded, label: 'رمز عبور مدیر'),
+              _fieldDecoration(icon: Icons.lock_rounded, label: 'رمز عبور'),
         ),
         Gaps.vMd,
         FilledButton.icon(
@@ -504,7 +505,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2.4, color: Colors.white),
                   )
-                : const Text('ورود مدیر'),
+                : const Text('ورود'),
           ),
         ),
       ];
@@ -647,7 +648,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildAdminSection(BuildContext context) {
-    // وقتی پیامک خاموش است فرمِ مدیر همان فرمِ اصلیِ تبِ ورود است و
+    // وقتی پیامک خاموش است فرمِ رمز همان فرمِ اصلیِ تبِ ورود است و
     // این بخش تکراری لازم نیست.
     if (!_smsEnabled) return const SizedBox.shrink();
     return Column(
@@ -660,7 +661,7 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Text(
             _adminOpen
                 ? 'بستنِ ورودِ مدیر ▲'
-                : 'ورود با رمز عبور (فقط حساب مدیر) ▼',
+                : 'ورود با رمز عبور ▼',
             style: const TextStyle(fontSize: 12, color: Colors.white38),
           ),
         ),
@@ -669,7 +670,7 @@ class _AuthScreenState extends State<AuthScreen> {
             controller: _adminMobile,
             style: const TextStyle(color: Colors.white),
             decoration: _fieldDecoration(
-                icon: Icons.shield_rounded, label: 'نام کاربری / شماره مدیر'),
+                icon: Icons.shield_rounded, label: 'نام کاربری یا شمارهٔ حساب'),
           ),
           Gaps.vSm,
           TextFormField(
@@ -677,12 +678,12 @@ class _AuthScreenState extends State<AuthScreen> {
             obscureText: true,
             style: const TextStyle(color: Colors.white),
             decoration: _fieldDecoration(
-                icon: Icons.lock_rounded, label: 'رمز عبور مدیر'),
+                icon: Icons.lock_rounded, label: 'رمز عبور'),
           ),
           Gaps.vSm,
           OutlinedButton(
             onPressed: _loading ? null : _adminLogin,
-            child: const Text('ورود مدیر'),
+            child: const Text('ورود'),
           ),
         ],
       ],

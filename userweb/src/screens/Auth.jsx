@@ -98,7 +98,7 @@ export default function Auth({ done }) {
     e?.preventDefault();
     if (busy) return;
     setMsg('');
-    if (!admin.mobile || !admin.password) return say('نام کاربری و رمز مدیر را وارد کنید');
+    if (!admin.mobile || !admin.password) return say('نام کاربری و رمز عبور را وارد کنید');
     setBusy(true);
     try {
       const d = await req('/api/auth/login', 'POST', {
@@ -133,14 +133,14 @@ export default function Auth({ done }) {
           <h2 style={{ fontSize: 22, fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
             {tab === 'register'
               ? (step === 'code' ? 'کد تایید را وارد کن' : 'ثبت‌نام در قلقلی')
-              : (loginOtp ? (step === 'code' ? 'کد تایید را وارد کن' : 'ورود به قلقلی') : 'ورود مدیر')}
+              : (loginOtp ? (step === 'code' ? 'کد تایید را وارد کن' : 'ورود به قلقلی') : 'ورود با رمز عبور')}
           </h2>
           <p style={{ color: '#94A3B8', fontSize: 13, marginTop: 4 }}>
             {tab === 'register'
               ? 'شماره + نام مستعار + کد معرف؛ بدون رمز عبور'
               : (loginOtp
                 ? (step === 'code' ? `کد به شمارهٔ ${cleanMobile()} ارسال شد` : 'فقط شماره موبایل و کد یک‌بارمصرف')
-                : 'تا فعال‌شدن پیامک، ورود کاربران با کد غیرفعال است')}
+                : 'تا فعال‌شدن پیامک، ورود با کد غیرفعال است؛ این فرم ویژهٔ حساب‌های دارای رمز عبور است')}
           </p>
         </div>
 
@@ -195,7 +195,7 @@ export default function Auth({ done }) {
             )
           ) : (
             <>
-              <input placeholder="نام کاربری / شماره مدیر" value={admin.mobile}
+              <input placeholder="نام کاربری یا شمارهٔ حساب" value={admin.mobile}
                 autoComplete="username" style={inputStyle}
                 onChange={e => setAdmin({ ...admin, mobile: e.target.value })} />
               <input placeholder="رمز عبور" type="password" value={admin.password}
@@ -226,7 +226,7 @@ export default function Auth({ done }) {
             {busy ? 'در حال ارتباط با سرور...' : (
               tab === 'register'
                 ? (step === 'code' ? 'ورود / عضویت' : 'دریافت کد یک‌بارمصرف')
-                : (loginOtp ? (step === 'code' ? 'ورود' : 'دریافت کد یک‌بارمصرف') : 'ورود مدیر'))}
+                : (loginOtp ? (step === 'code' ? 'ورود' : 'دریافت کد یک‌بارمصرف') : 'ورود'))}
           </button>
         </div>
       </form>
