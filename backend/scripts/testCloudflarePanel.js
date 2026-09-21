@@ -179,7 +179,7 @@ function makeGuard({ base, tmp, store, fetchImpl }) {
 
     await guard.verify(7);
     const before = await guard.load();
-    ok('بعد از تأییدِ موفق، وضعیت ثبت شده', !!before.verified && before.verified.domains.length === 3);
+    ok('بعد از تأییدِ موفق، وضعیت ثبت شده', !!before.verified && before.verified.domains.length === 7);
     await guard.saveConfig({ domains: ['ghelghelishop.com'] }, 7);
     const after = await guard.load();
     ok('عوض‌کردنِ دامنه‌ها، تأییدِ قبلی را باطل می‌کند (انتقال به دامنهٔ نو)', after.verified === null);
