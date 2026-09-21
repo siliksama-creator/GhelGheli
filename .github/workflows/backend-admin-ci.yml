@@ -148,6 +148,13 @@ jobs:
             sleep 1
           done
           echo "::error::API did not become healthy in 40s"; exit 1
+      # قواعدِ رشد (دامنهٔ ماموریت‌ها + منبعِ XP لول) و کمیسیونِ معرفی —
+      # خواستهٔ مالک ۳۱ شهریور: این قواعد پیش‌تر هیچ پوششی نداشتند و یکی‌شان
+      # (match_completed بدون شرطِ ربات) عملاً اشتباه بود.
+      - name: Growth rules guard (mission scope + level XP source)
+        run: node scripts/testGrowthGuards.js
+      - name: Referral purchase-commission guard
+        run: node scripts/testReferralCommission.js
       - name: End-to-end suite (HTTP money paths — withdrawal ledger)
         run: npm run test:e2e
       # سوکتِ واقعی، دو بازیکن: escrow شرط، تسویه به برنده، تساوی،

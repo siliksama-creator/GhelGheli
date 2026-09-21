@@ -11,6 +11,18 @@ import { useToast } from '../lib/toast.jsx';
  * حالا هر ماموریتِ توکار قابل بازنویسی است (جایزه/هدف/خاموش) و
  * ماموریت سفارشی هم می‌توان ساخت.
  */
+// برچسبِ فارسیِ رویدادها — خودِ id برای مدیر فنی در حالتِ حرفه‌ای کنارِ
+// برچسب می‌آید، ولی انتخابِ رویداد باید به زبانِ محصول باشد نه کد.
+const EVENT_LABEL = {
+  match_completed: 'تکمیل مسابقهٔ آنلاین (ربات نه)',
+  online_win: 'بردِ آنلاین',
+  bot_match: 'بازی با ربات یا ضربه‌زن',
+  share: 'اشتراک‌گذاری',
+  rematch: 'ریمچ',
+  friend_challenge: 'دعوتِ دوست به دوئل',
+  other: 'بدون رویدادِ خودکار',
+};
+
 export function MissionsPage({ request }) {
   const notify = useToast();
   const [data, setData] = useState(null);
@@ -250,8 +262,9 @@ export function MissionsPage({ request }) {
               hint="پیشرفتِ کاربر با همین کلید در `user_mission_progress` نگه داشته می‌شود؛ پس عوض‌کردنِ کلید یعنی صفرشدنِ وضعیتِ انجامِ همه. برای ویرایشِ متن، همین‌جا کلید را دست نزنید."><Input name="key" required placeholder="daily_hello" /></Field>
             <Field label="دوره"
               hint="فقط «روزانه» یا «هفتگی» پذیرفته می‌شود؛ تغییرِ دوره، ماموریت را از چرخهٔ قبلی بیرون می‌آورد و پیشرفتِ آن چرخه برای کاربر باقی می‌ماند."><Select name="period" defaultValue="daily"><option value="daily">روزانه</option><option value="weekly">هفتگی</option></Select></Field>
-            <Field label="رویداد"><Select name="event" defaultValue="other">
-              {(data.events || []).map((e) => <option key={e} value={e}>{e}</option>)}
+            <Field label="رویداد" hint="«بازی با ربات یا ضربه‌زن» یعنی ماموریت فقط با بازی با ربات/ضربه‌زن جلو می‌رود؛ «تکمیل مسابقه» یعنی فقط مسابقهٔ آنلاین (ربات شمارش نمی‌شود).">
+              <Select name="event" defaultValue="other">
+              {(data.events || []).map((e) => <option key={e} value={e}>{EVENT_LABEL[e] || e}</option>)}
             </Select></Field>
             <Field label="آیکون"><Input name="icon" defaultValue="star" /></Field>
             <Field label="عنوان فارسی"

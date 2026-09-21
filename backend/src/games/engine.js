@@ -531,9 +531,21 @@ function finish(room, winner, disconnectedSym = null) {
           timedOutRounds: (room.timeoutCounts && room.timeoutCounts[symbol]) || 0,
         },
       }).catch(() => {});
-      growth.missions.record(player.id, 'match_completed').catch(() => {});
-      if (!room.vsBot && resolvedWinner === symbol) {
-        growth.missions.record(player.id, 'online_win').catch(() => {});
+      // ── قانونِ دامنهٔ ماموریت (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──────────
+      // پیش‌تر `match_completed` بدون شرط ثبت می‌شد، پس بازی مقابل ربات هم
+      // ماموریت‌های عمومی («مسابقه را تا پایان کامل کن») را جلو می‌برد —
+      // همان ماموریت‌هایی که دامنه‌شان مشخص نشده. قانون مالک: ماموریتِ
+      // مشخص‌نشده نباید با ربات کامل شود؛ فقط ماموریتی که صریحاً برای
+      // بازی با ربات ساخته شده (`bot_match`) با ربات پیشرفت می‌کند — و
+      // به خواستهٔ همان پیام، با بازی ضربه‌زن هم (در routes/server.js
+      // هنگامِ تمام‌شدنِ لولِ ضربه‌زن منتشر می‌شود).
+      if (room.vsBot) {
+        growth.missions.record(player.id, 'bot_match').catch(() => {});
+      } else {
+        growth.missions.record(player.id, 'match_completed').catch(() => {});
+        if (resolvedWinner === symbol) {
+          growth.missions.record(player.id, 'online_win').catch(() => {});
+        }
       }
     }
   }
@@ -699,29 +711,23 @@ function finish(room, winner, disconnectedSym = null) {
     //
     // `room.vsBot` را خودِ موتور موقع ساختن اتاق تعیین می‌کند (وقتی
     // حریف دوم پیدا نشود)، پس قابل جعل از سمت کلاینت نیست.
-    if (!room.vsBot && room.stake > 0) {
+    if (!room.vsBot) {
       for (const sym of ['X', 'O']) {
         const info = room.players?.[sym];
         if (!info?.id || info.isBot) continue;
-        pass.grantXp(info.id, 'game_play').catch(() => {});
-        // ⚠️ `resolvedWinner` نه `winner`. وقتی حریف قطع می‌شود موتور
-        // `winner='DISCONNECT'` می‌فرستد و برندهٔ واقعی در
-        // `resolvedWinner` است. سنجش با `winner` یعنی برنده‌ی قطع‌اتصال
-        // نه XP گذر نبرد می‌گرفت نه XP لول — در حالی که تسویه و آنالیتیکس
-        // درست به او برد می‌دادند.
-        if (resolvedWinner === sym) pass.grantXp(info.id, 'game_win').catch(() => {});
 
         // ═══════════════════════════════════════════════════════════════
-        // XP لولِ دائمی — جدا از گذر نبرد
+        // XP لولِ دائمی: هر مسابقهٔ آنلاین با کاربرِ واقعی — رایگان یا ورودی‌دار
         // ═══════════════════════════════════════════════════════════════
         //
-        // چرا دو سیستم و نه یکی: گذر نبرد فصلی است، سقفِ روزانه دارد،
-        // و از منابعِ غیربازی هم تغذیه می‌شود. لول باید «مجموعِ همهٔ
-        // بازی‌های آنلاین» را نشان دهد — دائمی و بدون سقف. توضیح کامل
-        // در services/levelService.js.
-        //
-        // داخل همین شرطِ `!room.vsBot` است، پس همان قانون را به ارث
-        // می‌برد: بازی مقابل ربات هیچ XPی نمی‌دهد.
+        // طراحیِ مستند (سرآمدِ levelService و کامنتِ بالای همین بلوک):
+        // لول «مجموعِ همهٔ بازی‌های آنلاین» است. پیش‌تر این صدا **داخلِ**
+        // شرطِ `room.stake > 0` هم نشسته بود — یعنی مسابقهٔ آنلاینِ رایگان
+        // هیچ XP لولی نمی‌داد؛ دقیقاً همان چیزی که مالک در بررسیِ ۳۱
+        // شهریور گرفت: «چک کن با بازی آنلاین بالا می‌ره یا نه». بالا
+        // نمی‌رفت، مگر با ورودی. شرطِ stake مالِ گذرِ نبرد است (پایین)،
+        // نه لول. قانونِ ربات ولی سرِ جایش می‌ماند: کلِ این بلوک پشتِ
+        // `!room.vsBot` است، پس بازی با ربات هیچ XPی نمی‌دهد.
         const other = room.players?.[sym === 'X' ? 'O' : 'X'];
         level
           .grantGameXp(info.id, {
@@ -730,6 +736,22 @@ function finish(room, winner, disconnectedSym = null) {
             opponentId: other?.isBot ? null : other?.id,
           })
           .catch(() => {});
+
+        // ── XP گذرِ نبرد: فقط مسابقهٔ آنلاینِ ورودی‌دار ─────────────────
+        // چرا اینجا stake لازم است: گذر نبرد سقفِ روزانه دارد ولی دو
+        // اکانتِ هماهنگ می‌توانند مسابقهٔ رایگان پشت‌سرهم بسازند؛ ورودیِ
+        // شرط‌ی هزینهٔ همان هماهنگ‌سازی را نگه می‌دارد. سقفِ روزانهٔ
+        // passService محافظِ دوم است.
+        //
+        // ⚠️ `resolvedWinner` نه `winner`. وقتی حریف قطع می‌شود موتور
+        // `winner='DISCONNECT'` می‌فرستد و برندهٔ واقعی در
+        // `resolvedWinner` است. سنجش با `winner` یعنی برنده‌ی قطع‌اتصال
+        // نه XP گذر نبرد می‌گرفت نه XP لول — در حالی که تسویه و آنالیتیکس
+        // درست به او برد می‌دادند.
+        if (room.stake > 0) {
+          pass.grantXp(info.id, 'game_play').catch(() => {});
+          if (resolvedWinner === sym) pass.grantXp(info.id, 'game_win').catch(() => {});
+        }
       }
     }
   } catch (e) {

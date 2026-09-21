@@ -1091,6 +1091,13 @@ app.post('/api/games/tap/progress', auth, tapBatchLimiter.mw, asyncHandler(async
   const lvlUp = Math.max(0, Number(payload?.level || 0) - lvlBefore);
   if (lvlUp > 0) {
     pass.grantXp(req.user.id, 'tap_level', { multiplier: lvlUp }).catch(() => {});
+    // ── ضربه‌زن و ماموریت‌هایScoped به ربات (خواستهٔ مالک) ──
+    // یک لولِ تمام‌شدهٔ ضربه‌زن یک «بازیِ واقعیِ شمارشی» است. مالک: ماموریتی
+    // که برای بازی با ربات ساخته شده اشکالی ندارد با ضربه‌زن هم پیشرفت
+    // کند. ماموریت‌های مشخص‌نشده (match_completed) از ضربه‌زن چیزی نمی‌گیرند
+    // — دقیقاً مثلِ قبل، چون رویدادشان اینجا منتشر نمی‌شود.
+    require('./services/missionService')
+      .record(req.user.id, 'bot_match').catch(() => {});
   }
   res.status(status).json(payload);
 }));

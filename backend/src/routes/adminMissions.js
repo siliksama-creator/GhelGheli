@@ -19,7 +19,7 @@
  */
 const express = require('express');
 
-const EVENTS = ['match_completed', 'online_win', 'share', 'rematch', 'friend_challenge', 'other'];
+const EVENTS = ['match_completed', 'online_win', 'bot_match', 'share', 'rematch', 'friend_challenge', 'other'];
 const PERIODS = ['daily', 'weekly'];
 
 module.exports = function createAdminMissionsRoutes(deps) {
