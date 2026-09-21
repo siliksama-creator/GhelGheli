@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
   static const String defaultBaseUrl = String.fromEnvironment('API_BASE_URL',
-      defaultValue: 'https://api.ghelghelishop.ir');
+      defaultValue: 'https://api.ghelghelishop.com');
 
   final Dio dio = Dio(BaseOptions(
     baseUrl: defaultBaseUrl,

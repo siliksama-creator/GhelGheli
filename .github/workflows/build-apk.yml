@@ -263,8 +263,8 @@ jobs:
             # داخلِ این دستور را می‌سنجد.
             if flutter build apk --release --split-per-abi \
               --target-platform=android-arm,android-arm64 \
-              --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.ir' }} \
-              --dart-define=PUBLIC_WEB_URL=${{ vars.PUBLIC_WEB_URL || 'https://user.ghelghelishop.ir' }} \
+              --dart-define=API_BASE_URL=${{ vars.API_BASE_URL || 'https://api.ghelghelishop.com' }} \
+              --dart-define=PUBLIC_WEB_URL=${{ vars.PUBLIC_WEB_URL || 'https://user.ghelghelishop.com' }} \
               --dart-define=APP_RELEASE="$APP_RELEASE"; then
               ok=1
               break

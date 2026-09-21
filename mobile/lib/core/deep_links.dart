@@ -25,7 +25,7 @@ import 'package:app_links/app_links.dart';
 /// می‌کند؛ پس با تغییرِ یک متغیر در CI، اپ به دامنهٔ نو منتقل می‌شود.
 const String _publicWebUrlDefine = String.fromEnvironment(
   'PUBLIC_WEB_URL',
-  defaultValue: 'https://user.ghelghelishop.ir',
+  defaultValue: 'https://user.ghelghelishop.com',
 );
 
 /// دامنه‌هایی که لینکِ https آن‌ها داخلِ اپ پذیرفته می‌شود.

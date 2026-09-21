@@ -63,6 +63,10 @@ const DEFAULT_DOMAINS = [
   'admin.ghelghelishop.ir',
   'user.ghelghelishop.ir',
   'register.ghelghelishop.ir',
+  'api.ghelghelishop.com',
+  'ghelghelishop.com',
+  'admin.ghelghelishop.com',
+  'user.ghelghelishop.com',
 ];
 // portability-ok-end
 

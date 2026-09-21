@@ -690,7 +690,7 @@ class _ResultActions extends StatelessWidget {
           onPressed: () => SharePlus.instance.share(ShareParams(
             text:
                 '${session.resultText}\n${session.nameOf('X')} مقابل ${session.nameOf('O')}\n'
-                'تو هم به باشگاه بازی‌های قلقلی بیا: https://ghelghelishop.ir',
+                'تو هم به باشگاه بازی‌های قلقلی بیا: https://ghelghelishop.com',
             subject: 'نتیجه بازی قلقلی',
           )),
           icon: const Icon(Icons.ios_share_rounded, size: 18),

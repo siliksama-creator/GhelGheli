@@ -134,7 +134,8 @@ const doc = {
     description: 'قرارداد کامل HTTP API. این فایل از routeهای Express تولید می‌شود؛ Socket.IO در OpenAPI پوشش داده نمی‌شود.',
   },
   servers: [
-    { url: 'https://api.ghelghelishop.ir', description: 'Production' },
+    { url: 'https://api.ghelghelishop.com', description: 'Production' },
+    { url: 'https://api.ghelghelishop.ir', description: 'Production (legacy alias)' },
     { url: 'http://localhost:4000', description: 'Development' },
   ],
   paths,

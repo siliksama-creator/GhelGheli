@@ -91,7 +91,7 @@ enum ShareOutcome {
 /// لینکِ اشتراکِ اتاق استفاده می‌کند تا هر دو یک جا را نشان بدهند.
 const String kPublicWebUrl = String.fromEnvironment(
   'PUBLIC_WEB_URL',
-  defaultValue: 'https://user.ghelghelishop.ir',
+  defaultValue: 'https://user.ghelghelishop.com',
 );
 
 String inviteMessage(

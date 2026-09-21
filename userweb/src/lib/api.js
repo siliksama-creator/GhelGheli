@@ -3,7 +3,7 @@
 // Extracted from main.jsx so every screen speaks to the backend the same way
 // and error handling lives in exactly one place.
 export const API =
-  import.meta.env.VITE_API_BASE || 'https://api.ghelghelishop.ir';
+  import.meta.env.VITE_API_BASE || 'https://api.ghelghelishop.com';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // کشِ شرطیِ داده با ETag

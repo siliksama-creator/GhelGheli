@@ -90,7 +90,7 @@ class _PrivateMatchDialogState extends State<PrivateMatchDialog> {
         .toString();
     setState(() {
       _createdCode = code;
-      _shareUrl = 'https://user.ghelghelishop.ir/?game=$_selectedGame&room=$code';
+      _shareUrl = 'https://user.ghelghelishop.com/?game=$_selectedGame&room=$code';
     });
   }
 
