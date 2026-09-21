@@ -62,15 +62,22 @@ TG_CONF_ALT="${TG_CONF_ALT:-/root/.ghelgheli_backup.conf}"
 INTEGRITY_PATHS_FILE="${INTEGRITY_PATHS_FILE:-}"
 NOW_EPOCH="${NOW_EPOCH:-$(date +%s)}"
 
-DRY_RUN=0 FORCE_DIGEST=0 REFRESH=0
+DRY_RUN=0 FORCE_DIGEST=0 REFRESH=0 TEST_ALERT=0
 for arg in "$@"; do
   case "$arg" in
-    --dry-run) DRY_RUN=1 ;;
-    --digest)  FORCE_DIGEST=1 ;;
-    --refresh) REFRESH=1 ;;
-    *) echo "usage: $0 [--dry-run] [--digest] [--refresh]" >&2; exit 2 ;;
+    --dry-run)   DRY_RUN=1 ;;
+    --digest)    FORCE_DIGEST=1 ;;
+    --refresh)   REFRESH=1 ;;
+    --test-alert) TEST_ALERT=1 ;;
+    *) echo "usage: $0 [--dry-run] [--digest] [--refresh] [--test-alert]" >&2; exit 2 ;;
   esac
 done
+
+# ⚠️ درسِ ۲۹ شهریور: در حالتِ آزمایشی، **هیچ فایلی نوشته نمی‌شود**. قبلاً
+# `--dry-run` مُهرِ «قبلاً هشدار دادم» را هم می‌گذاشت؛ یعنی یک آزمونِ بی‌خطر
+# می‌توانست هشدارِ واقعیِ بعدی را بخورد — همان اشتباهی که با locale هم رخ داد.
+# حالا: dry-run = فقط بخوان و چاپ کن (فقط لاگ که append-only است نوشته می‌شود).
+state_write() { [ "$DRY_RUN" = "1" ] && return 0; "$@"; }
 
 # آستانه‌ها (قابلِ بازنویسی با متغیرِ محیطی، برای آزمون)
 CAMPAIGN_BANS="${CAMPAIGN_BANS:-3}"          # چند بن تا «کمپین» شمرده شود
@@ -78,6 +85,8 @@ CAMPAIGN_WINDOW="${CAMPAIGN_WINDOW:-900}"    # پنجرهٔ کمپین (ثانی
 BAN_COOLDOWN="${BAN_COOLDOWN:-1800}"         # سکوتِ هشدارِ کمپین
 SUCCESS_COOLDOWN="${SUCCESS_COOLDOWN:-21600}" # سکوتِ هشدارِ هر آی‌پیِ مشکوک
 DIGEST_PERIOD="${DIGEST_PERIOD:-86400}"      # خالصهٔ روزانه
+PERSIST_THRESHOLD="${PERSIST_THRESHOLD:-100}"  # تلاشِ ناموفقِ «کند» از یک آی‌پی
+PERSIST_COOLDOWN="${PERSIST_COOLDOWN:-43200}"  # سکوتِ ۱۲ ساعته برای هر آی‌پی
 LOOKBACK="${LOOKBACK:-86400}"                # پنجرهٔ آمارِ خالصه/موفقیت‌ها
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true
@@ -115,6 +124,21 @@ send() {
   fi
 }
 
+# پیامِ آزمایشی — برای اینکه مالک هر وقت خواست مطمئن شود مسیرِ تلگرام سالم است:
+#   bash monitor/ssh-watch.sh --test-alert
+if [ "$TEST_ALERT" = "1" ]; then
+  send "🧪 <b>پیامِ آزمایشی</b>
+
+این پیام فقط برای این است که مطمئن شوی مسیرِ هشدارِ تلگرام سالم است. کاری لازم نیست. پیام‌های واقعیِ زیر از این نگهبان می‌آید:
+• موجِ تلاشِ نفوذ (اسکنِ وب یا رمزِ SSH) از چند آی‌پی
+• ورودِ موفق از آی‌پی‌ای که تلاشِ ناموفق داشته (خطرناک‌ترین)
+• ورودِ موفق با کاربرِ غیرِ root
+• تغییرِ یکی از فایل‌های حساسِ سرور
+• خالصهٔ روزانه (۱ پیام در ۲۴ ساعت)"
+  [ "$DRY_RUN" = "1" ] && log "test-alert previewed (آزمایشی)" || log "test-alert sent"
+  exit 0
+fi
+
 # هشدار با سکوتِ کلیدِ مشخص (تا یک چیز هر ۶۰ ثانیه تکرار نشود)
 alert_once() {
   local key="$1" msg="$2" cooldown="$3" stamp_file="$STATE_DIR/alert-$1" last=0
@@ -122,8 +146,14 @@ alert_once() {
   case "$last" in ''|*[!0-9]*) last=0 ;; esac
   if [ $((NOW_EPOCH - last)) -ge "$cooldown" ]; then
     send "$msg"
-    log "ALERT [$key] ${msg//$'\n'/ }"
-    printf '%s\n' "$NOW_EPOCH" > "$stamp_file" 2>/dev/null || true
+    # در حالتِ آزمایشی، لاگ هم صریحاً «آزمایشی» می‌شود تا بعداً کسی خطِ لاگ را
+    # با هشدارِ واقعیِ ارسال‌شده اشتباه نگیرد (و آزمون‌ها هم قابلِ‌اتکا بمانند).
+    if [ "$DRY_RUN" = "1" ]; then
+      log "ALERT (آزمایشی) [$key] ${msg//$'\n'/ }"
+    else
+      log "ALERT [$key] ${msg//$'\n'/ }"
+    fi
+    state_write bash -c "printf '%s\n' '$NOW_EPOCH' > '$stamp_file' 2>/dev/null || true"
   fi
 }
 
@@ -132,12 +162,25 @@ alert_once() {
 # ═══════════════════════════════════════════════════════════════════════════
 # چرا از لاگِ fail2ban و نه از لاگِ auth: بن‌شدن یعنی خودِ لایهٔ دفاعی تصمیم
 # گرفته؛ همان لحظهٔ درست برای خبر دادن به مالک است.
-new_bans=()      # «epoch|ip»
+# ⚠️ درسِ ۲۹ شهریور (نسخهٔ اولِ همین نگهبان): پیامش می‌گفت «به‌خاطرِ تلاشِ
+# ناموفقِ رمزِ SSH بن شدند» — ولی آن چهار آی‌پی در واقع از جیلِ **nginx-scan**
+# بن شده بودند (اسکنِ وب، صفر تلاشِ رمزِ SSH). پیامِ هشدار باید دقیق باشد،
+# وگرنه مالک دنبالِ چیزِ اشتباهی می‌رود. حالا نامِ جیل هم از لاگ خوانده
+# می‌شود و متنِ پیام بر اساسِ همان نوشته می‌شود.
+jail_title() {
+  case "$1" in
+    sshd)                    printf 'تلاشِ ناموفقِ رمزِ SSH' ;;
+    nginx-scan)              printf 'اسکنِ وب — جست‌وجوی فایل‌های حساس (.env/.git/phpinfo)' ;;
+    ghelghelishop-wplogin)   printf 'تلاشِ ورود به پنلِ وردپرس' ;;
+    *)                       printf 'هشدارِ لایهٔ دفاعی (%s)' "$1" ;;
+  esac
+}
+new_bans=()      # «epoch|ip|jail»
 if [ -r "$F2B_LOG" ]; then
   LAST="$(cat "$LAST_BAN_FILE" 2>/dev/null || echo 0)"
   case "$LAST" in ''|*[!0-9]*) LAST=0 ;; esac
   max_seen="$LAST"
-  # خطِ نمونه: 2026-09-21 08:48:00,768 fail2ban.actions [828]: NOTICE [sshd] Ban 1.2.3.4
+  # خطِ نمونه: 2026-09-21 10:46:44,915 fail2ban.actions [828]: NOTICE  [nginx-scan] Ban 85.203.21.159
   while IFS= read -r line; do
     ip="${line##* }"
     case "$ip" in ''|*[!0-9.]*) continue ;; esac
@@ -145,32 +188,45 @@ if [ -r "$F2B_LOG" ]; then
     ep="$(date -d "$ts" +%s 2>/dev/null || echo 0)"
     [ "$ep" -le "$LAST" ] && continue
     [ "$ep" -gt "$max_seen" ] && max_seen="$ep"
-    new_bans+=("${ep}|${ip}")
+    jail="$(printf '%s' "$line" | sed -n 's/.*\[\([^]]*\)\] Ban .*/\1/p')"
+    [ -n "$jail" ] || jail=unknown
+    new_bans+=("${ep}|${ip}|${jail}")
   done < <(grep -a '\] Ban ' "$F2B_LOG" 2>/dev/null | tail -200 || true)
-  printf '%s\n' "$max_seen" > "$LAST_BAN_FILE" 2>/dev/null || true
-  for b in "${new_bans[@]:-}"; do [ -n "$b" ] && printf '%s\n' "$b" >> "$BANS_FILE"; done
+  state_write bash -c "printf '%s\n' '$max_seen' > '$LAST_BAN_FILE' 2>/dev/null || true"
+  for b in "${new_bans[@]:-}"; do [ -n "$b" ] && state_write bash -c "printf '%s\n' '$b' >> '$BANS_FILE'"; done
 fi
 
 # پروندهٔ بن‌ها را کوتاه نگه دار (۷ روز)
 if [ -s "$BANS_FILE" ]; then
   cutoff=$((NOW_EPOCH - 604800))
   awk -F'|' -v c="$cutoff" '$1 >= c' "$BANS_FILE" > "$BANS_FILE.tmp" 2>/dev/null || true
-  mv "$BANS_FILE.tmp" "$BANS_FILE" 2>/dev/null || true
+  state_write mv "$BANS_FILE.tmp" "$BANS_FILE"
 fi
 
-# کمپین: چند بنِ متفاوت در پنجرهٔ کوتاه
-if [ -s "$BANS_FILE" ]; then
+# کمپین: چند بنِ متفاوت در پنجرهٔ کوتاه — جدا برای هر جیل (پیامِ درست)
+#
+# ⚠️ نکته: فهرستِ بن‌ها = «پروندهٔ ذخیره‌شده» **به‌علاوهٔ** بن‌های همین اجرا.
+# چرا: در حالتِ آزمایشی پرونده نوشته نمی‌شود، ولی می‌خواهیم پیش‌نمایش دقیقاً
+# همان چیزی را نشان بدهد که در اجرای واقعی هشدار می‌داد (وگرنه dry-run
+# بی‌معنا می‌شد). در حالتِ واقعی، sort -u تکراری‌ها را جمع می‌کند.
+bans_view() {
+  cat "$BANS_FILE" 2>/dev/null || true
+  for b in "${new_bans[@]:-}"; do [ -n "$b" ] && printf '%s\n' "$b"; done
+}
+if [ -s "$BANS_FILE" ] || [ "${#new_bans[@]}" -gt 0 ]; then
   since=$((NOW_EPOCH - CAMPAIGN_WINDOW))
-  campaign="$(awk -F'|' -v s="$since" '$1 >= s {print $2}' "$BANS_FILE" 2>/dev/null | sort -u | head -8 || true)"
-  count="$(printf '%s\n' "$campaign" | grep -c . || true)"
-  if [ "${count:-0}" -ge "$CAMPAIGN_BANS" ]; then
-    alert_once campaign "🚨 کمپینِ ورودِ ناموفق روی SSH
+  for j in $(bans_view | awk -F'|' -v s="$since" '$1 >= s {print $3}' | sort -u || true); do
+    [ -n "$j" ] && [ "$j" != "unknown" ] || continue
+    ips="$(bans_view | awk -F'|' -v s="$since" -v j="$j" '$1 >= s && $3 == j {print $2}' | sort -u | head -8 || true)"
+    count="$(printf '%s\n' "$ips" | grep -c . || true)"
+    [ "${count:-0}" -ge "$CAMPAIGN_BANS" ] || continue
+    alert_once "campaign_$j" "🚨 موجِ حملهٔ خودکار به سرور — $(jail_title "$j")
 
-در ${CAMPAIGN_WINDOW} ثانیهٔ گذشته ${count} آی‌پیِ متفاوت به‌خاطر تلاشِ ناموفقِ رمز بن شدند (یعنی موجِ توزیع‌شده، نه یک ربات):
-$(printf '%s\n' "$campaign" | sed 's/^/• /')
+در ${CAMPAIGN_WINDOW} ثانیهٔ گذشته ${count} آی‌پیِ متفاوت توسطِ جیل «${j}» بسته شدند (یعنی موجِ توزیع‌شده، نه یک ربات):
+$(printf '%s\n' "$ips" | sed 's/^/• /')
 
-لایه‌های دفاعی (fail2ban + سقفِ تلاش) کار می‌کنند و ورودِ پسوردی بسته نشده. اگر این موج ادامه داشت، آی‌پی‌های بالا را در کلادفلر هم ببند." "$BAN_COOLDOWN"
-  fi
+لایهٔ دفاعی (fail2ban) خودش کار را کرده و آی‌پی‌ها بسته شده‌اند؛ کاری از تو لازم نیست. این پیام فقط برای اطلاعِ توست که بدانی چه می‌گذرد. اگر موج ادامه داشت، همان آی‌پی‌ها را در کلادفلر هم ببند." "$BAN_COOLDOWN"
+  done
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -199,6 +255,40 @@ if [ -r "$AUTH_LOG" ]; then
 این تنها الگویی است که «نفوذِ موفق» را از «نویزِ اینترنت» جدا می‌کند. اگر این آی‌پی را نمی‌شناسی، همین حالا رمزِ root را عوض کن و بعد در کلادفلر ببند." "$SUCCESS_COOLDOWN"
     fi
   done < <(grep -a 'Accepted' "$AUTH_LOG" 2>/dev/null | tail -120 || true)
+
+  # ── ورودِ موفق با کاربری غیرِ root: هیچ‌کس نباید با کاربرِ دیگری وارد شود ──
+  # (ایجنت‌ها همه root اند؛ اگر روزی کاربرِ جدیدی وارد شود، یعنی کسی حساب
+  #  ساخته یا حسابِ دیگری باز شده — خبرش را باید فوراً بدانی.)
+  while IFS= read -r line; do
+    ts="${line%% *}"; ts="${ts%%.*}"
+    ep="$(date -d "$ts" +%s 2>/dev/null || echo 0)"
+    [ "$ep" -eq 0 ] && continue
+    [ $((NOW_EPOCH - ep)) -gt "$LOOKBACK" ] && continue
+    user="$(printf '%s' "$line" | awk '{for(i=1;i<=NF;i++) if($i=="for") print $(i+1)}')"
+    ip="$(printf '%s' "$line" | awk '{for(i=1;i<=NF;i++) if($i=="from") print $(i+1)}')"
+    [ -n "$user" ] && [ "$user" != "root" ] || continue
+    alert_once "nonroot_$user" "🚨 ورودِ موفق با کاربرِ غیرِ root
+
+کاربر: ${user}
+آی‌پی: ${ip}
+زمان: $(date -d "@$ep" '+%Y-%m-%d %H:%M:%S')
+
+همهٔ ایجنت‌ها با root وارد می‌شوند؛ پس هر کاربرِ دیگری روی این سرور یعنی کسی حساب ساخته یا حسابِ کاربرِ دیگری باز شده. اگر این را نمی‌شناسی، همین حالا رمزها را عوض کن." "$SUCCESS_COOLDOWN"
+  done < <(grep -a 'Accepted' "$AUTH_LOG" 2>/dev/null | tail -120 || true)
+
+  # ── تلاشِ پیوستهٔ «کُند» (slow brute force) ──────────────────────────────
+  # کسی که هر ۱۰ دقیقه ۴ بار رمز را غلط می‌زند هرگز به سقفِ ۵ نرسد و بن نشود؛
+  # ولی در طولِ روز صدها تلاش جمع می‌کند. آستانه: ≥۱۰۰ خطِ ناموفق از یک آی‌پی.
+  while read -r cnt ip; do
+    [ -n "$ip" ] || continue
+    [ "$cnt" -ge "$PERSIST_THRESHOLD" ] || continue
+    alert_once "persist_$ip" "🚨 تلاشِ پیوستهٔ رمزِ SSH از یک آی‌پی
+
+آی‌پی: ${ip}
+تعدادِ تلاشِ ناموفق (کلِ لاگِ جاری): ${cnt}
+
+این الگوها آرام‌اند و ممکن است زیرِ آستانهٔ بن‌شدن بمانند. اگر این آی‌پی را نمی‌شناسی، در کلادفلر ببندش و رمزها را تازه کن." "$PERSIST_COOLDOWN"
+  done < <(grep -a 'Failed password' "$AUTH_LOG" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="from") print $(i+1)}' | grep -E '^[0-9.]+$' | sort | uniq -c | sort -rn | head -5 || true)
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -239,8 +329,14 @@ shopt -u nullglob
 sort -k2 "$tmp_hash" -o "$tmp_hash" 2>/dev/null || true
 
 if [ "$REFRESH" = "1" ] || [ ! -f "$INTEGRITY_FILE" ]; then
-  cp -f "$tmp_hash" "$INTEGRITY_FILE" 2>/dev/null || true
-  log "baseline یکپارچگی ثبت شد ($(grep -c . "$INTEGRITY_FILE" 2>/dev/null || echo 0) فایل)"
+  # در حالتِ آزمایشی هیچ‌چیز نوشته نمی‌شود (پایه‌گذاری هم نه) — تا یک آزمونِ
+  # بی‌خطر، هشدارِ واقعیِ بعدی را نخورد.
+  if [ "$DRY_RUN" = "1" ]; then
+    printf '\n(آزمایشی) پایه‌گذاری می‌شد: %s فایل\n' "$(grep -c . "$tmp_hash" 2>/dev/null || echo 0)"
+  else
+    cp -f "$tmp_hash" "$INTEGRITY_FILE" 2>/dev/null || true
+  fi
+  [ "$DRY_RUN" = "1" ] || log "baseline یکپارچگی ثبت شد ($(grep -c . "$INTEGRITY_FILE" 2>/dev/null || echo 0) فایل)"
   [ "$REFRESH" = "1" ] && send "♻️ اثرِ انگشتِ فایل‌های حساس از نو ثبت شد ($(grep -c . "$INTEGRITY_FILE" 2>/dev/null || echo 0) فایل). تغییرهای این فاصله عمداً نادیده گرفته شدند."
 else
   changed="$(diff <(sort "$INTEGRITY_FILE") <(sort "$tmp_hash") 2>/dev/null | grep -E '^[<>]' || true)"
@@ -253,8 +349,9 @@ $(printf '%s\n' "$changed" | awk '{print $NF}' | sort -u | sed 's/^/• /' | hea
 اگر این تغییر کارِ خودت (یا ایجنتِ خودت) بوده، با
   bash /var/www/GhelGheli/monitor/ssh-watch.sh --refresh
 اثرِ انگشتِ تازه ثبت می‌شود و هشدار نمی‌آید. اگر نبوده، یعنی کسی روی سرور دست برده — همین حالا رمزها را عوض کن." 0
-    cp -f "$tmp_hash" "$INTEGRITY_FILE" 2>/dev/null || true
-    log "INTEGRITY CHANGE: $(printf '%s\n' "$changed" | awk '{print $NF}' | tr '\n' ' ')"
+    state_write cp -f "$tmp_hash" "$INTEGRITY_FILE" 2>/dev/null || true
+    [ "$DRY_RUN" = "1" ] && log "INTEGRITY CHANGE (آزمایشی): $(printf '%s\n' "$changed" | awk '{print $NF}' | tr '\n' ' ')" \
+      || log "INTEGRITY CHANGE: $(printf '%s\n' "$changed" | awk '{print $NF}' | tr '\n' ' ')"
   fi
 fi
 rm -f "$tmp_hash" 2>/dev/null || true
@@ -268,21 +365,33 @@ if [ "$FORCE_DIGEST" = "1" ] || [ $((NOW_EPOCH - last_digest)) -ge "$DIGEST_PERI
   since=$((NOW_EPOCH - LOOKBACK))
   bans_24="$(awk -F'|' -v s="$since" '$1 >= s' "$BANS_FILE" 2>/dev/null | wc -l | tr -d ' ')"
   bans_ips="$(awk -F'|' -v s="$since" '$1 >= s {print $2}' "$BANS_FILE" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
+  # به تفکیکِ نوع: اسکنِ وب یا تلاشِ رمزِ SSH
+  bans_ssh="$(awk -F'|' -v s="$since" '$1 >= s && $3 == "sshd"' "$BANS_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+  bans_web="$(awk -F'|' -v s="$since" '$1 >= s && $3 == "nginx-scan"' "$BANS_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+  # ردیف‌های قدیمیِ قبل از این نسخه نامِ جیل نداشتند (دو ستونه بودند) — نه
+  # پنهانشان می‌کنیم و نه در دستهٔ اشتباه می‌شماریمشان.
+  bans_unk="$(awk -F'|' -v s="$since" '$1 >= s && (NF < 3 || $3 == "")' "$BANS_FILE" 2>/dev/null | wc -l | tr -d ' ')"
+  top_atk="$(grep -a 'Failed password' "$AUTH_LOG" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="from") print $(i+1)}' | grep -E '^[0-9.]+$' | sort | uniq -c | sort -rn | head -1 | awk '{print $2" ("$1" تلاش)"}' || true)"
   ok_lines="$(grep -a 'Accepted' "$AUTH_LOG" 2>/dev/null | tail -400 || true)"
   ok_24="$(printf '%s\n' "$ok_lines" | grep -c . || true)"
   ok_ips="$(printf '%s\n' "$ok_lines" | awk '{for(i=1;i<=NF;i++) if($i=="from") print $(i+1)}' | grep -E '^[0-9.]+$' | sort -u | wc -l | tr -d ' ')"
   fails_24="$(grep -ac 'Failed password' "$AUTH_LOG" 2>/dev/null || true)"
   send "📊 خالصهٔ روزانهٔ امنیتِ سرور
 
-• تلاشِ ناموفقِ رمز (کلِ لاگِ جاری): ${fails_24:-0}
-• آی‌پی‌های بن‌شده در ۲۴ ساعت: ${bans_24:-0} بن از ${bans_ips:-0} آی‌پی
-• ورودهای موفق: ${ok_24:-0} ورود از ${ok_ips:-0} آی‌پیِ متفاوت
-  (ایجنت‌های خودت از آی‌پی‌های ابریِ متغیر می‌آیند، پس این عدد طبیعی است)
+• تلاشِ ناموفقِ رمزِ SSH (کلِ لاگِ جاری): ${fails_24:-0}
+• بسته‌شده در ۲۴ ساعت: ${bans_24:-0} آی‌پی از ${bans_ips:-0} آی‌پیِ متفاوت
+     - تلاشِ رمزِ SSH: ${bans_ssh:-0} بن
+     - اسکنِ وب: ${bans_web:-0} بن
+     - ثبت‌شده پیش از به‌روزرسانیِ نگهبان: ${bans_unk:-0}
+• پرتلاش‌ترین آی‌پیِ مهاجم: ${top_atk:-ندارد}
+• ورودهای موفقِ خودت/ایجنت‌ها: ${ok_24:-0} ورود از ${ok_ips:-0} آی‌پی
+  (ایجنت‌ها از آی‌پی‌های ابریِ متغیر می‌آیند، پس این عدد طبیعی است)
 • فایل‌های حساسِ پایش‌شده: $(grep -c . "$INTEGRITY_FILE" 2>/dev/null || echo 0)
 
-سطحِ دفاع: fail2ban فعال (۳ جیل) · ورودِ پسوردی باز (برای ایجنت‌ها) با سقفِ ۱۰ تلاش در هر اتصال · ufw فقط ۲۲/۸۰/۴۴۳."
-  printf '%s\n' "$NOW_EPOCH" > "$DIGEST_FILE" 2>/dev/null || true
-  log "digest sent"
+سطحِ دفاع: fail2ban فعال (۳ جیل) · ورودِ پسوردی باز (برای ایجنت‌ها) با سقفِ ۱۰ تلاش در هر اتصالِ · ufw فقط ۲۲/۸۰/۴۴۳.
+برای آزمودنِ مسیرِ هشدار هر وقت خواستی: bash monitor/ssh-watch.sh --test-alert"
+  state_write bash -c "printf '%s\n' '$NOW_EPOCH' > '$DIGEST_FILE' 2>/dev/null || true"
+  [ "$DRY_RUN" = "1" ] && log "digest previewed (آزمایشی)" || log "digest sent"
 fi
 
 exit 0
