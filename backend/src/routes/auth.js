@@ -41,10 +41,14 @@ router.post('/auth/request-otp', otpLimiter, otpMobileLimiter, otpDailyLimiter, 
     return res.status(502).json({ message: 'ارسال پیامک ناموفق بود؛ کمی بعد دوباره تلاش کنید' });
   }
   if (process.env.OTP_DEV_MODE === 'true') logger.debug(`DEV OTP for ${mobile}: ${code}`);
+  // صادق‌بودن با کاربر: اگر درگاه پیامک خاموش/کانفیگ‌نشده است، نگوییم «کد
+  // ارسال شد». کلاینت‌های تازه این پرچم را پیامِ روشن نشان می‌دهند.
+  const smsDisabled = sms.sent === false && (sms.reason === 'disabled' || sms.reason === 'not_configured');
   res.json({
-    message: 'کد تایید ارسال شد',
+    message: smsDisabled ? 'سامانهٔ پیامک هنوز فعال نشده است؛ ورود با کد به‌زودی فعال می‌شود' : 'کد تایید ارسال شد',
+    smsDisabled,
     devCode: process.env.OTP_DEV_MODE === 'true' ? code : undefined,
-    sms: { sent: sms.sent, provider: sms.provider || null },
+    sms: { sent: sms.sent, provider: sms.provider || null, reason: sms.reason || null },
   });
 }));
 
@@ -60,21 +64,23 @@ router.post('/auth/verify-otp', otpVerifyLimiter, asyncHandler(async (req, res) 
 
 router.post('/auth/register', asyncHandler(async (req, res) => {
   const mobile = normalizeMobile(req.body.mobile);
-  const { password, firstName, lastName, nickname } = req.body;
+  // قراردادِ تازه (درخواستِ مالک): مسیرِ OTP **بدون رمز عبور** است؛ ورود و
+  // عضویت یکی شده‌اند: تأیید کد یعنی ورود، و اگر شماره تازه باشد همان لحظه
+  // حساب ساخته می‌شود. اگر کلاینتِ کهنه هنوز رمز بفرستد، نادیده گرفته می‌شود.
+  const { firstName, lastName, nickname } = req.body;
   const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1 AND mobile_verified=true', [mobile]);
   if (!rows[0]) return res.status(400).json({ message: 'ابتدا شماره موبایل را با OTP تایید کنید' });
-  if (!isValidPasswordLength(password)) return res.status(400).json({ message: 'رمز عبور باید بین ۶ تا ۷۲ کاراکتر باشد' });
   // نامِ مستعار اینجا هم باید از همان قانونِ پروفایل بگذرد؛ وگرنه کاربر
   // می‌توانست با ثبت‌نامِ دوباره، نامِ رکیک/بلندِ ردشده را بنشاند.
   const nick = nicknamePolicy.validate(nickname, { allowEmpty: true });
   if (!nick.ok) return res.status(400).json({ message: nick.error, code: nick.code });
-  const hash = await bcrypt.hash(password, 12);
-  // `session_epoch=session_epoch+1` — رمزِ تازه یعنی توکن‌های صادرشدهٔ قبلیِ
-  // همین حساب (اگر بود) بی‌اعتبار شوند. RETURNING عددِ جدید را می‌دهد، پس
-  // توکنی که پایین‌تر صادر می‌شود سالم است. جزئیات: migration 092.
+  // بدونِ تغییرِ رمز، پس بدونِ bump کردنِ session_epoch: هر ورودِ OTP نباید
+  // بقیهٔ دستگاه‌های همان کاربر را بیرون بیندازد. فیلدهای اختیاری فقط وقتی
+  // نوشته می‌شوند که مقدار داشته باشند (COALESCE) تا ورودِ دوبارهٔ یک کاربرِ
+  // قدیمی نامِ مستعارِ او را پاک نکند.
   const updated = await pool.query(
-    'UPDATE users SET password_hash=$1, first_name=$2, last_name=$3, nickname=$4, session_epoch=session_epoch+1, updated_at=NOW() WHERE mobile=$5 RETURNING *',
-    [hash, firstName, lastName, nick.value, mobile]
+    'UPDATE users SET mobile_verified=true, first_name=COALESCE($1, first_name), last_name=COALESCE($2, last_name), nickname=COALESCE($3, nickname), updated_at=NOW() WHERE mobile=$4 RETURNING *',
+    [firstName ?? null, lastName ?? null, nick.value ?? null, mobile]
   );
 
   // همان منطق مسیر ثبت‌نام مستقیم — این مسیر (OTP) وقتی درگاه پیامک وصل
@@ -340,6 +346,15 @@ router.post('/auth/login', userLoginLimiter, userAccountLimiter, asyncHandler(as
   const { rows } = await pool.query('SELECT * FROM users WHERE mobile=$1', [mobile]);
   const user = rows[0];
   if (!user || !user.password_hash || !(await bcrypt.compare(String(req.body.password || ''), user.password_hash))) return res.status(401).json({ message: 'شماره موبایل یا رمز عبور نادرست است' });
+  // ── قراردادِ تازه (درخواستِ مالک، مهر ۱۴۰۵): ورود با رمز فقط برای حسابِ
+  // مدیرِ اصلی. کاربران عادی فقط با کدِ یک‌بارمصرف وارد می‌شوند؛ تا وقتی
+  // درگاه پیامک فعال نشده، عملاً عضویت/ورودِ عادی بسته است — دقیقاً همان
+  // چیزی که مالک خواست. رمزِ درستِ یک کاربرِ عادی فقط این پیام را می‌گیرد
+  // و ورودی اتفاق نمی‌افتد.
+  const adminMobile = String(process.env.MAIN_ADMIN_USERNAME || '');
+  if (adminMobile && String(user.mobile) !== adminMobile && String(user.mobile).toLowerCase() !== adminMobile.toLowerCase()) {
+    return res.status(403).json({ message: 'ورود با رمز عبور فقط برای حساب مدیر است؛ با کد یک‌بارمصرف وارد شوید' });
+  }
   if (user.status !== 'active') return res.status(403).json({ message: 'حساب شما مسدود شده است' });
   res.json({ token: signUser(user), user: safeUser(user) });
 }));

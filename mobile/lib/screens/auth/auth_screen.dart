@@ -8,14 +8,18 @@ import '../../widgets/gradient_panel.dart';
 import '../../widgets/animated_logo.dart';
 import '../../core/app_config.dart';
 
-/// صفحهٔ ورود / ثبت‌نام کاربر.
+/// صفحهٔ ورود / عضویت کاربر — فقط با شماره + کد یک‌بارمصرف (قراردادِ مهر ۱۴۰۵).
 ///
-/// حالت ورود ادمین عمداً حذف شده: مدیریت فقط از پنل وب ادمین انجام می‌شود و
-/// اپ موبایل هیچ سطح ادمینی ندارد (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md).
+/// رمز عبور از جریانِ عادی حذف شده است؛ ورود و عضویت یکی شده‌اند:
+/// تأییدِ کد یعنی ورود، و شمارهٔ تازه همان لحظه حساب می‌سازد.
+/// فقط حسابِ مدیر یک بخشِ جداِ ورود با رمز دارد (درِ سمتِ سرور هم
+/// همین است: /api/auth/login فقط برای مدیر ۲۰۰ می‌دهد).
 ///
-/// قراردادهای کاربر که ۱:۱ حفظ شده‌اند:
-/// - login:     POST /api/auth/login            {mobile, password}
-/// - register:  POST /api/auth/register-password {mobile, password, nickname, profileAvatarKey}
+/// قراردادهای کاربر:
+/// - request-otp:  POST /api/auth/request-otp  {mobile, purpose:'register'}
+/// - verify-otp:   POST /api/auth/verify-otp   {mobile, code, purpose}
+/// - register:     POST /api/auth/register     {mobile, nickname?, referralCode?, profileAvatarKey}
+/// - ورود مدیر:    POST /api/auth/login        {mobile, password}
 class AuthScreen extends StatefulWidget {
   final ApiClient api;
   final VoidCallback onDone;
@@ -25,30 +29,22 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-// حالت ادمین عمداً حذف شده: مدیریت فقط از پنل وب ادمین است و اپ موبایل
-// پنل ادمین ندارد (docs/ADMIN_PANEL_MOBILE_RETIREMENT.md). این صفحه فقط
-// ورود و ثبت‌نامِ کاربر را انجام می‌دهد.
-enum _AuthMode { login, register }
+enum _Step { mobile, code }
 
 class _AuthScreenState extends State<AuthScreen> {
   final _mobile = TextEditingController();
-  final _pass = TextEditingController();
+  final _code = TextEditingController();
   final _name = TextEditingController();
-  final _currentPassword = TextEditingController();
   final _referral = TextEditingController();
+  final _adminMobile = TextEditingController();
+  final _adminPass = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  _AuthMode _mode = _AuthMode.login;
+  _Step _step = _Step.mobile;
+  bool _adminOpen = false;
   bool _loading = false;
-  bool _obscure = true;
   String? _errorMessage;
-  // The backend now requires proof of the current password when
-  // re-registering an already-used mobile number (fixes an account-takeover
-  // bug where anyone could overwrite someone else's password just by
-  // knowing their phone number). It replies with 409 the first time; we
-  // then reveal this field so the real owner can prove ownership and change
-  // their password — a real SMS-based reset isn't available yet.
-  bool _needsCurrentPassword = false;
+  String? _infoMessage;
   // از /api/config — تا تغییر پنل بدون آپدیت اپ روی متن ثبت‌نام بنشیند.
   int _referralSpins = 3;
 
@@ -74,10 +70,11 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void dispose() {
     _mobile.dispose();
-    _pass.dispose();
+    _code.dispose();
     _name.dispose();
-    _currentPassword.dispose();
     _referral.dispose();
+    _adminMobile.dispose();
+    _adminPass.dispose();
     super.dispose();
   }
 
@@ -89,70 +86,89 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       await fn();
     } catch (e) {
-      // A failed login can resolve after the user has already navigated
+      // A failed request can resolve after the user has already navigated
       // away; guard before touching state.
       if (!mounted) return;
-      setState(() {
-        _errorMessage = apiError(e);
-        if (_mode == _AuthMode.register && apiStatusCode(e) == 409) {
-          _needsCurrentPassword = true;
-        }
-      });
+      setState(() => _errorMessage = apiError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _submit() async {
+  String get _cleanMobile => normalizeMobileInput(_mobile.text);
+
+  Future<void> _requestCode() async {
+    if (_cleanMobile.isEmpty) {
+      setState(() => _errorMessage = 'شماره موبایل را وارد کنید');
+      return;
+    }
     await _run(() async {
-      switch (_mode) {
-        case _AuthMode.register:
-          final r = await widget.api.post('/api/auth/register-password', {
-            'mobile': normalizeMobileInput(_mobile.text),
-            'password': _pass.text,
-            // PRIVACY FIX: previously defaulted to the mobile number itself
-            // when left blank, which is shown publicly on the leaderboard
-            // and in chat — leaking the user's phone number to everyone.
-            // Omit it and let the backend assign an anonymous placeholder.
-            if (_name.text.isNotEmpty) 'nickname': _name.text,
-            if (_referral.text.trim().isNotEmpty)
-              'referralCode': _referral.text.trim(),
-            'profileAvatarKey': avatarFiles.first,
-            if (_needsCurrentPassword)
-              'currentPassword': _currentPassword.text,
-          });
-          await widget.api.saveToken(r['token']);
-          // اگر کد دعوت گرفت، جایزه‌اش را بگو. یک ورود بی‌صدا، جایزه را
-          // نامرئی می‌کند و کاربر فکر می‌کند کد کار نکرد.
-          if (r is Map && r['referralApplied'] == true && mounted) {
-            final n = (r['referralSpins'] as num?)?.toInt() ?? 3;
-            ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-              content: Text(' ${faNum(n)} چرخش گردونهٔ شانس گرفتی!'),
-              behavior: SnackBarBehavior.floating,
-            ));
-          }
-          break;
-        case _AuthMode.login:
-          final r = await widget.api.post('/api/auth/login', {
-            // ارقام فارسیِ کیبورد اندروید را به لاتین تبدیل می‌کند —
-            // بدون این، ورودِ کاملاً درست ۴۰۱ می‌گرفت. توضیح در
-            // normalizeMobileInput.
-            'mobile': normalizeMobileInput(_mobile.text),
-            'password': _pass.text,
-          });
-          await widget.api.saveToken(r['token']);
-          break;
+      final r = await widget.api.post('/api/auth/request-otp', {
+        'mobile': _cleanMobile,
+        'purpose': 'register',
+      });
+      if (!mounted) return;
+      if (r['smsDisabled'] == true) {
+        setState(() {
+          _errorMessage =
+              'سامانهٔ پیامک هنوز فعال نشده است؛ ورود با کد به‌زودی فعال می‌شود.';
+        });
+        return;
+      }
+      setState(() {
+        _step = _Step.code;
+        _infoMessage = r['devCode'] != null
+            ? 'کد آزمایشی شما: ${r['devCode']}'
+            : 'کد تایید به شماره‌تان ارسال شد';
+      });
+    });
+  }
+
+  Future<void> _submitCode() async {
+    final code = normalizeMobileInput(_code.text);
+    if (code.isEmpty) {
+      setState(() => _errorMessage = 'کد تایید را وارد کنید');
+      return;
+    }
+    await _run(() async {
+      await widget.api.post('/api/auth/verify-otp', {
+        'mobile': _cleanMobile,
+        'code': code,
+        'purpose': 'register',
+      });
+      final r = await widget.api.post('/api/auth/register', {
+        'mobile': _cleanMobile,
+        if (_name.text.trim().isNotEmpty) 'nickname': _name.text.trim(),
+        if (_referral.text.trim().isNotEmpty)
+          'referralCode': _referral.text.trim(),
+        'profileAvatarKey': avatarFiles.first,
+      });
+      await widget.api.saveToken(r['token']);
+      // اگر کد دعوت گرفت، جایزه‌اش را بگو. یک ورود بی‌صدا، جایزه را
+      // نامرئی می‌کند و کاربر فکر می‌کند کد کار نکرد.
+      if (r is Map && r['referralApplied'] == true && mounted) {
+        final n = (r['referralSpins'] as num?)?.toInt() ?? 3;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+          content: Text(' ${faNum(n)} چرخش گردونهٔ شانس گرفتی!'),
+          behavior: SnackBarBehavior.floating,
+        ));
       }
       widget.onDone();
     });
   }
 
-  void _setMode(_AuthMode mode) {
-    setState(() {
-      _mode = mode;
-      _needsCurrentPassword = false;
-      _currentPassword.clear();
-      _errorMessage = null;
+  Future<void> _adminLogin() async {
+    if (_adminMobile.text.isEmpty || _adminPass.text.isEmpty) {
+      setState(() => _errorMessage = 'شماره و رمز مدیر را وارد کنید');
+      return;
+    }
+    await _run(() async {
+      final r = await widget.api.post('/api/auth/login', {
+        'mobile': normalizeMobileInput(_adminMobile.text),
+        'password': _adminPass.text,
+      });
+      await widget.api.saveToken(r['token']);
+      widget.onDone();
     });
   }
 
@@ -167,18 +183,8 @@ class _AuthScreenState extends State<AuthScreen> {
         fit: StackFit.expand,
         children: [
           Positioned.fill(
-              // Full-bleed backdrop behind a translucent card.
-              //
-              // 720 was still 3.5 MB — the most expensive bitmap in the app,
-              // decoded on the very first screen a new user sees. It can go
-              // much lower than a normal image because of what sits on top
-              // of it: the very next widget is an opaque-to-#CC..#FF vertical
-              // gradient, so between 80% and 100% of this image's luminance
-              // is thrown away before a pixel reaches the eye. There is no
-              // fine detail left to preserve.
-              //
-              // 360 covers a 360dp screen at 1x and, after the gradient, is
-              // indistinguishable from 720 — while costing a quarter as much.
+              // Full-bleed backdrop behind a translucent card — see the old
+              // revision history for why cacheWidth 360 is enough here.
               child: Image.asset('assets/brand/login_hero.webp',
                   fit: BoxFit.cover, cacheWidth: 360)),
           const Positioned.fill(
@@ -211,25 +217,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     horizontal: Gaps.lg, vertical: Gaps.xl),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: isTablet ? 460 : 440),
-                  child: _AuthGlassCard(
-                    formKey: _formKey,
-                    mode: _mode,
-                    mobile: _mobile,
-                    pass: _pass,
-                    name: _name,
-                    referral: _referral,
-                    currentPassword: _currentPassword,
-                    needsCurrentPassword: _needsCurrentPassword,
-                    loading: _loading,
-                    obscure: _obscure,
-                    errorMessage: _errorMessage,
-                    onToggleObscure: () => setState(() => _obscure = !_obscure),
-                    onModeChanged: _setMode,
-                    onSubmit: () {
-                      if (_formKey.currentState?.validate() ?? true) _submit();
-                    },
-                    referralSpins: _referralSpins,
-                  ),
+                  child: _buildCard(context),
                 ),
               ),
             ),
@@ -238,47 +226,8 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
     );
   }
-}
 
-class _AuthGlassCard extends StatelessWidget {
-  final GlobalKey<FormState> formKey;
-  final _AuthMode mode;
-  final TextEditingController mobile;
-  final TextEditingController pass;
-  final TextEditingController name;
-  final TextEditingController referral;
-  final TextEditingController currentPassword;
-  final bool needsCurrentPassword;
-  final bool loading;
-  final bool obscure;
-  final String? errorMessage;
-  final VoidCallback onToggleObscure;
-  final ValueChanged<_AuthMode> onModeChanged;
-  final VoidCallback onSubmit;
-  final int referralSpins;
-
-  const _AuthGlassCard({
-    required this.formKey,
-    required this.mode,
-    required this.mobile,
-    required this.pass,
-    required this.name,
-    required this.referral,
-    required this.currentPassword,
-    required this.needsCurrentPassword,
-    required this.loading,
-    required this.obscure,
-    required this.errorMessage,
-    required this.onToggleObscure,
-    required this.onModeChanged,
-    required this.onSubmit,
-    this.referralSpins = 3,
-  });
-
-  bool get isRegister => mode == _AuthMode.register;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildCard(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(Gaps.xl, Gaps.xxl, Gaps.xl, Gaps.xl),
       decoration: BoxDecoration(
@@ -300,19 +249,17 @@ class _AuthGlassCard extends StatelessWidget {
         ],
       ),
       child: Form(
-        key: formKey,
+        key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // The animated brand mark. This is the first thing a user sees,
-            // so it earns a real entrance rather than a static PNG — see
-            // widgets/animated_logo.dart for why the motion is built as
-            // passes over one image instead of separated layers.
             const Center(child: AnimatedLogo(width: 230)),
             Gaps.vXs,
             Text(
-              'کارت‌های فوتبالی، امتیاز، لیگ و جایزه',
+              _step == _Step.code
+                  ? 'کد تایید را وارد کن'
+                  : 'کارت‌های فوتبالی، امتیاز، لیگ و جایزه',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.white70, fontWeight: FontWeight.w700),
@@ -330,30 +277,28 @@ class _AuthGlassCard extends StatelessWidget {
               ],
             ),
             Gaps.vXl,
-            _ModeSwitcher(mode: mode, onChanged: onModeChanged),
-            Gaps.vLg,
             AnimatedSwitcher(
               duration: Motion.normal,
               child: Column(
-                key: ValueKey(mode),
+                key: ValueKey(_step),
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextFormField(
-                    controller: mobile,
-                    style: const TextStyle(color: Colors.white),
-                    keyboardType: TextInputType.phone,
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'این فیلد الزامی است'
-                        : null,
-                    decoration: _fieldDecoration(
-                      icon: Icons.phone_android_rounded,
-                      label: 'شماره موبایل',
+                  if (_step == _Step.mobile) ...[
+                    TextFormField(
+                      controller: _mobile,
+                      style: const TextStyle(color: Colors.white),
+                      keyboardType: TextInputType.phone,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'این فیلد الزامی است'
+                          : null,
+                      decoration: _fieldDecoration(
+                        icon: Icons.phone_android_rounded,
+                        label: 'شماره موبایل',
+                      ),
                     ),
-                  ),
-                  if (isRegister) ...[
                     Gaps.vSm,
                     TextFormField(
-                      controller: name,
+                      controller: _name,
                       style: const TextStyle(color: Colors.white),
                       decoration: _fieldDecoration(
                           icon: Icons.badge_rounded,
@@ -364,7 +309,7 @@ class _AuthGlassCard extends StatelessWidget {
                     // و maxLength جلوی تایپ اضافه را می‌گیرد. ارقام فارسی
                     // هم پذیرفته می‌شوند — سرور نرمال‌سازی می‌کند.
                     TextFormField(
-                      controller: referral,
+                      controller: _referral,
                       keyboardType: TextInputType.number,
                       maxLength: 4,
                       textAlign: TextAlign.center,
@@ -395,7 +340,7 @@ class _AuthGlassCard extends StatelessWidget {
                       ),
                       child: Text(
                         ' اگر کد دعوت یکی از دوستانت را وارد کنی، '
-                        'هر دوی شما $referralSpins چرخش گردونهٔ شانس می‌گیرید.',
+                        'هر دوی شما $_referralSpins چرخش گردونهٔ شانس می‌گیرید.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: const Color(0xFFBEF264),
@@ -403,74 +348,98 @@ class _AuthGlassCard extends StatelessWidget {
                             ),
                       ),
                     ),
-                    Gaps.vXs,
-                    Text(
-                      'ثبت‌نام سریع است؛ اطلاعات کامل را بعداً در پروفایل تکمیل کن. چون پیامک هنوز فعال نیست، اگر قبلاً با این شماره ثبت‌نام کرده‌ای رمز فعلی را هم وارد کن.',
+                  ] else ...[
+                    TextFormField(
+                      controller: _code,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 8,
+                      ),
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
                       textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: Colors.white60),
+                      decoration: _fieldDecoration(
+                        icon: Icons.sms_rounded,
+                        label: 'کد ۶ رقمی پیامک',
+                      ).copyWith(counterText: ''),
                     ),
-                    if (needsCurrentPassword) ...[
-                      Gaps.vSm,
-                      TextFormField(
-                        controller: currentPassword,
-                        obscureText: true,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: _fieldDecoration(
-                            icon: Icons.lock_person_rounded,
-                            label: 'رمز فعلی این شماره'),
-                      ),
-                    ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: _loading
+                              ? null
+                              : () => setState(() {
+                                    _step = _Step.mobile;
+                                    _infoMessage = null;
+                                    _errorMessage = null;
+                                  }),
+                          child: const Text('تغییر شماره',
+                              style: TextStyle(fontSize: 12.5)),
+                        ),
+                        TextButton(
+                          onPressed: _loading ? null : _requestCode,
+                          child: const Text('ارسال دوبارهٔ کد',
+                              style: TextStyle(fontSize: 12.5)),
+                        ),
+                      ],
+                    ),
                   ],
-                  Gaps.vSm,
-                  TextFormField(
-                    controller: pass,
-                    obscureText: obscure,
-                    style: const TextStyle(color: Colors.white),
-                    validator: (v) => (v == null || v.isEmpty)
-                        ? 'رمز عبور را وارد کنید'
-                        : null,
-                    decoration: _fieldDecoration(
-                            icon: Icons.lock_rounded, label: 'رمز عبور')
-                        .copyWith(
-                      suffixIcon: IconButton(
-                        onPressed: onToggleObscure,
-                        icon: Icon(
-                            obscure
-                                ? Icons.visibility_rounded
-                                : Icons.visibility_off_rounded,
-                            color: Colors.white54),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
+            if (_infoMessage != null) ...[
+              Gaps.vSm,
+              Container(
+                padding: const EdgeInsets.all(Gaps.sm),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00D49A).withValues(alpha: 0.12),
+                  borderRadius: Corners.rMd,
+                  border: Border.all(
+                      color: const Color(0xFF00D49A).withValues(alpha: 0.3)),
+                ),
+                child: Text(_infoMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Color(0xFF7BF1C8))),
+              ),
+            ],
             Gaps.vLg,
             FilledButton.icon(
               icon: const Icon(Icons.login_rounded),
-              onPressed: loading ? null : onSubmit,
+              onPressed: _loading
+                  ? null
+                  : () {
+                      if (_formKey.currentState?.validate() ?? true) {
+                        if (_step == _Step.code) {
+                          _submitCode();
+                        } else {
+                          _requestCode();
+                        }
+                      }
+                    },
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF00D49A),
                 foregroundColor: const Color(0xFF00281D),
               ),
               label: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
-                child: loading
+                child: _loading
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                             strokeWidth: 2.4, color: Colors.white),
                       )
-                    : Text(isRegister ? 'ساخت حساب' : 'ورود به قلقلی'),
+                    : Text(_step == _Step.code
+                        ? 'ورود / عضویت'
+                        : 'دریافت کد یک‌بارمصرف'),
               ),
             ),
             AnimatedSwitcher(
               duration: Motion.fast,
-              child: errorMessage == null
+              child: _errorMessage == null
                   ? const SizedBox.shrink()
                   : Padding(
                       padding: const EdgeInsets.only(top: Gaps.xs),
@@ -489,13 +458,60 @@ class _AuthGlassCard extends StatelessWidget {
                                 color: Colors.redAccent, size: 18),
                             Gaps.hXs,
                             Expanded(
-                              child: Text(errorMessage!,
+                              child: Text(_errorMessage!,
                                   style: const TextStyle(color: Colors.white)),
                             ),
                           ],
                         ),
                       ),
                     ),
+            ),
+            Gaps.vMd,
+            Container(
+              padding: const EdgeInsets.only(top: Gaps.sm),
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.white12, width: 1),
+                ),
+              ),
+              child: Column(
+                children: [
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _adminOpen = !_adminOpen;
+                      _errorMessage = null;
+                    }),
+                    child: Text(
+                      _adminOpen
+                          ? 'بستنِ ورودِ مدیر ▲'
+                          : 'ورود با رمز عبور (فقط حساب مدیر) ▼',
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.white38),
+                    ),
+                  ),
+                  if (_adminOpen) ...[
+                    TextFormField(
+                      controller: _adminMobile,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _fieldDecoration(
+                          icon: Icons.shield_rounded, label: 'شماره / نام مدیر'),
+                    ),
+                    Gaps.vSm,
+                    TextFormField(
+                      controller: _adminPass,
+                      obscureText: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: _fieldDecoration(
+                          icon: Icons.lock_rounded, label: 'رمز عبور مدیر'),
+                    ),
+                    Gaps.vSm,
+                    OutlinedButton(
+                      onPressed: _loading ? null : _adminLogin,
+                      child: const Text('ورود مدیر'),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
@@ -522,68 +538,6 @@ class _AuthGlassCard extends StatelessWidget {
       errorBorder: OutlineInputBorder(
         borderRadius: Corners.rMd,
         borderSide: const BorderSide(color: Colors.redAccent),
-      ),
-    );
-  }
-}
-
-class _ModeSwitcher extends StatelessWidget {
-  final _AuthMode mode;
-  final ValueChanged<_AuthMode> onChanged;
-  const _ModeSwitcher({required this.mode, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: Corners.rPill,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-      ),
-      child: Row(
-        children: [
-          _segment(context, _AuthMode.login, 'ورود', Icons.login_rounded),
-          _segment(context, _AuthMode.register, 'ثبت‌نام',
-              Icons.person_add_alt_1_rounded),
-        ],
-      ),
-    );
-  }
-
-  Widget _segment(
-      BuildContext context, _AuthMode value, String label, IconData icon) {
-    final selected = mode == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onChanged(value),
-        child: AnimatedContainer(
-          duration: Motion.fast,
-          padding: const EdgeInsets.symmetric(vertical: Gaps.sm),
-          decoration: BoxDecoration(
-            color: selected
-                ? Colors.white.withValues(alpha: 0.95)
-                : Colors.transparent,
-            borderRadius: Corners.rPill,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon,
-                  size: 18,
-                  color: selected ? const Color(0xFF07111F) : Colors.white70),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
-                  color: selected ? const Color(0xFF07111F) : Colors.white70,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

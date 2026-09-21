@@ -208,8 +208,37 @@ async function testAuth() {
     'ثبت‌نام دوباره با همان موبایل، رمز را بازنویسی نمی‌کند',
     `status=${takeover.status}`);
 
+  // قراردادِ مهر ۱۴۰۵: ورود با رمز فقط برای مدیر. پس «رمزِ اصلی سالم است»
+  // یعنی رسیدن به درِ ۴۰۳ (رمز درست بوده ولی ورودِ عادی بسته است)، و رمزِ
+  // مهاجم باید همچنان ۴۰۱ بگیرد (یعنی بازنویسی نشده).
+  const attackerLogin = await POST('/api/auth/login', { mobile, password: 'Attacker@999' });
+  ok(attackerLogin.status === 401, 'رمز مهاجم کار نمی‌کند (تصاحب شکست خورده)',
+    `status=${attackerLogin.status}`);
   const stillWorks = await POST('/api/auth/login', { mobile, password });
-  ok(stillWorks.status === 200, 'رمز اصلی کاربر بعد از تلاش تصاحب هنوز کار می‌کند');
+  ok(stillWorks.status === 403, 'رمز اصلی کاربر عادی دست‌نخورده است ولی ورود با رمز بسته است (قرارداد مدیر-فقط)',
+    `status=${stillWorks.status}`);
+
+  const adminLogin = await POST('/api/auth/login', {
+    mobile: process.env.MAIN_ADMIN_USERNAME, password: process.env.MAIN_ADMIN_PASSWORD,
+  });
+  ok(adminLogin.status === 200 && adminLogin.data?.token, 'ورود با رمز برای حساب مدیر باز می‌ماند',
+    `status=${adminLogin.status}`);
+
+  group('مسیر OTP بدون رمز عبور');
+  const otpMobile = `otp${Date.now().toString().slice(-9)}`;
+  const reqOtp = await POST('/api/auth/request-otp', { mobile: otpMobile, purpose: 'register' });
+  ok(reqOtp.status === 200, 'درخواست کد یک‌بارمصرف پذیرفته می‌شود', `status=${reqOtp.status}`);
+  const devCode = reqOtp.data?.devCode;
+  ok(Boolean(devCode), 'در حالت آزمایش (OTP_DEV_MODE) کد در پاسخ می‌آید');
+  if (devCode) {
+    const ver = await POST('/api/auth/verify-otp', { mobile: otpMobile, code: devCode, purpose: 'register' });
+    ok(ver.status === 200, 'تأیید کد موفق است', `status=${ver.status}`);
+    const otpReg = await POST('/api/auth/register', { mobile: otpMobile });
+    ok(otpReg.status === 200 && otpReg.data?.token, 'عضویت/ورود با OTP بدون هیچ رمزی',
+      `status=${otpReg.status} ${otpReg.data?.message || ''}`);
+    const prof = await GET('/api/profile', otpReg.data?.token);
+    ok(prof.status === 200, 'توکن مسیر OTP معتبر است');
+  }
 
   group('ورود');
   const wrongPass = await POST('/api/auth/login', { mobile, password: 'WrongPass@1' });
