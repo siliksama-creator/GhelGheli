@@ -81,7 +81,7 @@ class PlayerCard extends StatelessWidget {
     final qty = cardQtyOf(card);
     // نشانِ تعداد (حتی ×۱) فقط برای نماهای کلکسیونی است که خودِ آیتم فیلدِ
     // quantity/registered_count دارد؛ کارتِ نبرد این فیلد را ندارد.
-    final hasQty = card?['quantity'] != null || card?['registered_count'] != null;
+    final hasQty = card['quantity'] != null || card['registered_count'] != null;
     final radius = compact ? 16.0 : 20.0;
     final child = AnimatedScale(
       scale: selected ? 1.035 : 1,

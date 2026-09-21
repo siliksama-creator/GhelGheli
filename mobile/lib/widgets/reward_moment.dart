@@ -214,10 +214,13 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
     duration: const Duration(milliseconds: _leaveMs),
   );
 
-  /// قلابِ محوِ خروج — یک نمونهٔ ثابت، تا در `dispose` بتوانیم مطمئن شویم
-  /// قلابِ روی صف **مالِ همین کارت** است و قلابِ کارتِ بعدی را پاک نمی‌کنیم
-  /// (صف کارت‌ها را پشت‌سرهم نشان می‌دهد).
-  late final VoidCallback _exitHook = () => _out.forward();
+  /// قلابِ محوِ خروج — تا در `dispose` بتوانیم مطمئن شویم قلابِ روی صف
+  /// **مالِ همین کارت** است و قلابِ کارتِ بعدی را پاک نمی‌کنیم (صف کارت‌ها را
+  /// پشت‌سرهم نشان می‌دهد). tear-offِ یک متدِ نمونه در دارت canonicalize
+  /// می‌شود، پس `identical(RewardMoment._exit, _exitHook)` مثل قبل دقیقاً
+  /// همان نمونهٔ ثابت را تشخیص می‌دهد (بدونِ lintِ
+  /// prefer_function_declarations_over_variables).
+  void _exitHook() => _out.forward();
 
   @override
   void initState() {

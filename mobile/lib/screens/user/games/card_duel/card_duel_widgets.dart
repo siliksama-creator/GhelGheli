@@ -880,7 +880,7 @@ class _LiveBattle extends StatelessWidget {
                         flex: 3,
                         child: _FocusBanner(
                           key: ValueKey(
-                            'focus-${roundNumber}-${state['roundFocus']?['stat']}',
+                            'focus-$roundNumber-${state['roundFocus']?['stat']}',
                           ),
                           focus: state['roundFocus'] is Map
                               ? Map<String, dynamic>.from(
