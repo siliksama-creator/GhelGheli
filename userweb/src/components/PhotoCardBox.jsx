@@ -115,11 +115,23 @@ async function shrink(file) {
   }
 }
 
+// ── کشِ نشستِ وضعیتِ ثبت کارت ──
+//
+// باگِ گزارش‌شدهٔ مالک (۳۱ شهریور): هر بار که از تبِ «خانه» به تبِ «ثبت
+// کارت» برمی‌گشتیم، برای یک لحظه پیامِ «ثبت کارت هنوز فعال نشده» دیده می‌شد.
+// ریشه: در وب با هر تعویضِ تب کامپوننت unmount می‌شود و `available` از `null`
+// شروع می‌کرد؛ `!null` هم `true` است، پس تا رسیدنِ پاسخِ سرور همان پیامِ
+// هشدار رندر می‌شد — یعنی کاربر یک دروغِ یک‌ثانیه‌ای می‌دید.
+// حالا پاسخِ موفقِ `/api/photo-cards/status` در سطحِ ماژول کش می‌شود تا
+// mount بعدی از همان لحظهٔ اول فرمِ واقعی را نشان بدهد؛ درخواستِ تازه هم
+// همچنان می‌رود تا عددِ «در بررسی» واقعی بماند.
+let statusCache = null;
+
 export default function PhotoCardBox({ token, onDone, setMsg }) {
   // وعدهٔ بررسی عکس از config خوانده می‌شود؛ بدونِ این خط، متنِ تازهٔ
   // ادمین فقط با رفرشِ کاملِ صفحه دیده می‌شد.
   useLive();
-  const [available, setAvailable] = useState(null);
+  const [available, setAvailable] = useState(statusCache ? statusCache.available : null);
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
   const [code, setCode] = useState('');
@@ -144,14 +156,14 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   const [phase, setPhase] = useState(0);
   const [result, setResult] = useState(null);
   const [locked, setLocked] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(statusCache ? statusCache.pendingCount : 0);
 
   // ── تعدادِ طرح‌های کاتالوگ ──
   //
   // فقط برای زمان‌بندیِ لودینگ. مقایسه با ۲۰۰ طرح ۲.۵ms طول می‌کشد
   // (اندازه‌گیری‌شده) پس عملاً بی‌اثر است، ولی آپلودِ شبکه با کاتالوگِ
   // بزرگ‌تر کندتر می‌شود چون سرور مشغول‌تر است.
-  const [designCount, setDesignCount] = useState(0);
+  const [designCount, setDesignCount] = useState(statusCache ? statusCache.designCount : 0);
   // با تغییرش، وضعیت از سرور دوباره خوانده می‌شود.
   const [refreshKey, setRefreshKey] = useState(0);
   const previewRef = useRef('');
@@ -170,6 +182,13 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       .then(r => r.json())
       .then(d => {
         if (!alive) return;
+        // فقط پاسخِ موفق کش می‌شود؛ خطا یعنی «نشان نده» و نباید mountِ
+        // بعدی را هم با همان خطای شبکه شروع کند.
+        statusCache = {
+          available: !!d.available,
+          pendingCount: Number(d.pendingCount) || 0,
+          designCount: Number(d.designCount) || 0,
+        };
         setAvailable(!!d.available);
         // ── چرا شمارِ در انتظار از سرور می‌آید ──
         //
@@ -355,6 +374,20 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   //  سکوت بدترین پاسخ است: کاربر نمی‌داند اپ خراب است، اینترنتش قطع
   //    است، یا هنوز کارتی تعریف نشده. هر سه حدس او را به پشتیبانی
   //    می‌فرستد — و دو تای اولش تقصیر را گردنِ محصول می‌اندازد.
+  // ── در حال بررسی: نه هشدارِ اشتباه، نه پرشِ چیدمان ──
+  // فقط اولین ورود (بدونِ کش) به اینجا می‌رسد؛ یک خطِpulse کوتاه به‌جای
+  // پیامِ «فعال نشده» که یک دروغِ لحظه‌ای بود.
+  if (available === null) {
+    return (
+      <div className="photoCardBox" aria-busy="true">
+        <div className="pcLoading">
+          <span className="pcLoadingDot" aria-hidden="true" />
+          در حال آماده‌سازی بخشِ ثبت کارت…
+        </div>
+      </div>
+    );
+  }
+
   if (!available) {
     return (
       <div className="photoCardBox">
@@ -404,25 +437,21 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
   //    یکی از پنج تلاشش را می‌سوزاند.
   return (
     <div className="photoCardBox">
-      <div className="pcHead">
-        <h2> ثبت کارت با عکس</h2>
-        {/* شمارِ در انتظار به‌صورت نشانِ کوچک کنارِ عنوان، به‌جای بنرِ
-            سه‌خطی. متنِ کامل در `title` است، پس با نگه‌داشتنِ اشاره‌گر
-            دیده می‌شود و صفحه‌خوان هم می‌خواندش. */}
-        {pendingCount > 0 && !result && (
-          // وعدهٔ «تا ۲۴ ساعت» از `live_rules.reviewSlaHours` می‌آید: وعده را
-          // تیم پشتیبانی در پنل تنظیم می‌کند، پس نباید در دو کلاینت دو عدد
-          // مختلف باشد (اندروید همین کلید را می‌خواند). متن در `title` است،
-          // پس هیچ تغییرِ ظاهری روی صفحه نمی‌افتد.
-          <span className="pcPendingChip"
-            title={text('photoReview.pendingNote',
-              `کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است تا ${fa(ruleNumber('reviewSlaHours', 24))} ساعت طول بکشد. کد شما محفوظ است و می‌توانید کارت‌های دیگرتان را ثبت کنید.`,
-              { slaHours: ruleNumber('reviewSlaHours', 24) })}>
-            <SvgIcon name="support" size={16} /> {pendingCount} در بررسی
-          </span>
+      {/* عنوان و توضیحِ این بخش در سربرگِ کارتِ تبِ «ثبت کارت» است
+          (CardReg.jsx) — دقیقاً مثلِ اندروید که در حالتِ embedded فقط
+          نشانِ «در بررسی» را می‌گذارد. تکرارِ عنوان فقط شلوغی بود. */}
+      {pendingCount > 0 && !result && (
+        // وعدهٔ «تا ۲۴ ساعت» از `live_rules.reviewSlaHours` می‌آید: وعده را
+        // تیم پشتیبانی در پنل تنظیم می‌کند، پس نباید در دو کلاینت دو عدد
+        // مختلف باشد (اندروید همین کلید را می‌خواند). متن در `title` است،
+        // پس هیچ تغییرِ ظاهری روی صفحه نمی‌افتد.
+        <span className="pcPendingChip"
+          title={text('photoReview.pendingNote',
+            `کیفیت عکس کامل نبود؛ کارشناس بررسی می‌کند و ممکن است تا ${fa(ruleNumber('reviewSlaHours', 24))} ساعت طول بکشد. کد شما محفوظ است و می‌توانید کارت‌های دیگرتان را ثبت کنید.`,
+            { slaHours: ruleNumber('reviewSlaHours', 24) })}>
+          <SvgIcon name="support" size={16} /> {pendingCount} در بررسی
+        </span>
         )}
-      </div>
-      <p className="hint">از کارت عکس بگیر و کدش را وارد کن.</p>
 
       {result?.kind === 'ok' && (
         <div className="pcResult ok">

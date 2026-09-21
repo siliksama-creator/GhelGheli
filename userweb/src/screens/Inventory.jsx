@@ -88,14 +88,20 @@ export default function Inventory({ items = [], grants = [], token, reload }) {
         <div><b>{fa(summary.total)}</b><span>کل کارت‌ها</span></div>
         <div><b>{fa(summary.points)}</b><span>ارزش</span></div>
       </div>
+      {/* ── نوارِ ابزار: یک ستون، نه درهم‌ریختگیِ wrap ──
+          شکایتِ مالک (۳۱ شهریور): «نیاز به زیباسازی و مرتب‌سازی مناسب دارد.»
+          قبلاً input و چیپ‌ها و دکمه در یک ردیفِ flex با wrap بودند و در
+          ستونِ باریکِ وب هر کدام یک‌جا می‌افتادند (الفبا تنها در ردیفِ دوم!).
+          حالا: ردیفِ اول جست‌وجو، ردیفِ دوم چیپ‌های ترتیب + تازه‌سازی در
+          انتهای همان ردیف. */}
       <div className="inventoryTools">
         {items.length >= 8 && <input type="search" value={query}
           onChange={e => setQuery(e.target.value)} placeholder="جست‌وجو در کارت‌ها…" />}
-        {items.length >= 2 && <div className="invSorts">
-          {[['recent', 'تازه‌ترین'], ['value', 'باارزش‌ترین'], ['name', 'الفبا']].map(([id, label]) =>
+        {(items.length >= 2 || reload) && <div className="invSorts">
+          {items.length >= 2 && [['recent', 'تازه‌ترین'], ['value', 'باارزش‌ترین'], ['name', 'الفبا']].map(([id, label]) =>
             <button key={id} className={sort === id ? 'on' : ''} onClick={() => setSort(id)}>{label}</button>)}
+          {reload && <button className="ghost invRefresh" onClick={reload}>تازه‌سازی</button>}
         </div>}
-        {reload && <button className="ghost" onClick={reload}>تازه‌سازی</button>}
       </div>
       {!shown.length ? (
         <div className="card pad center invEmpty">

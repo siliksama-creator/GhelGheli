@@ -440,7 +440,21 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     //
     // این حالت کسری از ثانیه طول می‌کشد و نشان دادنِ «چیزی نیست» در آن
     // لحظه فقط پرشِ چشمی می‌سازد.
-    if (_checking) return const SizedBox.shrink();
+    // قبلاً SizedBox.shrink بود: یعنی تا رسیدنِ پاسخ، کلِ بخش ناپدید و بعد
+    // یک‌جا ظاهر می‌شد (پرشِ چیدمان). حالا یک نشانگرِ کوچک جای همان فضا را
+    // نگه می‌دارد تا فرم بدونِ پرش بنشیند.
+    if (_checking) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: Gaps.lg),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+        ),
+      );
+    }
 
     // ══════════════════════════════════════════════════════════════════
     // کاتالوگِ خالی: پیامِ روشن، نه سکوت

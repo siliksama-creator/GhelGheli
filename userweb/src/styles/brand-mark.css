@@ -1424,6 +1424,34 @@ a:focus-visible {
 }
 .photoCardBox h2 { margin: 0 0 2px; font-size: 17px; }
 
+/* ── خطِ «در حال آماده‌سازی» — جایگزینِ پیامِ اشتباهِ «فعال نشده» ──
+   مالک (۳۱ شهریور): هنگامِ برگشت به تب، یک لحظه پیامِ هشدار دیده می‌شد.
+   حالا فقط اولین ورودِ بدونِ کش این خطِ pulse را می‌بیند و ارتفاعش نزدیکِ
+   فرم است تا چیدمان نپرد. */
+.pcLoading {
+  display: flex; align-items: center; justify-content: center;
+  gap: 9px; padding: 30px 12px;
+  color: #9fb6d0; font-size: 12px; font-weight: 700;
+}
+.pcLoadingDot {
+  width: 15px; height: 15px; border-radius: 50%; flex: none;
+  border: 2px solid rgba(34, 231, 166, .30);
+  border-top-color: #22e7a6;
+  animation: pcSpin .8s linear infinite;
+}
+@keyframes pcSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .pcLoadingDot { animation: none; border-top-color: rgba(34, 231, 166, .30); }
+}
+
+/* نشانِ «در بررسی» حالا بدونِ عنوانِ کنارش تنها می‌نشیند؛ فاصلهٔ زیرش
+   جای همان عنوان را پر می‌کند. */
+.photoCardBox > .pcPendingChip { margin: 0 0 8px; }
+
+/* دکمهٔ اصلیِ فرم تمام‌عرض: در ستونِ باریک، دکمهٔ کوچکِ چپ‌چسبیده
+   (شکایتِ «مرتب‌سازی مناسب») تعادلِ ردیفِ بالا را به‌هم می‌زد. */
+.photoCardBox > button.main { width: 100%; min-height: 46px; margin-top: 10px; }
+
 /* نشانِ «در بررسی» کنارِ عنوان، جایگزینِ بنرِ سه‌خطی (~۷۵ پیکسل).
    متنِ کامل در `title` است، پس نه اطلاعاتی گم شده نه صفحه‌خوان چیزی
    از دست داده. */
@@ -2213,7 +2241,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 
 /* صفحهٔ مستقل کلکسیون — همان مقصد InventoryPage اندروید */
 .inventoryPage{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:12px}.inventoryPage>.invStats{width:100%;margin:0}
-.inventoryTools{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.inventoryTools input{flex:1;min-width:210px;margin:0}.inventoryTools .invSorts{margin:0;flex:1}.inventoryTools .invSorts button,.inventoryTools>button{min-height:40px}.inventoryTools>button{margin:0}
+.inventoryTools{display:flex;flex-direction:column;align-items:stretch;gap:8px}.inventoryTools input{min-width:0;margin:0}.inventoryTools .invSorts{margin:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}.inventoryTools .invSorts button{min-height:40px}.inventoryTools .invSorts .invRefresh{margin-inline-start:auto}
 .inventoryGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.inventoryTile{margin:0;padding:7px;border-radius:20px;background:linear-gradient(145deg,#ffffff12,#ffffff07);border:1px solid #ffffff18;color:#fff;text-align:right;min-width:0;overflow:hidden}.inventoryTile .invArt{height:208px;border-radius:15px;overflow:hidden;background:#02070d;position:relative}.inventoryTile .invArt img{width:100%;height:100%;object-fit:cover}.inventoryTile>b,.inventoryTile>span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.inventoryTile>b{font-size:13px;margin-top:7px}.inventoryTile>span{font-size:11.5px;color:#9fb6d0}
 .invEmpty{width:100%;min-height:260px;display:grid;place-items:center;align-content:center;gap:8px}.invEmpty>span{display:flex;color:#FFD36B;opacity:.75}.invEmpty p{margin:0;color:#9fb6d0}
 .invModalShade{position:fixed;inset:0;z-index:1300;background:#000c;display:grid;place-items:center;padding:18px}.invModal{width:min(420px,94vw);padding:16px;position:relative}.invModal>img{width:100%;max-height:55vh;object-fit:contain;border-radius:18px;background:#02070d}.invModal h2{text-align:center;margin:10px 0}.invModalClose{position:absolute;top:-15px;inset-inline-end:-12px;z-index:12;width:40px;height:40px;padding:0;border-radius:50%;background:#071522e8;border:1px solid #ffffff38;box-shadow:0 7px 20px #000b;font-size:22px}.invDetailStats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.invDetailStats span{padding:8px;border-radius:11px;background:#ffffff0b;text-align:center;color:#9fb6d0;font-size:10.5px}.invDetailStats b{display:block;color:#fff;font-size:13px}
