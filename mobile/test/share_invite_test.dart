@@ -166,4 +166,31 @@ void main() {
       }
     });
   });
+  group('متنِ نتیجهٔ بازی', () {
+    test('کد دعوت و چرخش رایگان در پیام است', () {
+      final msg = gameShareMessage(
+        title: 'من برنده شدم!',
+        gameTitle: 'جفت‌یاب',
+        versus: 'علی مقابل رضا',
+        code: 'AB12',
+        spins: 3,
+      );
+      expect(msg, contains('AB12'));
+      expect(msg, contains('3 چرخش رایگان'));
+      expect(msg, isNot(contains('اینستا')));
+    });
+
+    test('بدون کد هم کرش نمی‌کند', () {
+      expect(
+        () => gameShareMessage(
+          title: 'تساوی',
+          gameTitle: 'پنالتی',
+          versus: 'تو مقابل ربات',
+          code: '',
+        ),
+        returnsNormally,
+      );
+    });
+  });
+
 }

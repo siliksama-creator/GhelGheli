@@ -16,6 +16,7 @@ export function AnalyticsPage({ request }) {
   const [wheel, setWheel] = useState(null);
   const [refs, setRefs] = useState(null);
   const [duel, setDuel] = useState(null);
+  const [zp, setZp] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = () => {
@@ -25,11 +26,13 @@ export function AnalyticsPage({ request }) {
       request('/api/admin/wheel/stats').catch(() => null),
       request('/api/admin/referrals/purchase-commissions?limit=30').catch(() => null),
       request('/api/admin/card-duel/balance').catch(() => null),
-    ]).then(([a, w, r, d]) => {
+      request('/api/admin/payments/zarinpal').catch(() => null),
+    ]).then(([a, w, r, d, z]) => {
       setData(a);
       setWheel(w);
       setRefs(r);
       setDuel(d);
+      setZp(z);
     }).catch(e => notify(e.message || 'دریافت تحلیل ناموفق بود', 'error'))
       .finally(() => setLoading(false));
   };
@@ -100,13 +103,33 @@ export function AnalyticsPage({ request }) {
       </Card>
     )}
 
+    {zp?.stats && (
+      <Card title="خرید زرین‌پال" subtitle={`${fmtNumber(zp.stats.paidCount)} خرید موفق · جمع ${fmtNumber(zp.stats.paidAmount)} تومان`}>
+        <div style={{ display:'flex', gap:24, flexWrap:'wrap', marginBottom:12 }}>
+          <Stat n={zp.stats.todayCount} l="خرید امروز" />
+          <Stat n={zp.stats.todayAmount} l="تومان امروز" />
+          <Stat n={zp.stats.monthCount} l="خرید این ماه" />
+          <Stat n={zp.stats.monthAmount} l="تومان این ماه" />
+        </div>
+        {(zp.stats.recent||[]).slice(0,12).map(row => (
+          <div key={row.id} style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:13, padding:'6px 0', borderBottom:'1px solid rgba(255,255,255,.06)' }}>
+            <span>{row.nickname || row.mobile} · {row.kind === 'card_box' ? 'صندوق کارت' : row.kind === 'shop_item' ? 'آیتم فروشگاه' : 'پلاس'}</span>
+            <b>{fmtNumber(row.amount)} تومان · {row.status === 'paid' ? 'موفق' : row.status === 'pending' ? 'در انتظار' : 'ناموفق'}</b>
+          </div>
+        ))}
+        {!(zp.stats.recent||[]).length && <div className="topbar-sub">هنوز سفارش زرین‌پالی ثبت نشده.</div>}
+      </Card>
+    )}
+
     {refs && (
       <Card title="کمیسیون نقدی معرفی" subtitle={`${fmtNumber(refs.totalCount)} خرید · جمع ${fmtNumber(refs.totalCommission)} تومان`}>
         {(refs.rows||[]).length === 0 ? (
           <div className="topbar-sub">هنوز کمیسیون خریدی ثبت نشده.</div>
         ) : refs.rows.map(row => (
           <div key={row.id} style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:13, padding:'6px 0', borderBottom:'1px solid rgba(255,255,255,.06)' }}>
-            <span>{row.referrer_nickname || row.referrer_mobile} ← {row.buyer_nickname || row.buyer_mobile}</span>
+            <span>{row.referrer_nickname || row.referrer_mobile} ← {row.buyer_nickname || row.buyer_mobile}
+              {row.gateway_provider ? <small className="topbar-sub"> · {row.gateway_provider === 'zarinpal' ? 'زرین‌پال' : row.gateway_provider}</small> : null}
+            </span>
             <b>{fmtNumber(row.commission_amount)} تومان</b>
           </div>
         ))}

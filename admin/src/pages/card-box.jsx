@@ -166,7 +166,7 @@ export function CardBoxAdminPage({ request }) {
         </p>
       </Card>
 
-      <Card title="قیمت صندوق" subtitle="قیمت به تومان — همان عددی که کاربر در فروشگاه می‌بیند (هم با کیف پول، هم با پرداخت کافه‌بازار).">
+      <Card title="قیمت صندوق" subtitle="قیمت به تومان — همان عددی که کاربر در فروشگاه می‌بیند (هم با کیف پول، هم با درگاه زرین‌پال).">
         <Field label="قیمت (تومان)" hint="مثلاً ۱۰۰۰۰۰ یعنی صندوق صد هزار تومان است.">
           <Input type="number" min="1" max="10000000" value={price}
             onChange={(e) => setPrice(Number(e.target.value) || 0)} />
@@ -249,6 +249,7 @@ export function CardBoxAdminPage({ request }) {
                     <th style={{ padding: '6px 8px' }}>کاربر</th>
                     <th style={{ padding: '6px 8px' }}>شماره</th>
                     <th style={{ padding: '6px 8px' }}>مبلغ</th>
+                    <th style={{ padding: '6px 8px' }}>درگاه</th>
                     <th style={{ padding: '6px 8px' }}>امتیاز</th>
                     <th style={{ padding: '6px 8px' }}>کارت‌ها</th>
                     <th style={{ padding: '6px 8px' }}>تاریخ</th>
@@ -260,6 +261,7 @@ export function CardBoxAdminPage({ request }) {
                       <td style={{ padding: '7px 8px', fontWeight: 700 }}>{p.nickname}</td>
                       <td style={{ padding: '7px 8px', direction: 'ltr', textAlign: 'right', color: 'rgba(255,255,255,.6)' }}>{p.mobile}</td>
                       <td style={{ padding: '7px 8px', color: '#FFD166', fontWeight: 700 }}>{fmtNumber(p.pricePaid)}</td>
+                      <td style={{ padding: '7px 8px' }}>{p.source === 'zarinpal' ? 'زرین‌پال' : p.source === 'wallet' ? 'کیف پول' : (p.source || '—')}</td>
                       <td style={{ padding: '7px 8px', color: '#A3E635' }}>{fmtNumber(p.points)}</td>
                       <td style={{ padding: '7px 8px' }}>
                         <span style={{ display: 'inline-flex', gap: 4 }}>

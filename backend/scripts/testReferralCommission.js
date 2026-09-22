@@ -34,6 +34,8 @@ ok(/payPurchaseCommission\(client, \{\s*buyerId: userId,\s*purchaseType: 'shop_i
   'خریدِ آیتم کمیسیون را داخل تراکنش صدا می‌زند');
 ok(/payPurchaseCommission\(client, \{\s*buyerId: userId,\s*purchaseType: cycle === 'annual' \? 'plus_annual' : 'plus_monthly'/.test(shop),
   'خریدِ پلاس هم کمیسیون دارد');
+ok(/'shop_item', 'plus_monthly', 'plus_annual', 'card_box'/.test(referral),
+  'صندوق کارت هم در انواع کمیسیون‌پذیر است');
 ok(/ON CONFLICT\(purchase_type, purchase_reference_id\) DO NOTHING/.test(referral),
   'سندِ یکتای کمیسیون جلوی پرداختِ دوباره را می‌گیرد');
 ok(/source: 'purchase_referral'/.test(referral), 'واریز به کیف پول معرف با source اختصاصی');

@@ -380,7 +380,7 @@ async function payPurchaseCommission(
 ) {
   const amount = Math.floor(Number(purchaseAmount) || 0);
   if (amount <= 0 || !purchaseReferenceId) return null;
-  if (!['shop_item', 'plus_monthly', 'plus_annual'].includes(purchaseType)) {
+  if (!['shop_item', 'plus_monthly', 'plus_annual', 'card_box'].includes(purchaseType)) {
     throw new Error('نوع خرید برای کمیسیون معرفی معتبر نیست');
   }
 
@@ -452,7 +452,7 @@ async function purchaseCommissionAudit({ limit = 100, offset = 0 } = {}) {
   const { rows } = await pool.query(
     `SELECT c.id, c.purchase_type, c.purchase_reference_id,
             c.purchase_amount, c.commission_rate, c.commission_amount,
-            c.wallet_transaction_id, c.created_at,
+            c.gateway_provider, c.wallet_transaction_id, c.created_at,
             r.nickname AS referrer_nickname, r.mobile AS referrer_mobile,
             b.nickname AS buyer_nickname, b.mobile AS buyer_mobile
        FROM purchase_referral_commissions c

@@ -17,6 +17,7 @@ import CoinRateStrip from './components/CoinRateStrip.jsx';
 import { ASSETS, SvgIcon } from './components/IconAsset.jsx';
 import WinnerCelebration from './components/WinnerCelebration.jsx';
 import { fa, asset, avatarUrl, req } from './lib/api.js';
+import ShareResult from './components/ShareResult.jsx';
 // «۵۰ لول»، «کد ۴ رقمی» و برچسب‌های بازی از این به بعد زنده‌اند (فاز ۲):
 // عدد از live_rules و جمله از live_copy. این هاب یکی از fetchهای
 // تکراریِ /api/config را هم داشت که به کشِ مشترک وصل شد.
@@ -778,24 +779,6 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
     });
   }, [phase, activeGameId, g.winner, g.me, g.netPot, g.vsBot, activeStake]);
 
-  const shareResult = async () => {
-    const title = g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : g.winner === g.me ? 'من برنده شدم!' : 'این بار حریف برد!';
-    try {
-      const blob = await makeGenericResultCard({ title, gameTitle,
-        players: [pX.nickname || 'بازیکن یک', pO.nickname || 'بازیکن دو'] });
-      const file = blob ? new File([blob], 'ghelgheli-result.png', { type: 'image/png' }) : null;
-      const text = `${title}\n${gameTitle}: ${pX.nickname || 'بازیکن یک'} مقابل ${pO.nickname || 'بازیکن دو'}\nتو هم به چالش قلقلی بیا:`;
-      if (navigator.share && (!file || !navigator.canShare || navigator.canShare({ files: [file] }))) {
-        await navigator.share({ title: 'نتیجه قلقلی', text, url: window.location.origin, ...(file ? { files: [file] } : {}) });
-      } else if (blob) {
-        const href = URL.createObjectURL(blob); const a = document.createElement('a');
-        a.href = href; a.download = 'ghelgheli-result.png'; a.click(); setTimeout(() => URL.revokeObjectURL(href), 1500);
-        await navigator.clipboard?.writeText(`${text}\n${window.location.origin}`);
-      }
-      req('/api/analytics/events', 'POST', { event:'share', platform:'web', gameId:activeGameId,
-        matchId:g.matchId, target:navigator.share?'system_share_image':'download' }, token).catch(() => {});
-    } catch (e) { if (e?.name !== 'AbortError') alert(e.message || 'اشتراک‌گذاری ناموفق بود'); }
-  };
 
   /**
    * حسابِ پایانِ مسابقه و دکمه‌های ادامهٔ کار — **همان بلوک در هر دو
@@ -842,10 +825,14 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
               style={{ background:'linear-gradient(135deg,#22E7A6,#38BDF8)',color:'#03121f',border:0,padding:'12px 20px',borderRadius:16,fontWeight:900 }}>
               {rematchWaiting ? 'منتظر قبول حریف…' : 'دوباره با همین حریف'}
             </button>
-            <button type="button" onClick={shareResult}
-              style={{background:'linear-gradient(135deg,#7C3AED,#EC4899)',color:'#fff',border:0,padding:'12px 18px',borderRadius:16,fontWeight:900}}>
-              اشتراک کارت نتیجه · تلگرام/اینستاگرام
-            </button>
+            <ShareResult
+              token={token}
+              title={g.winner === 'DRAW' ? 'مسابقه مساوی شد!' : g.winner === g.me ? 'من برنده شدم!' : 'این بار حریف برد!'}
+              gameTitle={gameTitle}
+              versus={`${pX.nickname || 'بازیکن یک'} مقابل ${pO.nickname || 'بازیکن دو'}`}
+              gameId={activeGameId}
+              matchId={g.matchId}
+            />
             <button
               type="button"
               onClick={() => { leave(); onBack(); }}

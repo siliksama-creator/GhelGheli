@@ -537,7 +537,7 @@ function catalog() {
 async function history(userId, limit = 20) {
   const { rows } = await pool.query(
     `SELECT o.id, o.amount, o.product_id, o.status, o.purchase_kind,
-            o.plus_cycle, o.created_at, o.paid_at,
+            o.plus_cycle, o.created_at, o.paid_at, o.provider,
             i.name AS item_name, i.slug AS item_slug
        FROM payment_orders o
        LEFT JOIN shop_items i ON i.id = o.shop_item_id
@@ -551,6 +551,7 @@ async function history(userId, limit = 20) {
     status: r.status,
     kind: r.purchase_kind,
     cycle: r.plus_cycle,
+    provider: r.provider,
     itemName: r.item_name,
     itemSlug: r.item_slug,
     createdAt: r.created_at,

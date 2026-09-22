@@ -444,6 +444,7 @@ function createCardBoxService(db = pool) {
       id: r.id,
       pricePaid: Number(r.price_paid),
       points: Number(r.points_awarded),
+      source: r.source,
       createdAt: r.created_at,
       cards: r.cards,
     }));
@@ -458,6 +459,7 @@ function createCardBoxService(db = pool) {
     const n = Math.min(200, Math.max(1, Number(limit) || 50));
     const { rows } = await db.query(
       `SELECT b.id, b.user_id, b.price_paid, b.points_awarded, b.created_at,
+              b.source,
               u.nickname, u.first_name, u.mobile,
               COALESCE(json_agg(json_build_object(
                 'rarity', c.rarity, 'name', t.name

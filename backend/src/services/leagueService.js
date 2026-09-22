@@ -659,6 +659,41 @@ async function seedCarryoverFromLatestClosed({ leagueType = null, targetSeasonId
   }
 }
 
+
+/**
+ * متنِ اعلانِ پایانِ لیگ — فقط از جایزهٔ واقعیِ جدولِ پنل.
+ *
+ * باگِ زنده (۲۳ شهریور ۱۴۰۵): لیگِ تست بدونِ جایزهٔ عمدیِ مدیر بسته شد
+ * و دو کاربر پیامِ «رتبهٔ ۱ / جایزهٔ ۵۰۰٬۰۰۰ تومانی» گرفتند، چون
+ * `prize_table` از قبل همان اعداد را داشت و متنِ اعلان مبلغ را بدونِ
+ * هیچ نگهبانی چاپ می‌کرد.
+ *
+ * قانون:
+ *   • مبلغِ نقدی فقط وقتی در متن می‌آید که `amount > 0` باشد
+ *     (همان عددی که مدیر در پنل ذخیره کرده و `closeActiveSeason`
+ *     از `prize_table` خوانده).
+ *   • جایزهٔ غیرنقدی متنِ خودش را دارد و تومان نمی‌گوید.
+ *   • اگر هیچ‌کدام نبود، فقط رتبه اعلام می‌شود — نه «جایزه گرفتی».
+ */
+function winnerNotifyBody(w) {
+  if (w?.perk) {
+    const extra = w.perk.kind === 'card_box'
+      ? 'برایت ثبت شد. از کلکسیون بازش کن.'
+      : 'برایت ثبت شد.';
+    return `تبریک! رتبهٔ ${w.rank} لیگ را گرفتی و ${describePerk(w.perk)} ${extra}`;
+  }
+  const amount = Number(w?.amount) || 0;
+  if (amount > 0) {
+    const fa = amount.toLocaleString('fa-IR');
+    if (w.pendingApproval) {
+      return `تبریک! رتبهٔ ${w.rank} را گرفتی. جایزهٔ ${fa} تومانی `
+        + 'پس از بررسی و تأیید نهایی به کیف پولت واریز می‌شود.';
+    }
+    return `تبریک! جایزهٔ ${fa} تومانی شما به کیف پول واریز شد.`;
+  }
+  return `رتبهٔ ${w.rank} لیگ مشخص شد. برای این رتبه جایزه‌ای در پنل تعیین نشده بود.`;
+}
+
 async function closeActiveSeason({ force = false, seasonId = null } = {}) {
   const client = await pool.connect();
   try {
@@ -1044,20 +1079,7 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
       //    کیف پول واریز شد» می‌گرفت — چون `amount` برایش صفر است و
       //    `pendingApproval` هم false. یعنی بهترین خبرِ ماهش به یک
       //    پیامِ خراب تبدیل می‌شد.
-      const body = w.perk
-        ? (w.perk.kind === 'card_box'
-          // بدون این جمله کاربر فکر می‌کند صندوق همان لحظه باز شده و
-          // کارت‌ها گم شده‌اند — در حالی که باید از کلکسیون بازش کند.
-          ? `تبریک! رتبهٔ ${w.rank} لیگ را گرفتی و ${describePerk(w.perk)} `
-            + 'برایت ثبت شد. از کلکسیون بازش کن.'
-          : `تبریک! رتبهٔ ${w.rank} لیگ را گرفتی و ${describePerk(w.perk)} `
-            + 'برایت ثبت شد.')
-        : w.pendingApproval
-          ? `تبریک! رتبهٔ ${w.rank} را گرفتی. جایزهٔ `
-            + `${w.amount.toLocaleString('fa-IR')} تومانی پس از بررسی و `
-            + 'تأیید نهایی به کیف پولت واریز می‌شود.'
-          : `تبریک! جایزهٔ ${w.amount.toLocaleString('fa-IR')} تومانی شما `
-            + 'به کیف پول واریز شد.';
+      const body = winnerNotifyBody(w);
 
       createNotification(
         w.userId,
@@ -1311,7 +1333,7 @@ async function approvePayouts(payoutId, adminId) {
 
 module.exports = {
   ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason,
-  closeExpiredSeasons, defaultPrizeTable, approvePayouts,
+  closeExpiredSeasons, defaultPrizeTable, approvePayouts, winnerNotifyBody,
   carryoverBetween, seedCarryoverFromLatestClosed, carryoverAmount,
   carryoverMarkerKey,
 };

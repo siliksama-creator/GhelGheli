@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { asset, avatarUrl, fa, req } from './lib/api.js';
+import ShareResult from './components/ShareResult.jsx';
 import { useLive, ruleNumber } from './lib/liveConfig.js';
 import { primeImageCache } from './lib/imageCache.js';
 import { useGameSession } from './gameSession.js';
@@ -963,50 +964,6 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
   const mode = modeCopy({ stake, vsBot, roomCode, initialStart });
   const session = useGameSession(api, token, 'card_duel', stake, vsBot,
     roomCode, externalSocket, initialStart, enabled);
-  const [sharing, setSharing] = useState(false);
-  const [shareNotice, setShareNotice] = useState('');
-
-  const shareResult = async () => {
-    if (sharing) return;
-    setSharing(true); setShareNotice('در حال ساخت لینک چالش…');
-    try {
-      const invite = await session.createChallenge();
-      const scoreState = session.g.state?.score || {};
-      const mine = session.g.me || 'X';
-      const other = mine === 'X' ? 'O' : 'X';
-      const myScore = num(scoreState[mine]);
-      const theirScore = num(scoreState[other]);
-      const narration = session.g.state?.narration;
-      const title = narration?.headline
-        || (session.g.winner === 'DRAW' ? 'نبرد برابر!' : session.g.winner === mine ? 'من آرنا را بردم!' : 'این بار حریف برد!');
-      const mvp = resultMvp(session.g.state);
-      const opponentRole = session.g.vsBot ? 'ربات' : 'حریف';
-      const opponent = session.g.players?.[other]?.nickname || opponentRole;
-      const scoreLabel = `تو ${fa(myScore)} — ${opponentRole} ${fa(theirScore)}`;
-      const achievementLine = narration?.achievement ? `\nنشان: ${narration.achievement.label}` : '';
-      const text = `${title}\nنتیجه: ${scoreLabel}${achievementLine}\nMVP: ${mvp?.name || 'ستاره آرنا'} (عدد راند ${fa(mvp?.mvpRoundPower || 0)})\nمستقیم به چالشم بیا:`;
-      const blob = await renderResultCard({ result: title, score: scoreLabel, mvp, opponent, url: invite.shareUrl });
-      const file = blob ? new File([blob], 'ghelgheli-result.png', { type: 'image/png' }) : null;
-      if (navigator.share && (!file || !navigator.canShare || navigator.canShare({ files: [file] }))) {
-        await navigator.share({ title: 'نتیجه دوئل قلقلی', text, url: invite.shareUrl, ...(file ? { files: [file] } : {}) });
-        setShareNotice('کارت نتیجه آماده و ارسال شد ');
-      } else {
-        await navigator.clipboard.writeText(`${text}\n${invite.shareUrl}`);
-        if (blob) {
-          const href = URL.createObjectURL(blob);
-          const anchor = document.createElement('a'); anchor.href = href; anchor.download = 'ghelgheli-result.png'; anchor.click();
-          window.setTimeout(() => URL.revokeObjectURL(href), 2000);
-        }
-        setShareNotice('متن چالش کپی و کارت نتیجه دانلود شد');
-      }
-      req('/api/analytics/events', 'POST', {
-        event: 'share', platform: 'web', gameId: 'card_duel',
-        matchId: session.g.matchId, target: navigator.share ? 'system_share' : 'clipboard',
-      }, token).catch(() => {});
-    } catch (shareError) {
-      if (shareError?.name !== 'AbortError') setShareNotice(shareError.message || 'اشتراک‌گذاری ناموفق بود');
-    } finally { setSharing(false); }
-  };
 
   const load = async () => {
     try {
@@ -1238,10 +1195,15 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
         <CoinAward amount={session.g.coinsAwarded} mine={session.g.coinsWinner === resultMine} />
         <small className="duelMvpLine">MVP • {resultMvp(session.g.state)?.name || 'ستاره آرنا'}</small>
         <RoundTimeline history={session.g.state?.history || []} mine={resultMine} opponentRole={resultOpponentRole} />
-        <button className="duelShareButton" type="button" onClick={shareResult} disabled={sharing}>
-          {sharing ? 'در حال ساخت…' : 'اشتراک'}
-        </button>
-        {shareNotice && <i className="duelShareNotice">{shareNotice}</i>}
+        <ShareResult
+          token={token}
+          title={(session.g.state?.narration?.headline)
+            || (session.g.winner === 'DRAW' ? 'نبرد برابر!' : session.g.winner === (session.g.me || 'X') ? 'من آرنا را بردم!' : 'این بار حریف برد!')}
+          gameTitle="دوئل کارت‌ها"
+          versus={`تو ${fa((session.g.state?.score || {})[session.g.me || 'X'])} — ${(session.g.vsBot ? 'ربات' : 'حریف')} ${fa((session.g.state?.score || {})[((session.g.me || 'X') === 'X') ? 'O' : 'X'])}`}
+          gameId="card_duel"
+          matchId={session.g.matchId}
+        />
         <div><button className="main" type="button" disabled={session.rematchWaiting || !session.g.rematchAvailable} onClick={session.rematch}>
           {session.rematchWaiting ? 'منتظر حریف…' : 'دوباره'}
         </button>

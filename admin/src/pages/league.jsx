@@ -426,7 +426,7 @@ export function LeaguePage({ request }) {
       <Card title="لیدربرد زنده" subtitle="به‌روزرسانی خودکار بر اساس امتیاز ماه جاری">
         {data ? <RankList entries={data.entries} /> : null}
       </Card>
-      <Card title="تعداد برندگان و جدول جوایز" subtitle="مبلغ هر رتبه در پایان ماه به کاربر تعلق می‌گیرد">
+      <Card title="تعداد برندگان و جدول جوایز" subtitle="اعلان وب و اندروید دقیقاً همین مبالغ را می‌گوید. صفر یعنی برای آن رتبه جایزه‌ای اعلام نمی‌شود — عدد آزمایشی ذخیره نکن.">
         <Field label="تعداد برندگان نقدی (۱ تا ۳۰۰)"
               hint="کمتر از ۱ یا بیشتر از ۳۰۰ در سرور به همین بازه برمی‌گردد و اگر عددی خوانده نشود، طولِ جدولِ جوایز مصرف می‌شود؛ جدولِ جوایزِ بلندتر از این عدد، بی‌صدا نیمه‌کاره می‌ماند.">
           <Input type="number" min="1" max="300" value={winnerCount} onChange={(e) => changeWinnerCount(Number(e.target.value) || 0)} />

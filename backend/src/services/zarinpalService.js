@@ -165,9 +165,72 @@ async function verifyPayment({ amountRial, authority }) {
   };
 }
 
+
+/**
+ * آمارِ سفارش‌های زرین‌پال برای داشبورد، صفحهٔ درگاه و تحلیل رشد.
+ * همهٔ مبلغ‌ها تومان‌اند (ستون `payment_orders.amount`).
+ */
+async function stats() {
+  const [{ rows: byStatus }, { rows: today }, { rows: month }, { rows: recent }] = await Promise.all([
+    pool.query(
+      `SELECT status, count(*)::int AS count,
+              COALESCE(SUM(amount),0)::bigint AS amount
+         FROM payment_orders WHERE provider='zarinpal'
+        GROUP BY status`),
+    pool.query(
+      `SELECT count(*)::int AS count,
+              COALESCE(SUM(amount),0)::bigint AS amount
+         FROM payment_orders
+        WHERE provider='zarinpal' AND status='paid'
+          AND (paid_at AT TIME ZONE 'Asia/Tehran')::date
+              = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date`),
+    pool.query(
+      `SELECT count(*)::int AS count,
+              COALESCE(SUM(amount),0)::bigint AS amount
+         FROM payment_orders
+        WHERE provider='zarinpal' AND status='paid'
+          AND date_trunc('month', paid_at AT TIME ZONE 'Asia/Tehran')
+              = date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')`),
+    pool.query(
+      `SELECT o.id, o.amount, o.status, o.purchase_kind, o.plus_cycle,
+              o.created_at, o.paid_at, o.wallet_amount,
+              u.nickname, u.mobile
+         FROM payment_orders o
+         JOIN users u ON u.id = o.user_id
+        WHERE o.provider='zarinpal'
+        ORDER BY o.created_at DESC
+        LIMIT 40`),
+  ]);
+  const paid = byStatus.find((r) => r.status === 'paid') || { count: 0, amount: 0 };
+  return {
+    byStatus: byStatus.map((r) => ({
+      status: r.status, count: r.count, amount: Number(r.amount),
+    })),
+    paidCount: Number(paid.count || 0),
+    paidAmount: Number(paid.amount || 0),
+    todayCount: Number(today[0]?.count || 0),
+    todayAmount: Number(today[0]?.amount || 0),
+    monthCount: Number(month[0]?.count || 0),
+    monthAmount: Number(month[0]?.amount || 0),
+    recent: recent.map((r) => ({
+      id: r.id,
+      amount: Number(r.amount),
+      walletAmount: Number(r.wallet_amount || 0),
+      status: r.status,
+      kind: r.purchase_kind,
+      cycle: r.plus_cycle,
+      createdAt: r.created_at,
+      paidAt: r.paid_at,
+      nickname: r.nickname,
+      mobile: r.mobile,
+    })),
+  };
+}
+
 module.exports = {
   readSettings,
   configured,
+  stats,
   merchantLooksValid,
   requestPayment,
   verifyPayment,

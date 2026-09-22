@@ -4740,3 +4740,10 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   .momentIcon{width:44px;height:44px}
   .momentTitle{font-size:14px}
 }
+
+/* نوار فشردهٔ اشتراک نتیجه — کنار دکمه‌های پایان بازی، نه یک مودال بزرگ */
+.shareStrip { display:flex; flex-direction:column; align-items:center; gap:6px; margin:2px 0 4px; }
+.shareStripLabel { font-size:11px; font-weight:800; color:rgba(255,255,255,.62); }
+.shareStripBtns { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; }
+.shareStrip .msgBtn { padding:6px 12px; font-size:11.5px; }
+.shareStripErr { margin:0; font-size:11px; color:#fb7185; font-weight:700; }

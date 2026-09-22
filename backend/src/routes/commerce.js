@@ -52,7 +52,7 @@ router.post('/shop/plus', auth, shopLimiter, asyncHandler(async (req, res) => {
 //
 // ⚠️ اینجا هیچ کارتی تحویل داده نمی‌شود. `buy` فقط سفارشِ pending
 //    می‌سازد؛ قرعه‌کشی و تحویل داخلِ تراکنشِ `/api/purchase/verify`
-//    انجام می‌شود، بعد از آنکه کافه‌بازار پرداخت را تأیید کرد.
+//    انجام می‌شود، بعد از آنکه درگاه (زرین‌پال) پرداخت را تأیید کرد.
 router.get('/card-box/overview', auth, asyncHandler(async (req, res) => {
   res.json(await cardBox.overview(req.user.id));
 }));

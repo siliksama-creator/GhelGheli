@@ -37,11 +37,14 @@ export function Dashboard({ request, onNavigate }) {
 
   const go = (page) => onNavigate && onNavigate(page);
 
+  const zp = data.zarinpal || {};
   const overview = [
     ['کاربران', data.users, Users, null],
     ['کدهای امروز', data.usedCodesToday, CreditCard, 'photo-cards'],
     ['کدهای ماه', data.usedCodesThisMonth, BarChart3, null],
     ['عضویت امروز', data.usersJoinedToday || 0, UserPlus, 'users'],
+    ['خرید زرین‌پال امروز', zp.todayCount || 0, CreditCard, 'zarinpal'],
+    ['فروش امروز (تومان)', zp.todayAmount || 0, Wallet, 'zarinpal'],
   ];
 
   const queues = [
@@ -162,6 +165,14 @@ export function Dashboard({ request, onNavigate }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 22, fontWeight: 900 }}>
                 <CircleDot size={18} /> {fmtNumber(data.wheelSpinsToday || 0)}
               </div>
+            </div>
+            <div>
+              <div className="stat-label">فروش زرین‌پال این ماه</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>
+                {fmtNumber(zp.monthAmount || 0)}
+                <span style={{ fontSize: 12, fontWeight: 700, marginInlineStart: 6, opacity: .7 }}>تومان</span>
+              </div>
+              <div className="topbar-sub">{fmtNumber(zp.monthCount || 0)} خرید موفق</div>
             </div>
           </div>
         </Card>

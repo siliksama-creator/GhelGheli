@@ -35,6 +35,11 @@ ok(zp.startPayUrl('A1', true).startsWith('https://sandbox.zarinpal.com/'),
 console.log('\n══ ۲. پین‌های امنیتیِ روت ══');
 const route = read('src/routes/zarinpal.js');
 const service = read('src/services/zarinpalService.js');
+ok(/async function stats\(/.test(service), 'آمار سفارش‌های زرین‌پال برای پنل وجود دارد');
+ok(/FROM payment_orders WHERE provider='zarinpal'/.test(service),
+  'آمار فقط سفارش‌های زرین‌پال را می‌شمارد');
+ok(/stats,/.test(route) && /recent/.test(service),
+  'صفحهٔ ادمین فهرست سفارش‌های اخیر را می‌گیرد');
 ok(/api\.zarinpal\.com|API_BASE/.test(service),
   'سرویس از API نسخهٔ ۴ زرین‌پال استفاده می‌کند');
 ok(route.includes("status !== 'OK'") && route.includes("back('cancel')"),

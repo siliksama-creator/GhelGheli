@@ -3,7 +3,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../../api_client.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/reward_moment.dart';
@@ -11,6 +10,7 @@ import 'coin_award.dart';
 import 'game_audio.dart';
 import 'game_session.dart';
 import 'versus_bar.dart';
+import '../../../widgets/result_share_strip.dart';
 
 class GameScaffold extends StatelessWidget {
   const GameScaffold({
@@ -420,7 +420,7 @@ class GameScaffold extends StatelessWidget {
             SizedBox(
               height: 40,
               child: session.phase == GamePhase.over
-                  ? _ResultActions(session: session, accent: accent)
+                  ? _ResultActions(session: session, accent: accent, api: api, gameTitle: title)
                   : OutlinedButton.icon(
                       onPressed: session.leave,
                       icon: const Icon(Icons.flag_outlined, size: 18),
@@ -662,45 +662,54 @@ class _MemoryResultMomentState extends State<_MemoryResultMoment> {
 }
 
 class _ResultActions extends StatelessWidget {
-  const _ResultActions({required this.session, required this.accent});
+  const _ResultActions({
+    required this.session,
+    required this.accent,
+    required this.api,
+    required this.gameTitle,
+  });
   final GameSession session;
   final Color accent;
+  final ApiClient api;
+  final String gameTitle;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: FilledButton.icon(
-            onPressed:
-                session.rematchAvailable ? session.rematch : session.join,
-            style: FilledButton.styleFrom(backgroundColor: accent),
-            icon: const Icon(Icons.replay_rounded, size: 18),
-            label: Text(session.rematchWaiting
-                ? 'منتظر حریف…'
-                : session.rematchAvailable
-                    ? 'دوباره با همین حریف'
-                    : 'بازی دوباره'),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed:
+                    session.rematchAvailable ? session.rematch : session.join,
+                style: FilledButton.styleFrom(backgroundColor: accent),
+                icon: const Icon(Icons.replay_rounded, size: 18),
+                label: Text(session.rematchWaiting
+                    ? 'منتظر حریف…'
+                    : session.rematchAvailable
+                        ? 'دوباره با همین حریف'
+                        : 'بازی دوباره'),
+              ),
+            ),
+            Gaps.hXs,
+            Expanded(
+              child: OutlinedButton(
+                onPressed: session.leave,
+                child: const Text('پایان'),
+              ),
+            ),
+          ],
         ),
-        Gaps.hXs,
-        IconButton.filledTonal(
-          tooltip: 'اشتراک نتیجه در تلگرام/اینستاگرام',
-          // share_plus ۱۳: API تازه. توضیحِ چراییِ ارتقا در card_duel_page.
-          onPressed: () => SharePlus.instance.share(ShareParams(
-            text:
-                '${session.resultText}\n${session.nameOf('X')} مقابل ${session.nameOf('O')}\n'
-                'تو هم به باشگاه بازی‌های قلقلی بیا: https://ghelghelishop.com',
-            subject: 'نتیجه بازی قلقلی',
-          )),
-          icon: const Icon(Icons.ios_share_rounded, size: 18),
-        ),
-        Gaps.hXs,
-        Expanded(
-          child: OutlinedButton(
-            onPressed: session.leave,
-            child: const Text('پایان'),
-          ),
+        const SizedBox(height: 8),
+        ResultShareStrip(
+          api: api,
+          title: session.resultText,
+          gameTitle: gameTitle,
+          versus: '${session.nameOf('X')} مقابل ${session.nameOf('O')}',
+          gameId: session.gameId,
+          matchId: session.matchId,
         ),
       ],
     );

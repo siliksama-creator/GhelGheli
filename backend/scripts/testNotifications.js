@@ -130,9 +130,11 @@ console.log('\n== ۴. برندهٔ لیگ در پایان ماه ==');
   ok(notifyBlock.length > 0 && /\.catch\(/.test(notifyBlock),
     'شکستِ اعلان بلعیده می‌شود — پول از قبل واریز شده');
 
-  // متن باید رتبه و مبلغ را داشته باشد.
-  ok(/rank/.test(notifyBlock) && /amount/.test(notifyBlock),
-    'متنِ اعلان رتبه و مبلغ را دارد');
+  // متن از winnerNotifyBody می‌آید: رتبه همیشه، مبلغ فقط اگر جایزه > ۰.
+  ok(/winnerNotifyBody\(w\)/.test(notifyBlock),
+    'متن اعلان از winnerNotifyBody ساخته می‌شود');
+  ok(/function winnerNotifyBody/.test(league) && /amount > 0/.test(league),
+    'متنِ اعلان رتبه دارد و مبلغ را فقط برای جایزهٔ واقعی می‌گوید');
 }
 
 console.log('\n== ۵. اعلان هدفمند واقعاً به backend وصل است ==');

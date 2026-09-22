@@ -599,6 +599,19 @@ class _ShopPageState extends State<ShopPage> {
 }
 
 /// فهرست سوابق خرید — آینهٔ `historyPanel` وب: نام آیتم، مبلغ، تاریخ.
+String _gatewayFa(Object? g) {
+  switch ('$g') {
+    case 'zarinpal':
+      return 'زرین‌پال · ';
+    case 'wallet':
+      return 'کیف پول · ';
+    case 'cafebazaar':
+      return 'کافه‌بازار · ';
+    default:
+      return '';
+  }
+}
+
 class _HistoryPanel extends StatelessWidget {
   const _HistoryPanel({required this.history});
 
@@ -639,7 +652,7 @@ class _HistoryPanel extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${faNum(h['price_paid'] ?? 0)} تومان · ${faDate(h['purchased_at'])}',
+                    '${faNum(h['price_paid'] ?? 0)} تومان · ${_gatewayFa(h['gateway'])}${faDate(h['purchased_at'])}',
                     style: TextStyle(
                         fontSize: 10, color: theme.colorScheme.onSurface.withValues(alpha: 0.55)),
                   ),

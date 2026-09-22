@@ -343,7 +343,9 @@ async function deliverCardBox(client, { userId, amount, orderId, gatewayProvider
   const box = await cardBox.grantBox(client, {
     userId,
     pricePaid: Number(amount) || 0,
-    source: 'cafebazaar',
+    // منبع باید همان درگاهِ واقعی باشد؛ وگرنه آمارِ صندوق همیشه
+    // «کافه‌بازار» می‌ماند حتی وقتی پول از زرین‌پال آمده.
+    source: gatewayProvider || 'zarinpal',
     orderId,
   });
 
@@ -1038,18 +1040,30 @@ async function purchaseHistory(userId, { limit = 50, offset = 0 } = {}) {
   const [items, subscriptions] = await Promise.all([
     pool.query(
       `SELECT usi.purchase_id AS id, 'item' AS type, i.slug, i.kind, i.name,
-              usi.price_paid, usi.bought_at AS purchased_at
+              usi.price_paid, usi.bought_at AS purchased_at,
+              o.provider AS gateway
          FROM user_shop_items usi JOIN shop_items i ON i.id=usi.item_id
+         LEFT JOIN LATERAL (
+           SELECT provider FROM payment_orders
+            WHERE granted_reference_id = usi.purchase_id AND status='paid'
+            ORDER BY paid_at DESC NULLS LAST LIMIT 1
+         ) o ON true
         WHERE usi.user_id=$1 ORDER BY usi.bought_at DESC LIMIT $2 OFFSET $3`,
       [userId, n, o],
     ),
     pool.query(
-      `SELECT id, 'subscription' AS type, plan AS slug,
-              CASE WHEN plan='plus_annual' THEN 'پلاس سالانه' ELSE 'پلاس ماهانه' END AS name,
-              price_paid, starts_at, expires_at, created_at AS purchased_at
-         FROM user_subscriptions
-        WHERE user_id=$1 AND plan IN ('plus','plus_annual')
-        ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      `SELECT s.id, 'subscription' AS type, s.plan AS slug,
+              CASE WHEN s.plan='plus_annual' THEN 'پلاس سالانه' ELSE 'پلاس ماهانه' END AS name,
+              s.price_paid, s.starts_at, s.expires_at, s.created_at AS purchased_at,
+              o.provider AS gateway
+         FROM user_subscriptions s
+         LEFT JOIN LATERAL (
+           SELECT provider FROM payment_orders
+            WHERE granted_reference_id = s.id AND status='paid'
+            ORDER BY paid_at DESC NULLS LAST LIMIT 1
+         ) o ON true
+        WHERE s.user_id=$1 AND s.plan IN ('plus','plus_annual')
+        ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
       [userId, n, o],
     ),
   ]);

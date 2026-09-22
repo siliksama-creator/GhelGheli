@@ -186,7 +186,11 @@ router.get('/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
     pool.query("SELECT count(*)::int AS count FROM app_crash_reports WHERE status='open'"),
     pool.query("SELECT count(*)::int AS count FROM users WHERE joined_at::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date"),
     pool.query("SELECT count(*)::int AS count FROM wheel_spins WHERE spun_day = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date"),
+    // آمارِ درگاهِ زنده. require درون‌تابعه تا گرافِ ماژولِ بالای فایل
+    // عوض نشود و تست‌های تزریقِ وابستگی نشکنند.
+    require('../services/zarinpalService').stats().catch(() => null),
   ]);
+  const zp = q[13] || { todayCount: 0, todayAmount: 0, monthCount: 0, monthAmount: 0, paidCount: 0, paidAmount: 0 };
   res.json({
     users: q[0].rows[0].count,
     usedCodesToday: q[1].rows[0].count,
@@ -202,6 +206,14 @@ router.get('/admin/dashboard', adminAuth, asyncHandler(async (req, res) => {
     openCrashes: q[10].rows[0].count,
     usersJoinedToday: q[11].rows[0].count,
     wheelSpinsToday: q[12].rows[0].count,
+    zarinpal: {
+      todayCount: zp.todayCount || 0,
+      todayAmount: zp.todayAmount || 0,
+      monthCount: zp.monthCount || 0,
+      monthAmount: zp.monthAmount || 0,
+      paidCount: zp.paidCount || 0,
+      paidAmount: zp.paidAmount || 0,
+    },
   });
 }));
 

@@ -104,6 +104,24 @@ String inviteMessage(
     'با این کد ثبت‌نام کن؛ هر دومون $spins چرخش هدیه می‌گیریم و من از خریدهای مستقیم تو $purchasePercent٪ درآمد معرفی می‌گیرم.\n'
     '${webBase ?? kPublicWebUrl}';
 
+/// متن اشتراک نتیجهٔ بازی — کد دعوت و ۳ چرخش رایگان همیشه در پیام است.
+String gameShareMessage({
+  required String title,
+  required String gameTitle,
+  required String versus,
+  required String code,
+  int spins = 3,
+  String? webBase,
+}) {
+  final codeLine = code.isEmpty
+      ? 'با ثبت‌نام در قلقلی $spins چرخش رایگان گردونه بگیر.'
+      : 'کد دعوت من: $code\nبا این کد ثبت‌نام کن و $spins چرخش رایگان گردونه بگیر.';
+  return '$title\n'
+      '$gameTitle: $versus\n'
+      '$codeLine\n'
+      '${webBase ?? kPublicWebUrl}';
+}
+
 Future<ShareOutcome> shareInvite(
   ShareTarget target,
   String code, {

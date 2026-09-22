@@ -5,6 +5,7 @@
 // یک اشتباهِ تایپی هیچ‌وقت دکمهٔ خرید را نیمه‌فعال نمی‌کند.
 import { useEffect, useState } from 'react';
 import { CreditCard, RefreshCw, Save, ShieldCheck, TestTube2 } from 'lucide-react';
+import { fmtNumber } from '../lib/api.js';
 import { Badge, Button, Card, Field, Input } from '../components/ui.jsx';
 import { useToast } from '../lib/toast.jsx';
 
@@ -14,6 +15,7 @@ export function ZarinPalPage({ request, isSuperAdmin }) {
   const notify = useToast();
   const [settings, setSettings] = useState(EMPTY);
   const [orders, setOrders] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -23,6 +25,7 @@ export function ZarinPalPage({ request, isSuperAdmin }) {
       const d = await request('/api/admin/payments/zarinpal');
       setSettings({ ...EMPTY, ...(d.settings || {}) });
       setOrders(Array.isArray(d.orders) ? d.orders : []);
+      setStats(d.stats || null);
       setLoaded(true);
     } catch (e) {
       notify(e.message || 'خواندن تنظیمات زرین‌پال ناموفق بود', 'error');
@@ -120,12 +123,50 @@ export function ZarinPalPage({ request, isSuperAdmin }) {
         </form>
       </Card>
 
-      <Card title="وضعیت سفارش‌های زرین‌پال" subtitle="این جدول فقط شمارش وضعیت‌هاست؛ جزئیات خرید در سابقهٔ خرید کاربر باقی می‌ماند.">
+      <Card title="وضعیت سفارش‌های زرین‌پال" subtitle="شمارش و مبلغ از همان جدول سفارش‌هایی است که وب و اندروید می‌سازند.">
         <div className="card-grid cols-3">
           <div><Badge tone="warning">در انتظار: {String(count('pending'))}</Badge></div>
           <div><Badge tone="success">موفق: {String(count('paid'))}</Badge></div>
           <div><Badge>ناموفق/لغوشده: {String(count('failed'))}</Badge></div>
         </div>
+        {stats && (
+          <div className="card-grid cols-3" style={{ marginTop: 12 }}>
+            <div><b>{fmtNumber(stats.todayAmount)}</b><div className="topbar-sub">تومان امروز · {fmtNumber(stats.todayCount)} خرید</div></div>
+            <div><b>{fmtNumber(stats.monthAmount)}</b><div className="topbar-sub">تومان این ماه · {fmtNumber(stats.monthCount)} خرید</div></div>
+            <div><b>{fmtNumber(stats.paidAmount)}</b><div className="topbar-sub">جمع موفق · {fmtNumber(stats.paidCount)} خرید</div></div>
+          </div>
+        )}
+      </Card>
+
+      <Card title="سفارش‌های اخیر زرین‌پال" subtitle="۴۰ سفارش آخر — منبع آمار داشبورد و کمیسیون معرفی همین ردیف‌هاست.">
+        {!(stats?.recent || []).length ? (
+          <p className="topbar-sub">هنوز سفارشی ثبت نشده.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ textAlign: 'right', color: 'rgba(255,255,255,.55)' }}>
+                  <th style={{ padding: '6px 8px' }}>کاربر</th>
+                  <th style={{ padding: '6px 8px' }}>نوع</th>
+                  <th style={{ padding: '6px 8px' }}>مبلغ</th>
+                  <th style={{ padding: '6px 8px' }}>وضعیت</th>
+                  <th style={{ padding: '6px 8px' }}>تاریخ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.recent.map((r) => (
+                  <tr key={r.id} style={{ borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                    <td style={{ padding: '7px 8px', fontWeight: 700 }}>{r.nickname || r.mobile}</td>
+                    <td style={{ padding: '7px 8px' }}>{r.kind === 'card_box' ? 'صندوق کارت' : r.kind === 'shop_item' ? 'آیتم فروشگاه' : 'پلاس'}</td>
+                    <td style={{ padding: '7px 8px', color: '#FFD166', fontWeight: 700 }}>{fmtNumber(r.amount)}</td>
+                    <td style={{ padding: '7px 8px' }}>{r.status === 'paid' ? 'موفق' : r.status === 'pending' ? 'در انتظار' : 'ناموفق'}</td>
+                    <td style={{ padding: '7px 8px' }}>{r.createdAt ? new Date(r.createdAt).toLocaleString('fa-IR') : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       <Card title="نکتهٔ مهم قبل از فعال‌سازی" subtitle="چون کال‌بک باید از اینترنت به سرور برسد">

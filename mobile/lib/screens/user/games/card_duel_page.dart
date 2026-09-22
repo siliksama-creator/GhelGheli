@@ -1,21 +1,17 @@
 import 'dart:async';
-import 'dart:io';
 // برای لرزشِ میرای لحظهٔ برخورد در _ClashStage (سینوسِ میراشونده).
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../api_client.dart';
 import '../../../core/app_config.dart';
 import '../../../core/assets.dart';
 import '../../../core/cosmetics.dart';
-import '../../../core/share_invite.dart';
+import '../../../widgets/result_share_strip.dart';
 import '../../../services/image_disk_cache.dart';
 import '../../../theme/colors.dart';
 import '../../../theme/tokens.dart';
@@ -385,109 +381,19 @@ class _CardDuelPageState extends State<CardDuelPage> {
     return performances.isEmpty ? null : performances.first;
   }
 
-  Future<XFile> _renderResultCard({
-    required String title,
-    required String score,
-    required Map<String, dynamic>? mvp,
-    required String url,
-  }) async {
-    const size = Size(1080, 1080);
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final paint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF071522), Color(0xFF17304C), Color(0xFF35105D)],
-      ).createShader(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, paint);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(34, 34, 1012, 1012),
-        const Radius.circular(38),
-      ),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 10
-        ..color = _gold,
-    );
-    void text(
-      String value,
-      double y,
-      double fontSize,
-      Color color, {
-      FontWeight weight = FontWeight.w700,
-    }) {
-      final painter = TextPainter(
-        text: TextSpan(
-          text: value,
-          style: TextStyle(
-            fontSize: fontSize,
-            color: color,
-            fontWeight: weight,
-          ),
-        ),
-        textDirection: TextDirection.rtl,
-        textAlign: TextAlign.center,
-        maxLines: 2,
-      )..layout(maxWidth: 900);
-      painter.paint(canvas, Offset((1080 - painter.width) / 2, y));
-    }
-
-    text('GHELGHELI CARD ARENA', 120, 34, _cyan, weight: FontWeight.w900);
-    text(title, 240, 76, Colors.white, weight: FontWeight.w900);
-    text(score, 380, 82, _gold, weight: FontWeight.w900);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(135, 590, 810, 200),
-        const Radius.circular(28),
-      ),
-      Paint()..color = _gold.withValues(alpha: .12),
-    );
-    text('MVP مسابقه', 625, 32, _gold, weight: FontWeight.w900);
-    text(
-      '${mvp?['name'] ?? 'ستاره آرنا'} · عدد راند ${faNum(mvp?['mvpRoundPower'])}',
-      690,
-      46,
-      Colors.white,
-      weight: FontWeight.w900,
-    );
-    text(
-      'جرأت داری؟ مستقیم به چالشم بیا',
-      850,
-      34,
-      _emerald,
-      weight: FontWeight.w900,
-    );
-    text(url, 925, 23, const Color(0xFFCBD5E1));
-    final image = await recorder.endRecording().toImage(1080, 1080);
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    final directory = await getTemporaryDirectory();
-    final file = File(
-      '${directory.path}/ghelgheli-result-${DateTime.now().millisecondsSinceEpoch}.png',
-    );
-    await file.writeAsBytes(bytes!.buffer.asUint8List(), flush: true);
-    return XFile(file.path, mimeType: 'image/png');
-  }
-
   Future<void> _shareResult() async {
     if (_sharing) return;
     setState(() => _sharing = true);
     try {
-      final invite = await _session.createChallenge();
       final score = _session.state['score'] is Map
           ? _session.state['score'] as Map
           : const {};
       final me = _session.mySymbol ?? 'X';
       final other = me == 'X' ? 'O' : 'X';
-      final mvp = _resultMvp();
       final narration = _session.state['narration'] is Map
           ? _session.state['narration'] as Map
           : const {};
       final narratedTitle = '${narration['headline'] ?? ''}';
-      final achievement = narration['achievement'] is Map
-          ? narration['achievement'] as Map
-          : const {};
       final title = narratedTitle.isNotEmpty
           ? narratedTitle
           : _session.winner == 'DRAW'
@@ -498,174 +404,26 @@ class _CardDuelPageState extends State<CardDuelPage> {
       final opponentRole = _session.vsBot ? 'ربات' : 'حریف';
       final scoreLabel =
           'تو ${faNum(score[me])} — $opponentRole ${faNum(score[other])}';
-      final achievementLine = achievement['label'] != null
-          ? 'نشان: ${achievement['label']}\n'
-          : '';
-      final message = '$title\n'
-          'نتیجه: $scoreLabel\n'
-          '$achievementLine'
-          'MVP: ${mvp?['name'] ?? 'ستاره آرنا'} (عدد راند ${faNum(mvp?['mvpRoundPower'])})\n'
-          'جرأت داری؟ مستقیم به چالشم بیا:\n${invite['shareUrl']}';
-      final card = await _renderResultCard(
-        title: title,
-        score: scoreLabel,
-        mvp: mvp,
-        url: '${invite['shareUrl']}',
-      );
       if (!mounted) return;
       await showModalBottomSheet<void>(
         context: context,
         backgroundColor: const Color(0xFF071522),
-        isScrollControlled: true,
         builder: (ctx) => SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(Gaps.md),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(Gaps.lg),
-                  decoration: BoxDecoration(
-                    borderRadius: Corners.rXl,
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF17304C), Color(0xFF35105D)],
-                    ),
-                    border: Border.all(color: _gold, width: 1.5),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'GHELGHELI CARD ARENA',
-                        style: TextStyle(
-                          color: _cyan,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Gaps.vSm,
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        scoreLabel,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: _gold,
-                          fontSize: 40,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Gaps.vSm,
-                      Text(
-                        'MVP · ${mvp?['name'] ?? 'ستاره آرنا'}',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
-                      ),
-                      Text(
-                        'عدد راند ${faNum(mvp?['mvpRoundPower'])}',
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 11,
-                        ),
-                      ),
-                      Gaps.vSm,
-                      const Text(
-                        'از لینک چالش مستقیم وارد آرنا شو',
-                        style: TextStyle(
-                          color: _emerald,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Gaps.vMd,
-                FilledButton.icon(
-                  onPressed: () async {
-                    // share_plus ۱۳: `Share.*` منسوخ شده و جایش
-                    // `SharePlus.instance.share(ShareParams(...))` است.
-                    // ارتقا لازم بود چون نسخهٔ ۱۰ هنوز Kotlin Gradle Plugin
-                    // را خودش اعمال می‌کرد و بیلد هشدارِ KGP می‌داد؛
-                    // نسخه‌های آینده فلاتر آن را خطا می‌کنند.
-                    await SharePlus.instance.share(
-                      ShareParams(
-                        files: [card],
-                        text: message,
-                        subject: 'نتیجه دوئل قلقلی',
-                      ),
-                    );
-                    unawaited(
-                      widget.api.post('/api/analytics/events', {
-                        'event': 'share',
-                        'platform': 'android',
-                        'gameId': 'card_duel',
-                        'matchId': _session.matchId,
-                        'target': 'system_share_image',
-                      }).catchError((_) => <String, dynamic>{}),
-                    );
-                  },
-                  icon: const Icon(Icons.image_rounded),
-                  label: const Text('اشتراک کارت تصویری نتیجه'),
-                ),
-                Gaps.vSm,
-                Row(
-                  children: [
-                    for (final target in shareTargets)
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 3),
-                          child: InkWell(
-                            onTap: () async {
-                              await shareText(target, message);
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              unawaited(
-                                widget.api.post('/api/analytics/events', {
-                                  'event': 'share',
-                                  'platform': 'android',
-                                  'gameId': 'card_duel',
-                                  'matchId': _session.matchId,
-                                  'target': target.id,
-                                }).catchError((_) => <String, dynamic>{}),
-                              );
-                            },
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                MessengerIcon(app: target.app, size: 34),
-                                const SizedBox(height: 4),
-                                Text(
-                                  target.label,
-                                  style: const TextStyle(fontSize: 11.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                Gaps.vSm,
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    await copyText(message);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    unawaited(
-                      widget.api.post('/api/analytics/events', {
-                        'event': 'share',
-                        'platform': 'android',
-                        'gameId': 'card_duel',
-                        'matchId': _session.matchId,
-                        'target': 'clipboard',
-                      }).catchError((_) => <String, dynamic>{}),
-                    );
-                  },
-                  icon: const Icon(Icons.copy_rounded),
-                  label: const Text('کپی کارت نتیجه و لینک'),
+                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                Text(scoreLabel, style: const TextStyle(color: Color(0xFFFFD166), fontWeight: FontWeight.w800)),
+                const SizedBox(height: 12),
+                ResultShareStrip(
+                  api: widget.api,
+                  title: title,
+                  gameTitle: 'دوئل کارت‌ها',
+                  versus: scoreLabel,
+                  gameId: 'card_duel',
+                  matchId: _session.matchId,
                 ),
               ],
             ),
