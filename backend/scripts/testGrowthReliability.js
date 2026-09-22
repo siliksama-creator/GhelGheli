@@ -106,7 +106,8 @@ ok(idxMigration.includes('CREATE INDEX IF NOT EXISTS idx_analytics_created_at'),
 const analyticsSrc = read('backend/src/services/analyticsService.js');
 ok(analyticsSrc.includes('async function pruneOld') && analyticsSrc.includes('keepDays = 90'),
   'analytics service prunes old events with a 90-day floor');
-const serverSrc = read('backend/src/server.js');
+// هرس‌های زمان‌بندی‌شده به src/cron.js منتقل شدند (بندِ ۱ ممیزی ۸ مهر)
+const serverSrc = read('backend/src/server.js') + '\n' + read('backend/src/cron.js');
 ok(serverSrc.includes('analytics.pruneOld(90)')
   && serverSrc.includes('[analytics] event prune failed'),
   'server schedules the analytics prune with safe error handling');

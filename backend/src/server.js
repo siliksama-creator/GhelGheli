@@ -28,7 +28,6 @@ const { makeRateStore } = require('./lib/rateLimitStore');
 const rlStore = prefix => { const s = makeRateStore(prefix); return s ? { store: s } : {}; };
 // کشِ مشترک با TTL (ردیس اگر باشد، وگرنه حافظهٔ پروسه) برای مسیرهای داغ.
 const { cacheGet, cacheSet } = require('./lib/cache');
-const cron = require('node-cron');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yaml');
 const { Server } = require('socket.io');
@@ -2909,178 +2908,14 @@ if (PROCESS_ROLE !== 'http') {
   games.attach(io);
 }
 
-// اگر process بعد از کسر stake و قبل از تسویه خاموش شود، سند reserved در
-// دیتابیس می‌ماند. startup و sweep ساعتی اصل امتیاز را برمی‌گردانند؛ در
-// نتیجه crash/reboot هرگز ورودی کاربر را برای همیشه قفل نمی‌کند.
-gameStakes.refundStaleMatches(60)
-  .then(n => { if (n) logger.info(`[games:stake] startup refunded ${n} stale match(es)`); })
-  .catch(e => logger.error('[games:stake] startup recovery failed:', e.message));
-cron.schedule('29 * * * *', () => {
-  gameStakes.refundStaleMatches(60)
-    .then(n => { if (n) logger.info(`[games:stake] refunded ${n} stale match(es)`); })
-    .catch(e => logger.error('[games:stake] recovery failed:', e.message));
+// ── کارهای زمان‌بندی‌شده — همه در src/cron.js (بندِ ۱ ممیزیِ ۸ مهر). ──
+// همان scheduleها با همان ترتیب و timezone ثبت می‌شوند؛ جزئیات و دلیلِ
+// هر job در همان ماژول آمده است.
+require('./cron')({
+  pool, logger, gameStakes, closeExpiredSeasons, addLeaguePoints,
+  wheelReminder, tapGame, cardDuel, coins, analytics,
+  imageUploadDir, thumbRoot, THUMB_WIDTHS, IMAGE_EXT_RE,
 });
-
-// ── بستنِ لیگ‌های تمام‌شده — ساعتی، نه «اولِ ماه» ────────────────────────
-//
-// قبلاً `cron.schedule('5 0 1 * *', closeActiveSeason)` بود: فقط اولِ هر
-// ماهِ میلادی و فقط روی **یک** لیگ.
-//
-// مالک تصریح کرد: «تعداد روز لیگ فقط توسط ادمین مشخص میشه و اصلا ربطی
-// به ماهانه و هفتگی نداره، ساعت اتمامش هم ادمین به تاریخ ایران مشخص
-// میکنه». پنلِ مدیر هم تا سه لیگِ هم‌زمان با تاریخِ دلخواه می‌سازد.
-//
-// با زمان‌بندِ قبلی، لیگی که مثلاً چهارشنبه ۲۰:۰۰ تمام می‌شد تا اولِ ماهِ
-// بعد باز می‌ماند و هیچ‌کس جایزه‌اش را نمی‌گرفت.
-//
-// حالا هر ساعت سرِ دقیقهٔ ۵ اجرا می‌شود و هر لیگی که `ends_at`اش گذشته
-// را می‌بندد. حداکثر تأخیر یک ساعت است — که برای واریزِ جایزه (که
-// به‌هرحال منتظرِ تأییدِ مدیر می‌ماند) کاملاً قابل قبول است.
-//
-// timezone صریح داده شده تا اگر سرور مهاجرت کرد، تفسیرِ تاریخ‌هایی که
-// مدیر به وقتِ ایران وارد کرده جابه‌جا نشود.
-cron.schedule('5 * * * *', () => {
-  closeExpiredSeasons()
-    .then(r => { if (r.closed) logger.info(`[league] ${r.closed} فصل بسته شد`); })
-    .catch(e => logger.error('[league] بستنِ خودکارِ فصل شکست خورد:', e.message));
-}, { timezone: 'Asia/Tehran' });
-
-// Sweep expired tap-game nonces hourly.
-//
-// submitBatch() prunes only the CALLING user's rows, so a player who stops
-// playing leaves theirs behind forever — the table grew unbounded with
-// replay-protection records that were long past their 30-minute TTL.
-// ── یادآور چرخش رایگان ───────────────────────────────────────────────────
-//
-// ۱۸:۳۰ به وقت تهران. سرور روی Asia/Tehran است، ولی timezone صریح داده
-// شده تا اگر روزی سرور مهاجرت کرد، ساعتِ اعلان جابه‌جا نشود و نیمه‌شب
-// به گوشی مردم نرود.
-//
-// سرویس **خودش هم** ساعات استراحت (۲۲:۰۰–۰۹:۰۰) را بررسی می‌کند؛ این
-// دو لایه عمدی است. جزئیات در wheelReminderService.
-cron.schedule('30 18 * * *', () => {
-  wheelReminder.sendDailyReminder()
-    .catch(e => logger.error('[wheel-reminder] failed:', e.message));
-}, { timezone: 'Asia/Tehran' });
-
-cron.schedule('17 * * * *', () => {
-  tapGame.pruneNonces()
-    .then(n => { if (n > 0) logger.info(`[tap] pruned ${n} expired nonces`); })
-    .catch(e => logger.error('[tap] nonce prune failed:', e.message));
-});
-
-// تاریخچهٔ دوئل فقط پنج بازی امتیازی اخیر را نشان می‌دهد؛ ربات و ردیف‌های
-// کهنه‌تر از دو هفته اینجا پاک می‌شوند تا جدول سبک بماند.
-cron.schedule('17 4 * * *', () => {
-  cardDuel.pruneBattleHistory()
-    .then(n => { if (n) logger.info(`[card-duel] pruned ${n} old battle log(s)`); })
-    .catch(e => logger.error('[card-duel] history prune failed:', e.message));
-}, { timezone: 'Asia/Tehran' });
-
-// جدولِ سهمیهٔ سکه به ازای هر کاربرِ فعال روزی یک ردیف می‌سازد. بدونِ
-// هرس، بعد از یک سال با ۱۰٬۰۰۰ کاربرِ فعال حدود ۳.۶ میلیون ردیفِ مرده
-// می‌ماند. هفت روز نگه می‌داریم تا اگر لازم شد بشود دیروز را بررسی کرد.
-cron.schedule('23 4 * * *', () => {
-  coins.pruneQuota(7)
-    .then(n => { if (n) logger.info(`[coins] pruned ${n} old quota row(s)`); })
-    .catch(e => logger.error('[coins] quota prune failed:', e.message));
-}, { timezone: 'Asia/Tehran' });
-
-// هرسِ رویدادهای تحلیلیِ کهنه — بند ۶بِ ممیزیِ مستقلِ دوم: این جدول
-// تنها جدولِ رویدادی بود که بدون سقف رشد می‌کرد. رویدادها فقط به‌دردِ
-// نمودارهای پنل می‌خورند که حداکثر ۹۰ روز عقب را نشان می‌دهند؛ کهنه‌تر
-// از آن نه کاربردی دارد نه ارزش نگهداری.
-cron.schedule('41 4 * * *', () => {
-  analytics.pruneOld(90)
-    .then(n => { if (n) logger.info(`[analytics] pruned ${n} old event(s)`); })
-    .catch(e => logger.error('[analytics] event prune failed:', e.message));
-  // صندوقِ کرش هم سقف دارد: رخدادهای حل/نادیدهٔ قدیمی‌تر از ۱۸۰ روز پاک
-  // می‌شوند (گزارش‌های «باز» هرگز). بدون این، جدولِ کرش برای همیشه رشد می‌کرد.
-  analytics.pruneCrashes(180)
-    .then(n => { if (n) logger.info(`[analytics] pruned ${n} old crash report(s)`); })
-    .catch(e => logger.error('[analytics] crash prune failed:', e.message));
-}, { timezone: 'Asia/Tehran' });
-// ── پاک‌سازی عکس‌های رها شده (۳ روز) ───────────────────────────────────
-// عکس کاربر بعد از تأیید خودکار حذف می‌شود (serverReviewQueue)، ولی اگر
-// پنل ۳ روز پرونده را نبندد یا فایل orphan بماند، اینجا روزانه جارو می‌شود.
-// عکس طرح‌ها (designs) دست نمی‌خورد — فقط uploads/images که در هیچ جدولِ
-// مرجع نیست و قدیمی است.
-cron.schedule('33 3 * * *', async () => {
-  try {
-    const cutoff = Date.now() - 3 * 24 * 60 * 60 * 1000;
-    let removed = 0;
-    for (const name of fs.readdirSync(imageUploadDir)) {
-      if (!IMAGE_EXT_RE.test(name)) continue;
-      const fp = path.join(imageUploadDir, name);
-      try {
-        const stat = fs.statSync(fp);
-        if (stat.mtimeMs > cutoff) continue;
-        // آیا این فایل هنوز در photo_card_submissions یا designs ارجاع دارد؟
-        const rel = `/uploads/images/${name}`;
-        const { rows: s1 } = await pool.query(`SELECT 1 FROM photo_card_submissions WHERE user_image_path LIKE '%' || $1 LIMIT 1`, [name]);
-        if (s1[0]) continue;
-        const { rows: s2 } = await pool.query(`SELECT 1 FROM photo_card_designs WHERE image_url=$1 LIMIT 1`, [rel]);
-        if (s2[0]) continue;
-        // همچنین اگر در پشتیبانی پیوست شده باشد (attachments json)
-        const { rows: s3 } = await pool.query(`SELECT 1 FROM support_ticket_messages WHERE attachments::text LIKE '%' || $1 || '%' LIMIT 1`, [name]);
-        if (s3[0]) continue;
-        fs.unlinkSync(fp);
-        // thumbnail‌ِ مربوطه را هم پاک کن
-        for (const w of THUMB_WIDTHS) {
-          const tp = path.join(thumbRoot, `${w}-${name}.webp`);
-          try { if (fs.existsSync(tp)) fs.unlinkSync(tp); } catch {}
-        }
-        removed++;
-      } catch {}
-    }
-    if (removed) logger.info(`[cleanup] ${removed} عکس قدیمی رها پاک شد`);
-  } catch (e) {
-    logger.error('[cleanup] failed:', e.message);
-  }
-}, { timezone: 'Asia/Tehran' });
-
-
-// ── فاز ۴: جاروبِ بازبینیِ خودکارِ صفِ کارت‌های عکسی ──
-//
-// ── فاز ۴: جاروبِ بازبینیِ خودکارِ صفِ کارت‌های عکسی ──
-//
-// پرونده‌های «در انتظار» را با مدلِ روی سرور (یونِت/س‌فیس + امبد بصریِ
-// تمام‌رزولوشن) دوباره می‌سنجد. مواردِ پراطمینان خودکار تأیید می‌شوند
-// (اگر SERVER_AUTO_APPROVE=true باشد)؛ بقیه در صفِ ادمین می‌مانند. هنگام
-// ورود به صف هم یک بازبینیِ فوری (آسنکرون) اجرا می‌شود؛ این کرون فقط پوششِ
-// عقب‌افتاده‌ها و مواردی که مدل دیرتر لود شد را تضمین می‌کند.
-//
-// ── چرا «هر پنج دقیقه» و چرا اینجا شرطِ نقش نیست ──
-//
-// این بلوک روی **هر سه** پروسه ثبت می‌شود و این عمدی است: کدام پروسه جاروب
-// را بردارد به قفلِ مشورتیِ پستگرس تصمیم می‌گیرد (توضیحِ کامل در
-// `services/serverReviewQueue.js`). اگر به‌جای قفل، اینجا شرطِ
-// `PROCESS_ROLE === 'game'` می‌گذاشتیم، خوابیدنِ گرهِ بازی جاروب را هم
-// متوقف می‌کرد؛ با قفل، هر پروسهٔ زنده‌ای می‌تواند مسئول شود.
-//
-// بازه از ۱۰ دقیقه به ۵ دقیقه آمد چون پس از تک‌مسئول‌شدن، هزینهٔ هر جاروب
-// محدود و قابل پیش‌بینی است (حداکثر ۲۰ پرونده × ~۱۰۰ms استنتاج، ترتیبی) و
-// کوتاه‌ترشدنِ بازه یعنی دیرترین حالتِ انتظارِ کاربر برای تأییدِ خودکار
-// نصف می‌شود: ۱۰ → ۵ دقیقه.
-{
-  const serverReviewQueue = require('./services/serverReviewQueue');
-  const runPhotoSweep = () => serverReviewQueue.sweepPending(pool, {
-    addLeaguePoints,
-    leaderboardSignal: () => {
-      try { require('./services/leaderboardSignal').leaderboardChanged(); } catch { /* بی‌خیال */ }
-    },
-  }).then(r => {
-    if (r.skipped) return; // پروسهٔ دیگری قفل را دارد — بی‌سروصدا رد شو
-    if (r.processed || r.approved) {
-      logger.info(`[photoReview] sweep: ${r.processed} بررسی، ${r.approved} تأیید خودکار، ${r.queued} در صف، ${r.errors} خطا${
-        r.retries ? `، ${r.retries} تلاشِ مجدد` : ''}`);
-    }
-  }).catch(e => logger.error('[photoReview] sweep failed:', e.message));
-  // یک‌بار بعد از بالا‌آمدن (فرصت لودشدن مدل)، سپس هر پنج دقیقه.
-  setTimeout(runPhotoSweep, 45 * 1000);
-  cron.schedule('*/5 * * * *', runPhotoSweep);
-}
-
 // Centralized error handler. Previously this forwarded err.message straight
 // to the client, which meant raw PostgreSQL errors (unique/foreign-key
 // constraint names, column/table names, data types) leaked verbatim to

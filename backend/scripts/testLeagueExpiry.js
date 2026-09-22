@@ -42,7 +42,10 @@ function ck(name, cond, detail = '') {
   else { failures.push(`${name}${detail ? ` — ${detail}` : ''}`); console.log('  ✗', name, detail ? `→ ${detail}` : ''); }
 }
 
-const server = fs.readFileSync(path.join(ROOT, 'src', 'server.js'), 'utf8');
+// scheduleها به src/cron.js منتقل شدند (بندِ ۱ ممیزی ۸ مهر) — هر دو خوانده
+// می‌شوند تا این گارد نسبت به جابه‌جاییِ ماژول‌ها کور نشود.
+const server = fs.readFileSync(path.join(ROOT, 'src', 'server.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(ROOT, 'src', 'cron.js'), 'utf8');
 const league = fs.readFileSync(path.join(ROOT, 'src', 'services', 'leagueService.js'), 'utf8');
 
 /**
