@@ -53,3 +53,22 @@ jobs:
           set -o pipefail
           echo "trigger: ${{ github.event_name }}${{ github.event.workflow_run.head_sha }}"
           sudo -n /var/www/GhelGheli/scripts/deploy.sh
+
+      # ── بررسی‌های پسادیپلوی روی دامنهٔ زنده ────────────────────────────
+      # CI ابزارهای مرورگری را روی previewِ محلی می‌زند (نصفِ login)؛ اینجا
+      # همان smoke روی **سایتِ زنده** است تا servingِ واقعیِ nginx (TLS،
+      # مسیرها، فونت‌ها، رندرِ واقعی) بعد از هر دیپلوی آزموده شود.
+      # نیمهٔ لاگین‌شدهٔ smoke (هر ۷ تب + کیف پول) به JWTِ واقعی نیاز
+      # دارد و طبقِ چک‌لیستِ دیپلوی دستی است — این گام جای آن را نمی‌گیرد.
+      #
+      # cache-headers عمداً اینجاست نه CI: هدرهای no-cache/immutable را
+      # فقط nginxِ زنده می‌دهد و vite preview نمی‌دهد. همین ابزار یک بار
+      # بی‌صدا کهنه شد (.irِ پیش‌فرض از قبلِ مهاجرتِ دامنه) و چون هیچ‌جا
+      # خودکار اجرا نمی‌شد، کسی نفهمید — از ۸ مهر بعدِ هر دیپلوی اجرا می‌شود.
+      - name: بررسیِ وبِ زنده (smokeِ بدونِ توکن + هدرهای کش)
+        shell: bash
+        run: |
+          set -o pipefail
+          cd /var/www/GhelGheli/userweb
+          node tool/smoke.mjs https://user.ghelghelishop.com
+          node tool/cache-headers.mjs
