@@ -27,10 +27,17 @@ const engine = read('src/games/engine.js');
 const server = read('src/server.js');
 const adminMissions = read('src/routes/adminMissions.js');
 const levelSvc = read('src/services/levelService.js');
+const memoryRules = read('src/games/rules/memory.js');
+const soloSrc = read('src/games/solo.js');
 
 console.log('\n== ۱. دامنهٔ ماموریت‌ها: ربات فقط رویدادِ scoped به ربات ==');
-ok(/if \(room\.vsBot\) \{\s*growth\.missions\.record\(player\.id, 'bot_match'\)/.test(engine),
-  'بازی با ربات فقط bot_match منتشر می‌کند');
+const vsBotMission = engine.indexOf('if (room.vsBot) {');
+const botMissionRec = engine.indexOf("record(player.id, 'bot_match')", vsBotMission);
+ok(vsBotMission > -1 && botMissionRec > vsBotMission
+  && engine.slice(vsBotMission, botMissionRec).includes('!room.rules.practiceOnlyBot'),
+  'بازی با ربات فقط bot_match منتشر می‌کند — مگر بازیِ تمرینیِ record-only');
+ok(/practiceOnlyBot:\s*true/.test(memoryRules),
+  'رباتِ جفت‌یاب record-only است (خواستهٔ مالک: «حالت تمرین فقط رکوردی»)');
 ok(/\} else \{\s*growth\.missions\.record\(player\.id, 'match_completed'\)/.test(engine),
   'match_completed فقط در شاخهٔ غیرربات ثبت می‌شود');
 ok(/if \(resolvedWinner === symbol\) \{\s*growth\.missions\.record\(player\.id, 'online_win'\)/.test(engine),
@@ -70,6 +77,16 @@ ok(/مجموع exp دریافتی از همه بازی های آنلاین/.test
 console.log('\n== ۵. رویدادِ جدید در پنل ادمین قابلِ انتخاب است ==');
 ok(/const EVENTS = \[[^\]]*'bot_match'[^\]]*\]/.test(adminMissions),
   'bot_match در EVENTS پنل ادمین هست');
+
+console.log('\n== ۶. جفت‌یاب: برگشتِ خودکارِ جفتِ ناموفق ==');
+ok(/missHoldMs:\s*1100/.test(memoryRules),
+  'قواعدِ جفت‌یاب زمانِ برگشتِ جفتِ ناموفق را تعریف می‌کند');
+ok(/room\.missTimer\s*=\s*setTimeout/.test(engine),
+  'موتور جفتِ ناموفق را خودش برمی‌گرداند');
+ok(/clearTimeout\(room\.missTimer\)/.test(engine),
+  'تایمرِ میس در پایانِ مسابقه پاک می‌شود');
+ok(/run\.missTimer\s*=\s*setTimeout/.test(soloSrc),
+  'حالتِ رکوردیِ تنها هم جفتِ ناموفق را برمی‌گرداند');
 
 // ── بخشِ پویا: فقط وقتی دیتابیس در دسترس باشد (jobِ e2e) ──────────────────
 async function runtime() {

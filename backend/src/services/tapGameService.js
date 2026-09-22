@@ -821,6 +821,11 @@ async function submitBatch(
         // چشماشون اضافه بشه»).
         coinsEarned,
         coinsTotal,
+        // چند لول در همین بسته تمام شده — کلاینت با این و دو عددِ
+        // pointsEarned/coinsEarned «لحظهٔ جایزهٔ لول‌آپ» را اجرا می‌کند
+        // (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵: «کاربر ببینه هر لول چی
+        // دریافت کرده»). افزودنی است؛ کلاینتِ قدیمی نادیده‌اش می‌گیرد.
+        levelsGained: rejected ? 0 : (next.gained || 0),
         // جمعِ سکهٔ ضربه‌زنِ این کاربر — برای صفحهٔ «بازی تمام شد».
         coinsAwarded: Number(row.coins_awarded || 0),
         pointsToNextLevel: justFinished

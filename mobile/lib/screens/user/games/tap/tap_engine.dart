@@ -179,6 +179,15 @@ class TapEngine extends ChangeNotifier {
   int coinsTotalLastBatch = 0;
   int _coinsEarnedSerial = 0;
   int get coinsEarnedSerial => _coinsEarnedSerial;
+
+  // ── دریافتیِ لول‌آپ (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──
+  // امتیاز/سکهٔ تأییدشدهٔ سرور برای آخرین بسته‌ای که در آن لولی تمام
+  // شده. صفحه با مقایسهٔ `levelAwardSerial` «لحظهٔ جایزه» را اجرا می‌کند
+  // تا کاربر ببیند هر لول دقیقاً چه گرفته است.
+  int pointsEarnedLastBatch = 0;
+  int levelsGainedLastBatch = 0;
+  int _levelAwardSerial = 0;
+  int get levelAwardSerial => _levelAwardSerial;
   String? get notice => _notice;
 
   // ── «بازی تمام شد» (دورِ ۳۳) ──────────────────────────────────────────
@@ -548,6 +557,19 @@ class TapEngine extends ChangeNotifier {
           coinsEarnedLastBatch = result.coinsEarned!;
           coinsTotalLastBatch = result.coinsTotal ?? 0;
           _coinsEarnedSerial++;
+        }
+        // ── لحظهٔ جایزهٔ لول‌آپ (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──
+        // فقط وقتی سرور خودش بگوید در همین بسته لولی تمام شده
+        // (levelsGained) — نه از روی شمارشِ خوش‌بینانهٔ محلی. سکهٔ همین
+        // بسته بی‌قیدِ >۰ نوشته می‌شود تا عددِ کهنهٔ بستهٔ قبلی به اسمِ
+        // این لول نمایش داده نشود (لیگِ بسته → سکه صفر، امتیاز مثبت).
+        if ((result.levelsGained ?? 0) > 0) {
+          levelsGainedLastBatch = result.levelsGained ?? 0;
+          pointsEarnedLastBatch = result.pointsEarned ?? 0;
+          coinsEarnedLastBatch = result.coinsEarned ?? 0;
+          if (pointsEarnedLastBatch > 0 || coinsEarnedLastBatch > 0) {
+            _levelAwardSerial++;
+          }
         }
         await _persist(immediate: true);
         _safeNotify();

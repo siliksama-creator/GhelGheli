@@ -434,15 +434,18 @@ class _MemoryGrid extends StatelessWidget {
         ),
         Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 340),
+            // ۲۹۶ نه ۳۴۰ — خواستهٔ مالک (۳۱ شهریور ۱۴۰۵): «عکس‌های
+            // بازی کوچیک‌تر و جمع‌وجورتر». آینهٔ وب در brand-mark.css
+            // (همان ۲۹۶/۵)؛ گاردِ یکپارچگیِ چینش سرِ جایش است.
+            constraints: const BoxConstraints(maxWidth: 296),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: cols,
-                mainAxisSpacing: 6,
-                crossAxisSpacing: 6,
+                mainAxisSpacing: 5,
+                crossAxisSpacing: 5,
                 childAspectRatio: 1.0,
               ),
               itemCount: cards.length,

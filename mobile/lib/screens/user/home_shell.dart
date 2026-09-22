@@ -48,6 +48,13 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell>
     with SingleTickerProviderStateMixin {
   int _index = 0;
+
+  // ── کاشیِ خانه → بازکردنِ مستقیمِ بازی (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──
+  // کاشیِ ضربه‌زن در داشبورد کاربر را مستقیم به خودِ بازی می‌برد، نه به
+  // فهرستِ بازی‌ها. nonce باعث می‌شود بازکردنِ دوبارهٔ همان بازی هم
+  // از راهِ didUpdateWidget برسد (نه فقط mountِ تازه).
+  String? _pendingGameId;
+  int _pendingGameNonce = 0;
   StreamSubscription<String>? _fcmRefreshSubscription;
 
   Future<void> _confirmLogout(BuildContext context) async {
@@ -298,6 +305,11 @@ class _HomeShellState extends State<HomeShell>
           onOpenWheel: () => setState(() => _index = wheelIndex),
           onOpenReferral: () => setState(() => _index = referralIndex),
           onOpenInventory: () => setState(() => _index = cardRegIndex),
+          onOpenTap: () => setState(() {
+            _index = 4;
+            _pendingGameId = 'tap';
+            _pendingGameNonce = DateTime.now().microsecondsSinceEpoch;
+          }),
           pendingGrants: _pendingGrants,
         );
       case cardRegIndex:
@@ -318,6 +330,8 @@ class _HomeShellState extends State<HomeShell>
       case 4:
         return SocialPage(
           api: widget.api,
+          externalGameId: _pendingGameId,
+          externalGameNonce: _pendingGameNonce,
           onOpenShop: () => setState(() => _index = shopIndex),
           // آلرتِ قرمزِ تبِ گذر نبرد از همین شمارنده تغذیه می‌شود؛
           // داده‌اش از /api/bootstrap می‌آید، پس درخواستِ اضافه ندارد.

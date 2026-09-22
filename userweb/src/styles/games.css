@@ -201,8 +201,11 @@
 .memEvent.match { color: #34D399; }
 .memEvent.miss { color: #F87171; }
 .memGrid {
+  /* ۳۵۲/۷ نه ۳۹۲/۹ — خواستهٔ مالک (۳۱ شهریور ۱۴۰۵): «عکس‌های بازی
+     کوچیک‌تر و جمع‌وجورتر». آینهٔ موبایل در brand-mark.css (۲۹۶/۵) و
+     آینهٔ اندروید در memory_board.dart (maxWidth 296, spacing 5). */
   display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr);
-  gap: 9px; width: min(392px, 92vw);
+  gap: 7px; width: min(352px, 88vw);
 }
 .memCard {
   aspect-ratio: .82; padding: 0; background: transparent; border: 0;

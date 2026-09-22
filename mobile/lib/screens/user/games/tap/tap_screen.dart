@@ -68,6 +68,7 @@ class _TapGameScreenState extends State<TapGameScreen>
       GlobalKey<TapCharacterState>();
 
   int _seenEventSerial = 0;
+  int _seenAwardSerial = 0;
 
   // Tap intentionally has no audio. Rapid sound-effect playback was the only
   // native resource opened on every accepted tap and could saturate the
@@ -236,7 +237,9 @@ class _TapGameScreenState extends State<TapGameScreen>
         case TapEvent.levelUp:
           HapticFeedback.mediumImpact();
           _characterKey.currentState?.pulse();
-          _showLevelUpDialog(_engine.level);
+          // جشنِ لول‌آپ دیگر دیالوگِ بسته‌دارِ محلی نیست: «لحظهٔ جایزهٔ»
+          // یکپارچه با اعدادِ تأییدشدهٔ سرور، پایین‌تر و به‌محضِ رسیدنِ
+          // پاسخِ همان بسته اجرا می‌شود (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵).
           break;
         case TapEvent.skinChanged:
           HapticFeedback.heavyImpact();
@@ -255,6 +258,16 @@ class _TapGameScreenState extends State<TapGameScreen>
           break;
       }
     }
+    // ── لحظهٔ جایزهٔ لول‌آپ (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──
+    // «وقتی ضربه‌زن لول‌آپ می‌شود باید مثلِ سیستمِ یکپارچه اعلام شود تا
+    // کاربر ببیند هر لول چه گرفته.» اعداد از پاسخِ سرورِ همان بسته می‌آیند
+    // (pointsEarned/coinsEarned) — لایه بی‌لمس و کوتاه است و مزاحمِ
+    // ضربه‌زدنِ پشت‌سرهم نمی‌شود.
+    if (_engine.levelAwardSerial != _seenAwardSerial) {
+      _seenAwardSerial = _engine.levelAwardSerial;
+      _fireLevelMoment();
+    }
+
     // ── لحظهٔ جایزهٔ پایانِ بازی (یک بار) ──
     //
     // همان جمعی که `_CompletionView` نشان می‌دهد، این‌جا هم جشن گرفته
@@ -312,13 +325,23 @@ class _TapGameScreenState extends State<TapGameScreen>
     });
   }
 
-  void _showLevelUpDialog(int newLevel) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: _LevelUpDialogContent(level: newLevel, accent: _accent),
+  /// لحظهٔ جایزهٔ لول‌آپ — از همان گذرگاهِ یکپارچهٔ پایانِ بازی.
+  ///
+  /// جایگزینِ دیالوگِ بسته‌دارِ قدیمی (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵):
+  /// کاربر باید ببیند هر لول **چه گرفته** — امتیاز و سکهٔ واقعیِ همان
+  /// بسته — و لایه بدونِ لمس‌گرفتن و کوتاه محو شود تا ریتمِ ضربه نخوابد.
+  void _fireLevelMoment() {
+    if (!mounted) return;
+    final pts = _engine.pointsEarnedLastBatch;
+    final coins = _engine.coinsEarnedLastBatch;
+    if (pts <= 0 && coins <= 0) return;
+    RewardMoment.moment(
+      context,
+      RewardMomentData(
+        source: RewardSource.tap,
+        points: pts,
+        coins: coins,
+        note: 'لولِ ${faNum(_engine.level)}',
       ),
     );
   }
@@ -1090,126 +1113,6 @@ class _FinishStat extends StatelessWidget {
           const SizedBox(height: 2),
           Text(label, style: theme.textTheme.labelSmall),
         ],
-      ),
-    );
-  }
-}
-
-class _LevelUpDialogContent extends StatefulWidget {
-  final int level;
-  final Color accent;
-  const _LevelUpDialogContent({required this.level, required this.accent});
-
-  @override
-  State<_LevelUpDialogContent> createState() => _LevelUpDialogContentState();
-}
-
-class _LevelUpDialogContentState extends State<_LevelUpDialogContent> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _scale;
-  late final Animation<double> _rotate;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3500),
-    )..repeat();
-
-    _scale = Tween<double>(begin: 0.2, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.4, curve: Curves.elasticOut)),
-    );
-    _rotate = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scale,
-      child: Container(
-        padding: const EdgeInsets.all(Gaps.lg),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1E1B4B), Color(0xFF090514)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          border: Border.all(color: widget.accent, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: widget.accent.withValues(alpha: 0.45),
-              blurRadius: 24,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(
-              width: 220,
-              height: 220,
-              child: RotationTransition(
-                turns: _rotate,
-                child: CustomPaint(
-                  painter: _SunburstPainter(color: widget.accent.withValues(alpha: 0.15)),
-                ),
-              ),
-            ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // تصویرِ لول‌آپ به‌جای ایموجی (بستهٔ ۲۰۲۶ بازی‌ها).
-                Image.asset(
-                  'assets/games/levelup_badge.webp',
-                  width: 88,
-                  height: 88,
-                  fit: BoxFit.contain,
-                  cacheWidth: 176,
-                  errorBuilder: (_, __, ___) =>
-                      Icon(Icons.celebration_rounded, size: 64, color: widget.accent),
-                ),
-                Gaps.vSm,
-                Text(
-                  'تبریک! لول آپ شدی',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: widget.accent,
-                  ),
-                ),
-                Gaps.vXs,
-                Text(
-                  'شما به لول ${faNum(widget.level)} رسیدی!',
-                  style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                Gaps.vMd,
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: FilledButton.styleFrom(backgroundColor: widget.accent),
-                    child: const Text(
-                      'ادامه بازی',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

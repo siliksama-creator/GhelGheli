@@ -94,8 +94,10 @@ function tierLabel(level){
   return {label:'تازه‌کار', color:'#94A3B8'};
 }
 
-export default function Games({ api, token, externalLaunch = null }) {
-  const [active, setActive] = useState(null);
+export default function Games({ api, token, externalLaunch = null, initialActive = null }) {
+  // `initialActive` از کاشیِ خانه می‌آید (main.jsx → Club → اینجا):
+  // «tap» یعنی ضربه‌زن بی‌درنگ باز شود، نه فهرستِ بازی‌ها.
+  const [active, setActive] = useState(initialActive ?? null);
   const [mode, setMode] = useState(100);
   // سهمیهٔ سکهٔ امروز از /api/bootstrap. تا وقتی نیامده `null` است و
   // چیزی رسم نمی‌شود — بهتر از رسمِ «۰ باقی‌مانده» که دروغ است.
@@ -443,7 +445,7 @@ export default function Games({ api, token, externalLaunch = null }) {
               ? 'در لابی، سازنده مقدار ورودی را انتخاب می‌کند'
               : `برای ورود حداقل ${fa(mode)} امتیاز لازم داری`}</b>
           <small>{mode === 0
-            ? 'بدون اثر روی موجودی و لیگ.'
+            ? 'بدون اثر روی موجودی و لیگ. تمرینِ جفت‌یاب فقط رکوردی است و روی ماموریت‌ها هم اثر ندارد.'
             : mode === -1
               ? 'ورودی امتیازی تا پایان بازی امن می‌ماند.'
               : `برنده ${fa(netPotFor(mode))} امتیاز می‌گیرد · بازنده ${fa(mode)} امتیاز می‌دهد.`}</small>

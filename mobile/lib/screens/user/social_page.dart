@@ -21,7 +21,15 @@ class SocialPage extends StatefulWidget {
     required this.api,
     this.onOpenShop,
     this.passClaimable = 0,
+    this.externalGameId,
+    this.externalGameNonce = 0,
   });
+
+  /// درخواستِ بازکردنِ مستقیمِ یک بازی از کاشیِ خانه — به GamesHubPage
+  /// پاس می‌شود و تبِ «بازی‌ها» را هم فعال می‌کند (خواستهٔ مالک،
+  /// ۳۱ شهریور ۱۴۰۵).
+  final String? externalGameId;
+  final int externalGameNonce;
   final ApiClient api;
 
   /// تعداد جایزهٔ آمادهٔ دریافت در گذر نبرد.
@@ -46,6 +54,25 @@ class _SocialPageState extends State<SocialPage> {
   GameExternalLaunch? _externalLaunch;
 
   @override
+  void initState() {
+    super.initState();
+    // اگر پوسته با نیتِ بازکردنِ بازی ساخته‌مان کند، مستقیم روی تبِ
+    // «بازی‌ها» باز می‌شویم (کاشیِ ضربه‌زن در خانه).
+    if (widget.externalGameId != null && widget.externalGameNonce > 0) {
+      _tab = 1;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant SocialPage old) {
+    super.didUpdateWidget(old);
+    if (widget.externalGameId != null &&
+        widget.externalGameNonce != old.externalGameNonce) {
+      setState(() => _tab = 1);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -64,7 +91,12 @@ class _SocialPageState extends State<SocialPage> {
             index: _tab,
             children: [
               ChatPage(api: widget.api),
-              GamesHubPage(api: widget.api, externalLaunch: _externalLaunch),
+              GamesHubPage(
+                api: widget.api,
+                externalLaunch: _externalLaunch,
+                externalGameId: widget.externalGameId,
+                externalGameNonce: widget.externalGameNonce,
+              ),
               SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.xs, Gaps.md, Gaps.xxl),
                 child: GrowthPanel(

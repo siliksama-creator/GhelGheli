@@ -85,6 +85,8 @@ class TapSyncResult {
     this.message,
     this.coinsEarned,
     this.coinsTotal,
+    this.pointsEarned,
+    this.levelsGained,
     this.finished = false,
     this.coinsAwardedTotal,
     this.pointsAwardedTotal,
@@ -118,6 +120,14 @@ class TapSyncResult {
 
   /// جمعِ کلِ سکهٔ کاربر بعد از این بسته.
   final int? coinsTotal;
+
+  /// امتیازِ واقعیِ همین بسته (سرور بعد از سقفِ روزانه حساب کرده) —
+  /// برای «لحظهٔ جایزهٔ لول‌آپ» تا کاربر ببیند هر لول چه گرفته.
+  final int? pointsEarned;
+
+  /// چند لول در همین بسته تمام شده — معیارِ سرور برای لحظهٔ لول‌آپ
+  /// (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵).
+  final int? levelsGained;
 
   /// ── «بازی تمام شد» (دورِ ۳۳) ──
   ///
@@ -250,6 +260,8 @@ class TapSync {
         message: map['message']?.toString(),
         coinsEarned: _asInt(map['coinsEarned']),
         coinsTotal: _asInt(map['coinsTotal']),
+        pointsEarned: _asInt(map['pointsEarned']),
+        levelsGained: _asInt(map['levelsGained']),
         finished: map['finished'] == true,
         coinsAwardedTotal: _asInt(map['coinsAwarded']),
         pointsAwardedTotal: _asInt(map['pointsAwarded']),

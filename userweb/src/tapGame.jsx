@@ -278,6 +278,22 @@ function registerTap(guard, nowMs) {
 }
 
 // ── component ──────────────────────────────────────────────────────────────
+// ── لحظهٔ جایزهٔ لول‌آپ (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──────────────────
+// «وقتی ضربه‌زن لول‌آپ می‌شود، مثلِ سیستمِ یکپارچه اعلامِ امتیاز و سکه
+// روی صفحه بیاید تا کاربر ببیند هر لول چه دریافت کرده.» معیار، فیلدِ
+// levelsGainedِ خودِ سرور است (نه شمارشِ خوش‌بینانهٔ محلی) و عددها همان
+// pointsEarned/coinsEarnedِ تأییدشدهٔ همان بسته‌اند. لایه بی‌کلیک و
+// کوتاه است و ریتمِ ضربه‌زدن را نمی‌خواباند.
+function fireLevelMoment(res) {
+  if (!res || res.rejected || res.finished) return;
+  if (!(Number(res.levelsGained) > 0)) return;
+  const points = Number(res.pointsEarned) > 0 ? Number(res.pointsEarned) : 0;
+  const coins = Number(res.coinsEarned) > 0 ? Number(res.coinsEarned) : 0;
+  // هیچ نگرفته → جشنی هم نیست (صداقتِ همان گذرگاه: جشنِ دروغ بدتر است).
+  if (points <= 0 && coins <= 0) return;
+  rewardMoment({ source: 'tap', points, coins, note: 'لولِ ' + fa(res.level) });
+}
+
 export default function TapGame({ token, onBack, economy }) {
   // ── قفلِ شماره معکوسِ لیگ ──
   // تا شروعِ لیگ، ضربه‌زن بسته است: هم دکمه (ناحیهٔ ضربه جایگزین می‌شود)،
@@ -502,6 +518,7 @@ export default function TapGame({ token, onBack, economy }) {
       if (typeof res?.pointsAwarded === 'number' && !res.finished) {
         setPointsTotalFromSrv(res.pointsAwarded);
       }
+      fireLevelMoment(res);
       // The server is authoritative: adopt its numbers when they differ.
       if (res && typeof res.level === 'number') {
         setProgress(p => {

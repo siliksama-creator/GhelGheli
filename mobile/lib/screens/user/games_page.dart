@@ -79,9 +79,21 @@ class GameExternalLaunch {
 }
 
 class GamesHubPage extends StatefulWidget {
-  const GamesHubPage({super.key, required this.api, this.externalLaunch});
+  const GamesHubPage({
+    super.key,
+    required this.api,
+    this.externalLaunch,
+    this.externalGameId,
+    this.externalGameNonce = 0,
+  });
   final ApiClient api;
   final GameExternalLaunch? externalLaunch;
+
+  /// بازکردنِ مستقیمِ یک بازی از کاشیِ خانه (خواستهٔ مالک، ۳۱ شهریور
+  /// ۱۴۰۵: ضربه‌زن «خیلی تو چشم‌تر» شود). برخلافِ `externalLaunch`
+  /// سوکت/مسابقه‌ای در میان نیست — فقط شناسهٔ بازی؛ مثلاً «tap».
+  final String? externalGameId;
+  final int externalGameNonce;
 
   @override
   State<GamesHubPage> createState() => _GamesHubPageState();
@@ -148,6 +160,9 @@ class _GamesHubPageState extends State<GamesHubPage> {
     if (widget.externalLaunch != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _consumeExternal(widget.externalLaunch!));
     }
+    if (widget.externalGameId != null && widget.externalGameNonce > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _consumeExternalGame());
+    }
   }
 
   @override
@@ -159,6 +174,21 @@ class _GamesHubPageState extends State<GamesHubPage> {
         if (mounted) _consumeExternal(widget.externalLaunch!);
       });
     }
+    if (widget.externalGameId != null &&
+        widget.externalGameNonce != oldWidget.externalGameNonce) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _consumeExternalGame();
+      });
+    }
+  }
+
+  void _consumeExternalGame() {
+    if (!mounted) return;
+    final id = widget.externalGameId;
+    if (id == null || id.isEmpty) return;
+    // همان مسیرِ کاشیِ داخلِ هاب: _active با شناسهٔ بازی پر می‌شود و
+    // build، صفحهٔ همان بازی (برای «tap» یعنی TapGameScreen) را برمی‌گرداند.
+    _launchGame(id);
   }
 
   void _consumeExternal(GameExternalLaunch launch) {
@@ -676,7 +706,7 @@ class _StakeRulesBanner extends StatelessWidget {
             ? 'در لابی، سازنده مقدار ورودی را انتخاب می‌کند'
             : 'برای ورود حداقل ${faNum(mode)} امتیاز لازم داری';
     final description = isPractice
-        ? 'بدون اثر روی موجودی و لیگ.'
+        ? 'بدون اثر روی موجودی و لیگ. تمرینِ جفت‌یاب فقط رکوردی است و روی ماموریت‌ها هم اثر ندارد.'
         : isLobby
             ? 'ورودی امتیازی تا پایان بازی امن می‌ماند.'
             : 'برنده ${faNum(netPotFor(mode))} امتیاز می‌گیرد · بازنده ${faNum(mode)} امتیاز می‌دهد.';

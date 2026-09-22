@@ -46,6 +46,7 @@ function clear(socketId) {
   const run = runs.get(socketId);
   if (!run) return;
   clearTimeout(run.reaper);
+  clearTimeout(run.missTimer);
   runs.delete(socketId);
 }
 
@@ -97,6 +98,28 @@ function attachSolo(io, rulesById) {
         // shared `result()` returns their symbol once the board is cleared.
         const finished = run.rules.result(run.state);
         if (!finished) {
+          // ── برگشتِ خودکارِ جفتِ ناموفق — همان قاعدهٔ اتاقِ رقابتی ──
+          // خواستهٔ مالک (۳۱ شهریور ۱۴۰۵): جفتِ ناموفق نباید باز بماند.
+          // در حالتِ رکوردی هم بازیکن همان ریتمِ بازیِ واقعی را می‌بیند.
+          clearTimeout(run.missTimer);
+          const holdMs = Number(run.rules.missHoldMs) || 0;
+          if (holdMs > 0 && run.state.lastResult === 'miss'
+              && Array.isArray(run.state.flipped) && run.state.flipped.length === 2) {
+            const flipsAt = run.state.totalFlips || 0;
+            run.missTimer = setTimeout(() => {
+              try {
+                if (run.done || runs.get(socket.id) !== run) return;
+                const st = run.state;
+                if (st.lastResult !== 'miss' || (st.totalFlips || 0) !== flipsAt) return;
+                if (!Array.isArray(st.flipped) || st.flipped.length !== 2) return;
+                st.flipped = [];
+                st.lastResult = null;
+                socket.emit('solo:update', { state: view(run) });
+              } catch (e) {
+                console.error('[solo] miss auto-flip failed:', e.message);
+              }
+            }, holdMs);
+          }
           return socket.emit('solo:update', { state: view(run) });
         }
 

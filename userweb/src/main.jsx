@@ -671,6 +671,9 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   // idهای میراثی: دیپ‌لینک/نوتیفیکیشن‌های دورانِ «جوایز» و تبِ جداگانهٔ
   // کلکسیون از این به بعد به همان تبِ «ثبت کارت» می‌رسند — صفحهٔ خالی نه.
   const setTab = (id) => setTabRaw(id === 'rewards' || id === 'inventory' ? 'cardreg' : id);
+  // ── کاشیِ خانه → بازکردنِ مستقیمِ بازی (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──
+  // دوقلوی اندروید: _pendingGameId/_pendingGameNonce در home_shell.dart.
+  const [gameLaunch, setGameLaunch] = useState(null);
   const [p, setP] = useState(null);
   const [msg, setMsg] = useState('');
   const [publicUser, setPublicUser] = useState(null);
@@ -995,7 +998,8 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
             openWallet={() => setTab('wallet')}
             openWheel={() => setTab('wheel')}
             openInvite={() => setTab('invite')}
-            openCardReg={() => setTab('cardreg')} />
+            openCardReg={() => setTab('cardreg')}
+            openTap={() => { setGameLaunch({ id: 'tap', nonce: Date.now() }); setTab('club'); }} />
         )}
         {tab === 'ledger' && (
           <Ledger token={token} setMsg={setMsg} />
@@ -1028,6 +1032,7 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
         {tab === 'club' && (
           <Club token={token} openProfile={setPublicUser} meId={u.id}
             openGames={Boolean(sharedRoom)} setMsg={setMsg}
+            launchGame={gameLaunch} onLaunchConsumed={() => setGameLaunch(null)}
             openShop={() => setTab('shop')}
             passClaimable={Number(passBrief?.claimable || 0)} />
         )}
@@ -1058,8 +1063,15 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   );
 }
 
-function Club({ token, openProfile, meId, openGames = false, setMsg, openShop, passClaimable = 0 }) {
-  const [sub, setSub] = useState(openGames ? 'games' : 'chat');
+function Club({ token, openProfile, meId, openGames = false, launchGame = null, onLaunchConsumed, setMsg, openShop, passClaimable = 0 }) {
+  const [sub, setSub] = useState(openGames || launchGame ? 'games' : 'chat');
+  // نیتِ پرتابِ بازی یک‌بار در mount مصرف می‌شود: Games مقدارِ
+  // initialActive را در useState خودش گرفت؛ اگر مصرف نکنیم، هر بارِ
+  // بعدی که کاربر دستی به تبِ بازی‌ها برگردد بازی دوباره تحمیل می‌شود.
+  useEffect(() => {
+    if (launchGame && onLaunchConsumed) onLaunchConsumed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [externalLaunch, setExternalLaunch] = useState(null);
   // نسلِ پنلِ ماموریت — آینهٔ `_growthGeneration` در اندروید.
   // با هر انتقالِ سوکت به تبِ بازی یکی زیاد می‌شود تا پنلِ قدیمی
@@ -1099,7 +1111,7 @@ function Club({ token, openProfile, meId, openGames = false, setMsg, openShop, p
       </div>
       {sub === 'chat' && <Chat token={token} openProfile={openProfile} meId={meId} />}
       {sub === 'games' && <GamesHub api={API} token={token} openProfile={openProfile}
-        externalLaunch={externalLaunch} />}
+        externalLaunch={externalLaunch} initialActive={launchGame?.id || null} />}
       {/* ⚠️ چرا `key` روی GrowthHub — و چرا رندرِ شرطی این‌جا یک باگِ واقعی بود:
           کاربر از تبِ «ماموریت و دوستان» دوستی را به دوئل دعوت می‌کند؛
           `game:start` می‌آید، سوکت به تبِ بازی منتقل می‌شود و تب عوض

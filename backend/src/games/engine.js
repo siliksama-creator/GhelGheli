@@ -487,6 +487,7 @@ function finish(room, winner, disconnectedSym = null) {
   room.done = true;
   clearTimeout(room.botTimer);
   clearTimeout(room.turnTimer);
+  clearTimeout(room.missTimer);
   for (const symbol of ['X', 'O']) clearTimeout(room.reconnectTimers?.[symbol]);
 
   const resolvedWinner = winner === 'DISCONNECT'
@@ -540,7 +541,14 @@ function finish(room, winner, disconnectedSym = null) {
       // به خواستهٔ همان پیام، با بازی ضربه‌زن هم (در routes/server.js
       // هنگامِ تمام‌شدنِ لولِ ضربه‌زن منتشر می‌شود).
       if (room.vsBot) {
-        growth.missions.record(player.id, 'bot_match').catch(() => {});
+        // تمرینِ جفت‌یاب = فقط رکوردی (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵):
+        // «حالت تمرین به ربات رو هم باید فقط حالت رکوردی کرد». قواعدی که
+        // practiceOnlyBot را اعلام می‌کند، در اتاقِ ربات حتی ماموریتِ
+        // bot_match را هم جلو نمی‌برد. بقیهٔ بازی‌ها (پنالتی، دوئل) و
+        // ضربه‌زن سرِ جای خودشان هستند.
+        if (!room.rules.practiceOnlyBot) {
+          growth.missions.record(player.id, 'bot_match').catch(() => {});
+        }
       } else {
         growth.missions.record(player.id, 'match_completed').catch(() => {});
         if (resolvedWinner === symbol) {
@@ -846,6 +854,35 @@ function advance(room, lastMove, extra = {}) {
     timedOut: room.timedOut || null,
     ...extra,
   });
+
+  // ── برگشتِ خودکارِ جفتِ ناموفق (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ─────────
+  // جفت‌یاب: جفتِ ناموفق نباید تا نوبتِ حریف باز بماند. قواعدِ بازی
+  // `missHoldMs` را تعریف می‌کند و موتور بعد از آن جفت را می‌بندد و
+  // تختهٔ تازه را برای هر دو طرف پخش می‌کند. نگهبانِ `totalFlips`:
+  // اگر پیش از زنگ خوردن، حرکتِ تازه‌ای (انسان یا ربات) ثبت شده باشد،
+  // این تایمر باید هیچ کار نکند — وگرنه جفتِ بازِ حرکتِ بعدی را
+  // زودهنگام می‌بست.
+  clearTimeout(room.missTimer);
+  const missHoldMs = Number(room.rules.missHoldMs) || 0;
+  if (missHoldMs > 0 && room.state?.lastResult === 'miss'
+      && Array.isArray(room.state.flipped) && room.state.flipped.length === 2) {
+    const flipsAt = room.state.totalFlips || 0;
+    room.missTimer = setTimeout(() => {
+      try {
+        const st = room.state;
+        if (room.done || !st || st.lastResult !== 'miss') return;
+        if ((st.totalFlips || 0) !== flipsAt) return;
+        if (!Array.isArray(st.flipped) || st.flipped.length !== 2) return;
+        st.flipped = [];
+        st.lastResult = null;
+        emitState(room, 'game:update', {});
+      } catch (e) {
+        // همان استدلالِ turnTimer: فرارِ استثنا اینجا کلِ پروسه را می‌خواباند.
+        console.error(`[games:${room.gameId}] miss auto-flip failed:`, e.message);
+      }
+    }, missHoldMs);
+  }
+
   scheduleBot(room);
 }
 

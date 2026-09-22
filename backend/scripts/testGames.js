@@ -54,7 +54,10 @@ console.log('\n== memory (جفت‌یاب) ==');
   ok(r.nextTurn(s, 'X') === 'X', 'a match earns another turn');
   ok(!r.isValidMove(s, 0), 'a claimed card cannot be flipped again');
 
-  // A miss hands the turn over and leaves the cards visible until next flip.
+  // A miss hands the turn over. The pair stays open in the RULES state —
+  // the ENGINE auto-flips it back after rules.missHoldMs (owner, 1405-06-31:
+  // it must not stay visible until the opponent's turn), and that timing is
+  // exercised with real timers in testEngine.js.
   s = r.create();
   const a0 = 0;
   const b0 = s.deck.findIndex(f => f !== s.deck[0]);
@@ -63,9 +66,11 @@ console.log('\n== memory (جفت‌یاب) ==');
   ok(s.lastResult === 'miss', 'mismatch reported');
   ok(s.scores.X === 0, 'no point for a miss');
   ok(r.nextTurn(s, 'X') === 'O', 'a miss passes the turn');
-  ok(r.decorate(s, 'O').cards.filter(c => c.up).length === 2, 'missed pair stays visible for the opponent');
+  ok(r.decorate(s, 'O').cards.filter(c => c.up).length === 2, 'missed pair is open in the rules state right after the miss');
   r.applyMove(s, 2, 'O');
   ok(s.flipped.length === 1, 'the stale pair clears on the next flip');
+  ok(Number(r.missHoldMs) > 0, 'rules define the auto flip-back delay for a missed pair');
+  ok(r.practiceOnlyBot === true, 'the memory practice bot is record-only (no mission progress)');
 
   // Winner is whoever holds more pairs.
   s = r.create();

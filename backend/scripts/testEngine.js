@@ -117,6 +117,54 @@ function makeIo() {
     ok(a.rooms.size === 0 && b.rooms.size === 0, 'room cleaned up');
   }
 
+  // ── جفت‌یاب: برگشتِ خودکارِ جفتِ ناموفق (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──
+  // «نباید اون دو تا عکس همین‌طوری بمونن و قابل دیدن باشن تا نوبتِ فردِ
+  // مقابل — باید زود دوباره برگردن.» موتور باید بعد از rules.missHoldMs
+  // جفتِ ناموفق را بدونِ حرکتِ هیچ بازیکنی ببندد و تخته را دوباره پخش کند.
+  console.log('\n== memory: miss auto-flip ==');
+  {
+    const io = makeIo(); attach(io, RULES);
+    const a = io.connect(new FakeSocket('m1', 'آرش'));
+    const b = io.connect(new FakeSocket('m2', 'سهراب'));
+    a.fire('game:join', { gameId: 'memory' });
+    b.fire('game:join', { gameId: 'memory' });
+    const start = a.last('game:start');
+    const holdMs = Number(RULES.memory.missHoldMs) || 0;
+    ok(holdMs > 0, 'rules define the auto flip-back delay');
+
+    // دو تا دو تا کارت برمی‌گردانیم تا یک miss واقعی پیدا شود (با ۸ جفت،
+    // حداکثر ظرف چند تلاش اتفاق می‌افتد؛ هر هفت تلاش پشت‌سرهم جفتِ درست
+    // از نظرِ احتمالی صفر است).
+    let missed = false;
+    for (let attempt = 0; attempt < 7 && !missed; attempt++) {
+      const ownView = sock => sock.last('game:update') ?? sock.last('game:start');
+      const v1 = ownView(a).turn === 'X' ? ownView(a) : ownView(b);
+      const s1 = v1.turn === 'X' ? a : b;
+      const p1 = ownView(s1).state?.playable ?? [];
+      if (p1.length < 2) break;
+      s1.fire('game:move', { roomId: start.roomId, move: p1[0] });
+      const mid = ownView(s1);
+      const s2 = mid.turn === 'X' ? a : b;
+      const p2 = ownView(s2).state?.playable ?? [];
+      if (!p2.length) break;
+      s2.fire('game:move', { roomId: start.roomId, move: p2[0] });
+      const after = ownView(s2);
+      if (after?.state?.lastResult === 'miss') {
+        missed = true;
+        ok((after.state.flipped || []).length === 2, 'the missed pair is open right after the miss');
+        await wait(holdMs + 500);
+        const cleared = a.last('game:update');
+        ok((cleared?.state?.flipped || []).length === 0 && cleared?.state?.lastResult === null,
+          'the engine auto-flipped the missed pair back');
+        ok((cleared?.state?.cards || []).filter(c => c.up).length === 0,
+          'no card stays face-up after the auto flip-back');
+        ok(b.last('game:update')?.state?.lastResult === null,
+          'both players received the flipped-back board');
+      }
+    }
+    ok(missed, 'a real miss was exercised (not skipped)');
+  }
+
   // جفت‌یاب no longer has a bot, so the fallback is exercised on penalty.
   console.log('\n== bot fallback (15s, penalty) ==');
   {

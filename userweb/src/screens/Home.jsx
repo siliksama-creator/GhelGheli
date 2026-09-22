@@ -79,7 +79,7 @@ function HeroHeader({ points, nickname, user, cosmetics, onOpenProfile, onOpenWa
   );
 }
 
-export default function Home({ token, p, load, setMsg, openProfile, openWallet, openWheel, openInvite, openCardReg }) {
+export default function Home({ token, p, load, setMsg, openProfile, openWallet, openWheel, openInvite, openCardReg, openTap }) {
   const u = p.user;
   const inventory = p.inventory || [];
 
@@ -101,6 +101,22 @@ export default function Home({ token, p, load, setMsg, openProfile, openWallet, 
       <HeroHeader points={asInt(u.current_points)} nickname={u.nickname||u.mobile||'قهرمان'} user={u} cosmetics={p.cosmetics} onOpenProfile={openProfile} onOpenWallet={openWallet} />
 
       <LoginStreak token={token} initialData={p.loginStreak} setMsg={setMsg} onClaimed={load} />
+
+      {/* ── کاشیِ تمام‌عرضِ ضربه‌زن (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──
+          «جایگاهش را عوض کنم که خیلی تو چشم‌تر باشد» — خانه اولین صفحهٔ
+          هر کاربر است. همان زبانِ بصریِ سه کاشیِ پایین (سبزِ ضربه‌زن +
+          درخشش) ولی تمام‌عرض و بالاتر؛ مستقیم خودِ بازی را باز می‌کند.
+          دوقلوی اندروید: _AnimatedQuickTile در dashboard_page.dart. */}
+      {openTap && (
+        <button type="button" onClick={openTap} style={{ background:'linear-gradient(135deg, #84CC1626, #84CC160A)', border:'1.5px solid #84CC1699', borderRadius:'16px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', boxShadow:'0 4px 14px #84CC1633', textAlign:'right' }}>
+          <img src="/games/tap/skin_1.webp" alt="" decoding="async" style={{ width:'40px', height:'40px', objectFit:'contain', flexShrink:0 }} />
+          <span style={{ flex:1 }}>
+            <b style={{ display:'block', color:'#FFF', fontSize:'13px', fontWeight:'900' }}>ضربه‌زن</b>
+            <small style={{ color:'#A3E635', fontSize:'10.5px', fontWeight:'700' }}>بزن، سکه و امتیاز بگیر</small>
+          </span>
+          <span style={{ background:'#84CC1622', color:'#A3E635', padding:'4px 10px', borderRadius:'99px', fontSize:'10px', fontWeight:'800', flexShrink:0 }}>بازی ‹</span>
+        </button>
+      )}
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
         <button onClick={openWheel} style={{ background:'linear-gradient(135deg, #F59E0B22, #F59E0B0A)', border:'1px solid #F59E0B55', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #F59E0B22' }}>

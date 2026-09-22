@@ -24,6 +24,9 @@ class DashboardPage extends StatefulWidget {
   final VoidCallback? onOpenReferral;
   final VoidCallback? onOpenInventory;
 
+  /// کاشیِ ضربه‌زن — بازی مستقیم از خانه (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵).
+  final VoidCallback? onOpenTap;
+
   /// منبعِ واحدِ بنر صندوق: از پوسته می‌آید تا بعد از باز کردن صندوق
   /// در کلکسیون، خانه همان عدد کهنه را نشان ندهد.
   final List<Map<String, dynamic>> pendingGrants;
@@ -37,6 +40,7 @@ class DashboardPage extends StatefulWidget {
     this.onOpenWheel,
     this.onOpenReferral,
     this.onOpenInventory,
+    this.onOpenTap,
     this.pendingGrants = const [],
   });
 
@@ -187,6 +191,27 @@ class _DashboardPageState extends State<DashboardPage> {
             cosmetics: _data?['cosmetics'] as Map<String, dynamic>?,
             onOpenProfile: widget.onOpenProfile,
             onOpenWallet: widget.onOpenWallet,
+          ),
+          Gaps.vSm,
+          // ── کاشیِ تمام‌عرضِ ضربه‌زن (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──
+          // «جایگاهش را عوض کنم که خیلی تو چشم‌تر باشد» — خانه اولین
+          // صفحه‌ای است که هر کاربر هر بار می‌بیند. این کاشی با همان زبانِ
+          // بصریِ سه کاشیِ پایین (شناور + درخشش) ولی تمام‌عرض و بالاتر
+          // از همه نشسته و مستقیم خودِ بازی را باز می‌کند، نه فهرستِ
+          // بازی‌ها را. دوقلوی وب: دکمهٔ hero در screens/Home.jsx.
+          _AnimatedQuickTile(
+            icon: Image.asset(
+              'assets/games/tap/skin_1.webp',
+              width: 44,
+              height: 44,
+              cacheWidth: 132,
+            ),
+            title: 'ضربه‌زن',
+            subtitle: 'بزن، سکه و امتیاز بگیر',
+            tint: const Color(0xFF84CC16),
+            glowColor: const Color(0xFFA3E635),
+            animOffset: 0.5,
+            onTap: widget.onOpenTap,
           ),
           Gaps.vSm,
           LoginStreakCard(
