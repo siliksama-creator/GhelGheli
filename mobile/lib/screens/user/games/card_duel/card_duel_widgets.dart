@@ -860,6 +860,17 @@ class _LiveBattle extends StatelessWidget {
             color: color,
             opponentRole: session.vsBot ? 'ربات' : 'حریف',
           ),
+        // ── صحنهٔ وقتِ اضافه (خواستهٔ مالک، ۸ مهر ۱۴۰۵) ──
+        // گزارشِ مالک: «راند شش بدون هیچ اکشنی و توضیحی سریع تموم میشه.»
+        // وقتِ اضافه خودکار داوری می‌شود؛ بدونِ این کارت، کاربرِ اندروید
+        // فقط پرشِ امتیاز می‌دید. این کارت با جملهٔ خودِ سرور
+        // (narrX/narrO → overtime) زیرِ صحنهٔ برخورد می‌نشیند و تمامِ
+        // مکثِ وقت اضافه (otHoldMs سرور) روی صفحه می‌ماند. آینهٔ وب:
+        // فازِ 'overtime' در cardDuelGame.jsx.
+        if (session.resultHolding &&
+            lastRound != null &&
+            lastRound!['overtime'] is Map)
+          _OvertimePanel(round: lastRound!, mine: mine),
         if (session.phase == GamePhase.playing) ...[
           Gaps.vSm,
           AppCard(
@@ -4485,4 +4496,108 @@ class CardDuelStakePayoutForTest extends StatelessWidget {
         balanceAfter: balanceAfter,
         opponentRole: opponentRole,
       );
+}
+
+/// ═══════════════════════════════════════════════════════════════════════
+/// کارتِ توضیحِ وقتِ اضافه — آینهٔ اندرویدِ صحنهٔ وب
+/// ═══════════════════════════════════════════════════════════════════════
+///
+/// خواستهٔ مالک (۸ مهر ۱۴۰۵): «راند شش بدون هیچ اکشنی و توضیحی سریع
+/// تموم میشه.» وقتِ اضافه اکشنِ بازیکن ندارد (قدرتِ کلِ ترکیب داوری
+/// می‌کند)، پس «درست ساخته شدن» یعنی توضیحِ کامل و زمانِ کافی: این کارت
+/// یک ثانیه بعد از مهرِ تساوی بالا می‌آید (همان ضربِ وب) و می‌گوید چرا
+/// وقت اضافه شد، اعداد چه بودند و دو امتیاز به کی نشست. همهٔ متن‌ها از
+/// بک‌اند (narrateOvertime) می‌آیند تا وب و اندروید یک جمله بگویند.
+class _OvertimePanel extends StatefulWidget {
+  const _OvertimePanel({required this.round, required this.mine});
+
+  final Map<String, dynamic> round;
+  final String mine;
+
+  @override
+  State<_OvertimePanel> createState() => _OvertimePanelState();
+}
+
+class _OvertimePanelState extends State<_OvertimePanel> {
+  bool _shown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // یک ثانیه تأخیر = همان ضربِ وب (phase 'overtime' یک ثانیه پس از
+    // verdict). بدونِ تأخیر، توضیح روی لحظهٔ برخورد می‌افتاد.
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (mounted) setState(() => _shown = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ot = widget.round['overtime'] is Map
+        ? Map<String, dynamic>.from(widget.round['overtime'] as Map)
+        : const <String, dynamic>{};
+    final narr = widget.round[widget.mine == 'O' ? 'narrO' : 'narrX'];
+    final otNarr = narr is Map && narr['overtime'] is Map
+        ? Map<String, dynamic>.from(narr['overtime'] as Map)
+        : const <String, dynamic>{};
+    final theme = Theme.of(context);
+    final iWon = '${ot['winner']}' == widget.mine;
+    return AnimatedOpacity(
+      opacity: _shown ? 1 : 0,
+      duration: const Duration(milliseconds: 420),
+      child: Container(
+        margin: const EdgeInsets.only(top: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: const Color(0xFF081420).withValues(alpha: .92),
+          border: Border.all(
+            color: const Color(0xFF7DD3FC).withValues(alpha: .55),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.schedule_rounded,
+                    size: 15, color: Color(0xFF7DD3FC)),
+                Gaps.hXs,
+                Text('${otNarr['title'] ?? 'وقت اضافه — راندِ سرنوشت'}',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: const Color(0xFF7DD3FC),
+                      fontWeight: FontWeight.w900,
+                    )),
+              ],
+            ),
+            Gaps.vXs,
+            Text(
+              '${otNarr['announce'] ?? 'تساویِ دو‌امتیازی! قدرتِ کلِ ترکیب تصمیم می‌گیرد.'}',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                height: 1.5,
+              ),
+            ),
+            if (otNarr['line'] != null) ...[
+              Gaps.vXs,
+              Text('${otNarr['line']}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(height: 1.5)),
+            ],
+            if (otNarr['result'] != null) ...[
+              Gaps.vXs,
+              Text('${otNarr['result']}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: iWon ? const Color(0xFF22E7A6) : const Color(0xFFFB7185),
+                    fontWeight: FontWeight.w900,
+                  )),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -667,6 +667,10 @@ export default function Games({ api, token, externalLaunch = null, initialActive
                   return;
                 }
                 if (mode === 0) {
+                  // جفت‌یاب در بخشِ «بازی با ربات» فقط حالتِ رکوردی دارد
+                  // (خواستهٔ مالک، ۸ مهر ۱۴۰۵): تمرینِ با رباتِ جفت‌یاب
+                  // حذف شد؛ کلیکِ کاشی مستقیم می‌رود روی تایم‌اتکِ رکوردی.
+                  if (g.id === 'memory') { openMemorySolo(); return; }
                   setActive({ id: g.id, vsBot: true });
                 } else {
                   setActive({ id: g.id, stake: mode });
@@ -677,20 +681,18 @@ export default function Games({ api, token, externalLaunch = null, initialActive
               <div className="gameTileArt">
                 <img src={g.art} alt="" loading="lazy" decoding="async" />
                 <span className="gameTileMode">
-                  {mode === 0 ? 'تمرین' : `${fa(mode)} امتیاز`}
+                  {mode === 0 ? (g.id === 'memory' ? 'رکوردی' : 'تمرین') : `${fa(mode)} امتیاز`}
                 </span>
               </div>
               <div className="gameTileBody">
                 <h4>{g.title}</h4>
                 <p>{gameSubtitle(g, tapLevels)}</p>
                 <div className="gameTileFoot">
-                  <span className="gameTilePlay">شروع</span>
-                  {g.id === 'memory' && mode === 0 && (
-                    <button type="button" className="gameTileAlt"
-                      onClick={e => { e.stopPropagation(); openMemorySolo(); }}>
-                      رکوردی
-                    </button>
-                  )}
+                  {/* در حالتِ رکوردی خودِ کاشی رکوردی است؛ دکمهٔ دوم حذف شد
+                      تا دو راهِ متفاوت جلوی کاربر نباشد (خواستهٔ مالک). */}
+                  <span className="gameTilePlay">
+                    {g.id === 'memory' && mode === 0 ? 'رکوردی' : 'شروع'}
+                  </span>
                 </div>
               </div>
             </div>

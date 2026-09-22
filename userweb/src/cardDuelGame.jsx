@@ -243,7 +243,7 @@ const REVEAL_PHASES = [
   { key: 'verdict', ms: 0 },
 ];
 
-function useRevealPhase(roundKey) {
+function useRevealPhase(roundKey, hasOvertime = false) {
   const [phase, setPhase] = useState('charge');
   useEffect(() => {
     // راندِ تازه = شروع دوباره از فاز اول.
@@ -255,6 +255,16 @@ function useRevealPhase(roundKey) {
       elapsed += REVEAL_PHASES[i].ms;
       const next = REVEAL_PHASES[i + 1].key;
       timers.push(setTimeout(() => setPhase(next), elapsed));
+    }
+    // ── ضربِ وقتِ اضافه (خواستهٔ مالک، ۸ مهر ۱۴۰۵) ──
+    // گزارشِ مالک: «راند شش بدون هیچ اکشنی و توضیحی سریع تموم میشه.»
+    // یک ثانیه پس از مهرِ تساوی، صحنهٔ مستقلِ وقت اضافه می‌آید و با
+    // جملهٔ خودِ سرور توضیح می‌دهد چه شد و دو امتیاز به کی نشست.
+    // عمداً بیرون از آرایهٔ REVEAL_PHASES است تا جمعِ فازهای راندِ
+    // عادی (نگهبانِ ریتم) عوض نشود؛ سرور هم برای راندِ وقت‌اضافه‌ای
+    // مکث را با otHoldMs بلندتر می‌کند تا راندِ بعد رویش نیفتد.
+    if (hasOvertime) {
+      timers.push(setTimeout(() => setPhase('overtime'), elapsed + 1000));
     }
     // پاکسازیِ تایمرها اجباری است: اگر کاربر وسطِ انیمیشن صفحه را ترک کند،
     // setState روی کامپوننتِ unmount شده هشدار می‌دهد و در حالتِ بدتر
@@ -324,8 +334,8 @@ function CountUp({ value, active, revealed = true }) {
 }
 
 function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حریف' }) {
-  const phase = useRevealPhase(round ? round.round : null);
   const view = round ? roundForViewer(round, me) : null;
+  const phase = useRevealPhase(round ? round.round : null, Boolean(view?.overtime));
   const lastHapticPhase = useRef(null);
   // ── حسِ لمسی برای دو لحظهٔ ویژه ──
   // خواستهٔ مالک: «با انیمیشن‌های جذاب‌تر و مکث‌های بیشتر بازی را جذاب‌تر
@@ -396,6 +406,28 @@ function RoundReveal({ round, me, myFrame, opponentFrame, opponentRole = 'حری
       {showVerdict && !draw && contractValid
         && <span className={`duelPointFlight ${mineWon ? 'mine' : 'theirs'}`} aria-hidden="true">+{fa(awardVal || 1)}</span>}
       {inOvertime && showVerdict && <span className="duelOvertimeTag"><SvgIcon name="clock" size={13} /> وقت اضافه</span>}
+      {inOvertime && phase === 'overtime' && (
+        /* صحنهٔ توضیحِ وقت اضافه — آینهٔ _OvertimePanel اندروید. همهٔ
+           متن‌ها از narrateOvertime سرور می‌آیند تا دو کلاینت یک جمله
+           بگویند. بی‌کلیک است و خودش محو نمی‌شود: مکثِ otHoldMs سرور
+           نگه‌اش می‌دارد و راندِ بعد جایش را می‌گیرد. */
+        <div role="status" style={{ position:'absolute', left:'50%', transform:'translateX(-50%)', bottom:'6px', width:'min(94%, 470px)', background:'rgba(8,20,32,.94)', border:'1px solid rgba(125,211,252,.55)', borderRadius:'14px', padding:'10px 12px', display:'flex', flexDirection:'column', gap:'4px', textAlign:'center', zIndex:3, boxShadow:'0 8px 24px rgba(0,0,0,.55)' }}>
+          <b style={{ color:'#7DD3FC', fontSize:'13px', fontWeight:900, display:'flex', alignItems:'center', justifyContent:'center', gap:'6px' }}>
+            <SvgIcon name="clock" size={14} /> {narr?.overtime?.title || 'وقت اضافه — راندِ سرنوشت'}
+          </b>
+          <small style={{ color:'#E2E8F0', fontSize:'11.5px', fontWeight:800, lineHeight:1.6 }}>
+            {narr?.overtime?.announce || 'تساویِ دو‌امتیازی! قدرتِ کلِ ترکیب تصمیم می‌گیرد.'}
+          </small>
+          {narr?.overtime?.line && (
+            <strong style={{ color:'#94A3B8', fontSize:'11px', fontWeight:700, lineHeight:1.6 }}>
+              {narr.overtime.line}
+            </strong>
+          )}
+          <em style={{ color: mineWon ? '#22E7A6' : '#FB7185', fontSize:'11.5px', fontStyle:'normal', fontWeight:900 }}>
+            {narr?.overtime?.result || ''}
+          </em>
+        </div>
+      )}
 
       <div className="duelClashSide mine">
         <span className={`duelSideOwner${showVerdict && mineWon ? ' winner' : ''}`}>تو</span>

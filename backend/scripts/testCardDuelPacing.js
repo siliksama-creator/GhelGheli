@@ -145,6 +145,21 @@ ck('مرز نتیجه→معرفی در هر دو کلاینت صدای مستق
   /resultHolding[\s\S]{0,300}Sfx\.duelIntro/.test(droidSession)
     && /!rHeld[\s\S]{0,180}duel_intro/.test(webSession));
 
+console.log('\n══ ۷. وقتِ اضافه: ساخته و توضیح‌داده، نه پرشِ بی‌صدا ══');
+// خواستهٔ مالک (۸ مهر ۱۴۰۵): «راند شش بدون هیچ اکشنی و توضیحی سریع
+// تموم میشه.» وقتِ اضافه اکشنِ بازیکن ندارد، پس باید صحنهٔ توضیح و
+// مکثِ کافی داشته باشد و کارتِ مساوی‌شده را هم نخورد (همان قولِ آموزش).
+const otHold = Number((rules.match(/otHoldMs:\s*(\d+)/) || [])[1] || 0);
+ck('otHoldMs در قواعد تعریف شده', otHold >= 6000, `مقدار=${otHold}`);
+ck('موتور مکثِ وقتِ اضافه را فقط برای راندِ وقت‌اضافه‌ای می‌خواند',
+  /lastRound\.overtime[\s\S]{0,160}otHoldMs/.test(engine));
+ck('وب صحنهٔ وقتِ اضافه را می‌سازد و توضیح می‌دهد',
+  /setPhase\('overtime'\)/.test(webGame) && /overtime\?\.announce/.test(webGame));
+ck('اندروید صحنهٔ وقتِ اضافه را می‌سازد و توضیح می‌دهد',
+  /_OvertimePanel/.test(droidWidgets) && /otNarr\['announce'\]/.test(droidWidgets));
+ck('وقتِ اضافه کارت مصرف نمی‌کند (همان قولِ آموزش)',
+  /if \(!resolved\.overtime\)/.test(rules));
+
 console.log(`\n${failures.length ? '✗' : '✓'} ${pass} موفق، ${failures.length} ناموفق`);
 if (failures.length) {
   console.log('\nشکست‌ها:');

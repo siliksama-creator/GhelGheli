@@ -103,6 +103,10 @@ class _GamesHubPageState extends State<GamesHubPage> {
   String? _active;
   int _activeStake = 0;
   bool _activeVsBot = false;
+  /// جفت‌یاب در بخشِ «بازی با ربات» فقط رکوردی است (خواستهٔ مالک، ۸ مهر
+  /// ۱۴۰) — صفحهٔ جفت‌یاب با این پرچم مستقیم روی تایم‌اتکِ تنها باز
+  /// می‌شود و مسیرِ ربات/صف اصلاً ساخته نمی‌شود.
+  bool _activeRecordOnly = false;
   String? _activeRoomCode;
   io.Socket? _activeSocket;
   Map<String, dynamic>? _activeInitialStart;
@@ -278,6 +282,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
       _active = null;
       _activeStake = 0;
       _activeVsBot = false;
+      _activeRecordOnly = false;
       _activeRoomCode = null;
       _activeSocket = null;
       _activeInitialStart = null;
@@ -288,6 +293,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
   void _launchGame(String gameId, {
     int stake = 0,
     bool vsBot = false,
+    bool recordOnly = false,
     String? roomCode,
     io.Socket? existingSocket,
     Map<String, dynamic>? initialStart,
@@ -296,6 +302,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
       _active = gameId;
       _activeStake = stake;
       _activeVsBot = vsBot;
+      _activeRecordOnly = recordOnly;
       _activeRoomCode = roomCode;
       _activeSocket = existingSocket;
       _activeInitialStart = initialStart;
@@ -314,6 +321,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
             onBack: _back,
             stake: _activeStake,
             vsBot: _activeVsBot,
+            recordOnly: _activeRecordOnly,
             roomCode: _activeRoomCode,
             existingSocket: _activeSocket,
             initialStart: _activeInitialStart,
@@ -665,8 +673,13 @@ class _GamesHubPageState extends State<GamesHubPage> {
                       return;
                     }
                     if (_selectedMode == 0) {
-                      // تمرین مستقیم با ربات؛ بدون صف و بدون جابه‌جایی امتیاز.
-                      _launchGame(g.id, stake: 0, vsBot: true);
+                      // جفت‌یاب در بخشِ ربات فقط رکوردی است (خواستهٔ مالک،
+                      // ۸ مهر ۱۴۰)؛ بقیهٔ بازی‌ها تمرینِ مستقیم با ربات.
+                      if (g.id == 'memory') {
+                        _launchGame(g.id, stake: 0, vsBot: true, recordOnly: true);
+                      } else {
+                        _launchGame(g.id, stake: 0, vsBot: true);
+                      }
                     } else {
                       // مسابقه آنلاین با بازیکن واقعی (بدون ربات)
                       _launchGame(g.id, stake: _selectedMode, vsBot: false);
@@ -1020,8 +1033,8 @@ class _CleanGameTile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                       color: entry.accent,
                     ),
-                    child: const Text(
-                      'شروع',
+                    child: Text(
+                      entry.id == 'memory' && mode == 0 ? 'رکوردی' : 'شروع',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,

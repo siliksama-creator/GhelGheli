@@ -141,8 +141,14 @@ function applyMove(state, move, player) {
     }
   }
 
-  state.remaining.X = state.remaining.X.filter(id => id !== state.pending.X);
-  state.remaining.O = state.remaining.O.filter(id => id !== state.pending.O);
+  // وقتِ اضافه کارت مصرف نمی‌کند — همان قاعده‌ای که خودِ بازی در
+  // آموزش و در «جزئیات راندها» به کاربر قول می‌دهد. کارت‌های مساوی‌شده
+  // در دست می‌مانند؛ خودِ راند در history ثبت می‌شود پس لوپِ پنج‌گانه
+  // نمی‌شکند.
+  if (!resolved.overtime) {
+    state.remaining.X = state.remaining.X.filter(id => id !== state.pending.X);
+    state.remaining.O = state.remaining.O.filter(id => id !== state.pending.O);
+  }
   state.history.push(resolved);
 
   // اسکوربورد از همان historyِ حکم‌ها مشتق می‌شود؛ دیگر یک شمارندهٔ دوم
@@ -335,6 +341,13 @@ module.exports = {
   // ۱.۳ ثانیه کامل دیده می‌شود، بدون اینکه لوپ پنج‌گانه کش‌دار شود.
   // نگهبان: `scripts/testCardDuelPacing.js`.
   resultHoldMs: 3200,
+  // ── مکثِ تماشای وقتِ اضافه (خواستهٔ مالک، ۸ مهر ۱۴۰۵) ──
+  // وقتِ اضافه «راندِ ششمِ» ادراکیِ مالک بود: خودکار حل می‌شد و کاربر
+  // فقط پرشِ امتیاز می‌دید. با مکثِ بلندتر، صحنهٔ توضیحِ وقت اضافه
+  // (وب: فازِ overtime، اندروید: _OvertimePanel) جا می‌شود. مجموعِ
+  // فازهای کلاینت (۴۹۰۰ms) باید زیر این عدد بماند — نگهبان:
+  // scripts/testCardDuelPacing.js بندِ ۷.
+  otHoldMs: 6500,
   simultaneous: true,
   create,
   createFromDecks,

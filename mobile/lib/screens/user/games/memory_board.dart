@@ -35,6 +35,7 @@ class MemoryScreen extends StatefulWidget {
     this.roomCode,
     this.existingSocket,
     this.initialStart,
+    this.recordOnly = false,
   });
 
   final ApiClient api;
@@ -44,6 +45,11 @@ class MemoryScreen extends StatefulWidget {
   final String? roomCode;
   final io.Socket? existingSocket;
   final Map<String, dynamic>? initialStart;
+
+  /// فقط حالتِ رکوردی (تایم‌اتکِ تنها): نه ربات، نه صفِ حریف واقعی.
+  /// خواستهٔ مالک (۸ مهر ۱۴۰۵): «جفت‌یاب در قسمتِ بازی با ربات فقط
+  /// باید حالتِ رکوردی داشته باشه.»
+  final bool recordOnly;
 
   @override
   State<MemoryScreen> createState() => _MemoryScreenState();
@@ -69,6 +75,12 @@ class _MemoryScreenState extends State<MemoryScreen> {
     super.initState();
     _solo.addListener(_onSolo);
     _loadRecords();
+    // حالتِ رکوردیِ خالص: صفحه مستقیم روی تایم‌اتکِ تنها باز می‌شود و
+    // مسیرِ ربات/صف اصلاً شروع نمی‌شود (سوکتِ versus هم بی‌کار می‌ماند).
+    if (widget.recordOnly) {
+      _mode = _Mode.solo;
+      return;
+    }
     if (widget.initialStart != null) {
       return;
     }
@@ -109,6 +121,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   void _switchTo(_Mode m) {
     if (widget.stake == 100 || widget.stake == 1000) return;
+    // رکوردیِ خالص راهِ برگشت به versus ندارد (خواستهٔ مالک).
+    if (widget.recordOnly && m == _Mode.versus) return;
     if (_mode == m) return;
     // Leaving one mode must actually release it server-side, otherwise the
     // player sits in the matchmaking queue while playing solo (and a real
@@ -139,7 +153,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
         bestMs: _bestMs,
         myRank: _myRank,
         onBack: widget.onBack,
-        onVersus: () => _switchTo(_Mode.versus),
+        onVersus: widget.recordOnly ? null : () => _switchTo(_Mode.versus),
       );
     }
 
@@ -223,7 +237,7 @@ class _SoloView extends StatelessWidget {
     required this.bestMs,
     required this.myRank,
     required this.onBack,
-    required this.onVersus,
+    this.onVersus,
   });
 
   final SoloSession session;
@@ -231,7 +245,8 @@ class _SoloView extends StatelessWidget {
   final int? bestMs;
   final int? myRank;
   final VoidCallback onBack;
-  final VoidCallback onVersus;
+  /// null یعنی حالتِ رکوردیِ خالص — دکمهٔ «حریف واقعی» اصلاً رسم نمی‌شود.
+  final VoidCallback? onVersus;
 
   @override
   Widget build(BuildContext context) {
@@ -255,11 +270,12 @@ class _SoloView extends StatelessWidget {
                     style: theme.textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.w800)),
               ),
-              TextButton.icon(
-                onPressed: session.running ? null : onVersus,
-                icon: const Icon(Icons.people_alt_rounded, size: 17),
-                label: const Text('حریف واقعی'),
-              ),
+              if (onVersus != null)
+                TextButton.icon(
+                  onPressed: session.running ? null : onVersus,
+                  icon: const Icon(Icons.people_alt_rounded, size: 17),
+                  label: const Text('حریف واقعی'),
+                ),
             ],
           ),
           Gaps.vXs,
