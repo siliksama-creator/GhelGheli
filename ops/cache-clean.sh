@@ -37,6 +37,38 @@ report() {
   else log "$1: $(mb "$2")MB آزاد می‌شد"; fi
 }
 
+# ── سپرِ مسیرهای حیاتی (تذکرِ مالک ۲۰۲۶-۰۹-۲۳) ─────────────────────────
+# این پاک‌کننده هرگز نباید فایلِ مهم یا دیتابیس را حذف کند. دو لایه:
+#   ۱) ذاتِ اسکریپت فقط فهرستِ سفیدِ هدف‌ها را rm می‌کند (کش‌ها و لاگ‌های
+#      چرخیده)، نه «هر چه قدیمی است».
+#   ۲) این سپر: هر هدفی که زیرِ یک مسیرِ حیاتی بیفتد، کلِ اجرا را متوقف
+#      می‌کند (exit 3) تا یک اشتباهِ آینده بی‌صدا فاجعه نسازد.
+#      دیتابیس هم اصلاً در دسترس این اسکریپت نیست: نه اعتبارنامهٔ DB دارد
+#      نه هیچ دستورِ psql/delete روی داده — فقط فایل‌های کش و لاگ.
+PROTECTED_PREFIXES=(
+  /var/lib/postgresql
+  /var/lib/mysql
+  /etc
+  /root/.ghelgheli-backups
+  /root/ghelghelishop-backup
+  /home/ghelgheli/.pm2
+  /var/www/GhelGheli/backend/.env
+  /var/www/GhelGheli/backend/uploads
+  /var/www/GhelGheli/userweb/dist
+  /var/www/ghelghelishop.com/wp-content/uploads
+  /var/www/ghelghelishop.com/wp-content/cache/index.php
+)
+assert_safe() {
+  for pre in "${PROTECTED_PREFIXES[@]}"; do
+    case "$1" in
+      "$pre"*)
+        log "REFUSED: هدفِ $1 زیرِ مسیرِ حیاتیِ $pre است — اجرا متوقف شد"
+        exit 3
+        ;;
+    esac
+  done
+}
+
 log "── شروع ──"
 DISK_BEFORE=$(df -k / | awk 'NR==2{print $3}')
 
@@ -57,6 +89,7 @@ done
 if [ -d /root/.cache/pip ]; then
   b=$(kb_of /root/.cache/pip)
   if [ "$MODE" = "--run" ]; then
+    assert_safe /root/.cache/pip
     rm -rf /root/.cache/pip
     report "pip-cache" "$b"
   else
@@ -88,6 +121,7 @@ fi
 b=$(find /tmp -mindepth 1 -maxdepth 1 -mtime +3 \! -name 'systemd*' \! -name '*.sock*' \! -name '.pm2*' \
       -exec du -sk {} + 2>/dev/null | awk '{s+=$1}END{print s+0}')
 if [ "$MODE" = "--run" ]; then
+  assert_safe /tmp
   find /tmp -mindepth 1 -maxdepth 1 -mtime +3 \! -name 'systemd*' \! -name '*.sock*' \! -name '.pm2*' \
     -exec rm -rf {} + 2>/dev/null || true
 fi
@@ -97,6 +131,7 @@ report "tmp(3روز+)" "$b"
 b=$(find /var/log -maxdepth 2 \( -name '*.gz' -o -name '*.[0-9]' \) -mtime +14 \
       -printf '%k\n' 2>/dev/null | awk '{s+=$1}END{print s+0}')
 if [ "$MODE" = "--run" ]; then
+  assert_safe /var/log
   find /var/log -maxdepth 2 \( -name '*.gz' -o -name '*.[0-9]' \) -mtime +14 -delete 2>/dev/null || true
 fi
 report "varlog-rotate(14روز+)" "$b"
@@ -107,6 +142,7 @@ WPC=/var/www/ghelghelishop.com/wp-content/cache
 if [ -d "$WPC" ]; then
   b=$(find "$WPC" -mindepth 1 -maxdepth 1 -mtime +1 -exec du -sk {} + 2>/dev/null | awk '{s+=$1}END{print s+0}')
   if [ "$MODE" = "--run" ]; then
+    assert_safe "$WPC"
     find "$WPC" -mindepth 1 -maxdepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null || true
   fi
   report "wp-cache(shop,1روز+)" "$b"
@@ -117,6 +153,7 @@ BL=/var/www/GhelGheli/backend/logs
 if [ -d "$BL" ]; then
   b=$(find "$BL" -name '*.gz' -mtime +14 -printf '%k\n' 2>/dev/null | awk '{s+=$1}END{print s+0}')
   if [ "$MODE" = "--run" ]; then
+    assert_safe "$BL"
     find "$BL" -name '*.gz' -mtime +14 -delete 2>/dev/null || true
   fi
   report "backend-logs(14روز+)" "$b"
