@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../api_client.dart';
-import '../core/app_config.dart';
 import '../core/deep_links.dart';
 import '../screens/user/games/game_audio.dart';
 import '../core/money.dart';
