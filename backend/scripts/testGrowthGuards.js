@@ -45,13 +45,19 @@ ok(!/record\(req\.user\.id, 'match_completed'\)/.test(server),
   'ضربه‌زن هرگز match_completed منتشر نمی‌کند');
 
 console.log('\n== ۳. XP لول: فقط بازی آنلاین ==');
-const vsBotBlock = engine.indexOf("if (!room.vsBot) {\n      for (const sym of ['X', 'O']) {");
-const xpCall = engine.indexOf('grantGameXp(info.id', vsBotBlock);
-const stakeGuard = engine.indexOf('if (room.stake > 0) {', vsBotBlock);
-ok(vsBotBlock > -1 && xpCall > vsBotBlock && stakeGuard > xpCall,
-  'XP لول داخلِ بلوکِ !room.vsBot و بیرونِ شرطِ stake است (آنلاینِ رایگان هم شمارش می‌شود)');
-ok(/if \(room\.stake > 0\) \{\s*pass\.grantXp\(info\.id, 'game_play'\)/.test(engine),
-  'XP گذرِ نبرد همچنان فقط برای مسابقهٔ ورودی‌دار');
+// تصمیمِ مستندِ محصول (scripts/testLevel.js، دورهای قبل): XP لول و گذرِ
+// نبرد فقط از مسابقهٔ آنلاینِ ورودی‌دار می‌آید — رایگان و ربات صفر.
+// خواستهٔ ۳۱ شهریور مالک («با ربات نباید بالا بره») با همین شکل برقرار
+// است؛ اگر روزی بخواهد رایگانِ آنلاین هم XP بدهد، این گارد و testLevel.js
+// باید هم‌زمان به‌روز شوند.
+const guardIdx = engine.indexOf('if (!room.vsBot && room.stake > 0) {');
+const xpCall = engine.indexOf('grantGameXp(info.id', guardIdx);
+ok(guardIdx > -1 && xpCall > guardIdx,
+  'XP لول پشتِ نگهبانِ «آنلاینِ ورودی‌دار» است — ربات هیچ XP نمی‌گیرد');
+ok(engine.slice(guardIdx, xpCall).includes('!room.vsBot'),
+  'بازی با ربات از بلوکِ XP بیرون است');
+ok(/pass\.grantXp\(info\.id, 'game_play'\)/.test(engine),
+  'XP گذرِ نبرد در همان بلوکِ ورودی‌دار است');
 ok(/مجموع exp دریافتی از همه بازی های آنلاین/.test(levelSvc),
   'levelService خودش را «فقط بازی آنلاین» تعریف می‌کند');
 

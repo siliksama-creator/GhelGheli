@@ -45,6 +45,7 @@ async function runtime() {
   const canConnect = await db.pool.query('SELECT 1').then(() => true).catch(() => false);
   if (!canConnect) { console.log('\n(دیتابیس در دسترس نیست — بخشِ پویا رد شد)'); return; }
   const referrals = require('../src/services/referralService');
+  const crypto = require('crypto');
   const suffix = Math.floor(Math.random() * 90000 + 10000);
   // setupCommit: کاربرها باید برای اتصالِ تراکنشِ کمیسیون دیده شوند.
   const a = await db.pool.query(
@@ -56,7 +57,9 @@ async function runtime() {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
-    const ref = `guard-${suffix}`;
+    // ستونِ purchase_reference_id از نوعِ uuid است — همان چیزی که
+    // shopService موقعِ خریدِ واقعی می‌فرستد (شناسهٔ ردیفِ خرید).
+    const ref = crypto.randomUUID();
     const first = await referrals.payPurchaseCommission(client, {
       buyerId, purchaseType: 'shop_item', purchaseReferenceId: ref,
       purchaseAmount: 10000, gatewayProvider: 'guard',
@@ -72,7 +75,7 @@ async function runtime() {
     ok(second && second.duplicate === true && second.earned === 0,
       'تکرارِ همان خرید پولِ دوباره نمی‌سازد (ایدمپوتنسی)');
     const noRef = await referrals.payPurchaseCommission(client, {
-      buyerId: referrerId, purchaseType: 'shop_item', purchaseReferenceId: `guard2-${suffix}`,
+      buyerId: referrerId, purchaseType: 'shop_item', purchaseReferenceId: crypto.randomUUID(),
       purchaseAmount: 10000, gatewayProvider: 'guard',
     });
     ok(noRef === null, 'خریدِ بدونِ معرف کمیسیون نمی‌سازد');
