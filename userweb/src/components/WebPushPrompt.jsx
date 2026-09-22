@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { req } from '../lib/api.js';
 import { liveConfig, loadLiveConfig } from '../lib/liveConfig.js';
+import { SvgIcon } from './IconAsset.jsx';
 
 const ASK_KEY = 'gg-webpush-ask';
 const LATER_MS = 7 * 24 * 60 * 60 * 1000;
@@ -113,10 +114,10 @@ export default function WebPushPrompt({ token }) {
         boxShadow: '0 8px 30px rgba(0,0,0,0.35)', fontSize: 13, lineHeight: 1.7,
       }}>
         {ok ? (
-          <div>✅ اعلان‌ها فعال شد — از این به بعد مثل اپ موبایل خبرت می‌کنیم.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><SvgIcon name="check" size={18} /><span>اعلان‌ها فعال شد — از این به بعد مثل اپ موبایل خبرت می‌کنیم.</span></div>
         ) : (
           <>
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>🔔 اعلان‌های قلقلی روی مرورگر</div>
+            <div style={{ fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}><SvgIcon name="bell" size={18} /><span>اعلان‌های قلقلی روی مرورگر</span></div>
             <div style={{ opacity: 0.85, marginBottom: 10 }}>
               از چرخش رایگان، ماموریت‌ها و خبرهای مهم جا نمانی — مثل اپ موبایل،
               روی همین مرورگر هم اعلان می‌گیری. هر وقت بخواهی از تنظیماتِ
