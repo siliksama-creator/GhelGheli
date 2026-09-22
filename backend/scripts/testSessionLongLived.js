@@ -34,7 +34,8 @@ const SRC = path.join(__dirname, '..', 'src');
 // ماژولار شدنِ server.js (مهر ۱۴۰۵): این مسیرها به routes/ منتقل شدند؛
 // هر دو پرونده خوانده می‌شوند تا بررسی نسبت به جابه‌جاییِ ماژول‌ها کور نماند.
 const serverSrc = fs.readFileSync(path.join(SRC, 'server.js'), 'utf8')
-  + fs.readFileSync(path.join(SRC, 'routes', 'profile.js'), 'utf8');
+  + fs.readFileSync(path.join(SRC, 'routes', 'profile.js'), 'utf8')
+  + fs.readFileSync(path.join(SRC, 'sockets.js'), 'utf8');
 const authSrc = fs.readFileSync(path.join(SRC, 'routes', 'auth.js'), 'utf8');
 const adminUsersSrc = fs.readFileSync(path.join(SRC, 'routes', 'adminUsers.js'), 'utf8');
 const envExample = fs.readFileSync(path.join(__dirname, '..', '.env.example'), 'utf8');

@@ -36,7 +36,9 @@ const read = p => strip(fs.readFileSync(path.join(root, p), 'utf8'));
 
 const web = read('userweb/src/screens/League.jsx');
 const android = read('mobile/lib/screens/user/league_page.dart');
-const server = read('backend/src/server.js');
+// لایهٔ سوکت به src/sockets.js رفت (ماژولار شدنِ server.js، مهر ۱۴۰۵) —
+// پین‌های هندلرهای سوکت هر دو پرونده را می‌خوانند.
+const server = read('backend/src/server.js') + read('backend/src/sockets.js');
 const signal = read('backend/src/services/leaderboardSignal.js');
 
 let checks = 0;
