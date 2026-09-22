@@ -1,4 +1,6 @@
 // نوار فشردهٔ اشتراک نتیجه — فقط تلگرام، واتس‌اپ، روبیکا، بله.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../api_client.dart';
@@ -65,14 +67,14 @@ class _ResultShareStripState extends State<ResultShareStrip> {
           SnackBar(content: Text('متن کپی شد؛ ${target.label} را باز کن و بچسبان')),
         );
       }
-      widget.api.post('/api/analytics/events', {
+      unawaited(widget.api.post('/api/analytics/events', {
         'event': 'share',
         'platform': 'android',
         'gameId': widget.gameId,
         'matchId': widget.matchId,
         'target': target.id,
-      }).catchError((_) => <String, dynamic>{});
-    } catch (e) {
+      }).catchError((_) => <String, dynamic>{}));
+    } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'اشتراک‌گذاری ناموفق بود');
     } finally {
@@ -120,7 +122,10 @@ class _ResultShareStripState extends State<ResultShareStrip> {
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
-            child: Text(_error!, style: const TextStyle(color: Color(0xFFFB7185), fontSize: 11, fontWeight: FontWeight.w700)),
+            child: Text(
+              _error!,
+              style: const TextStyle(color: Color(0xFFFB7185), fontSize: 11, fontWeight: FontWeight.w700),
+            ),
           ),
       ],
     );
