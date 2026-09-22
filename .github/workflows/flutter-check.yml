@@ -31,7 +31,12 @@ jobs:
       - run: flutter pub get
       - run: rm -f test/widget_test.dart
       - name: Analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        # قبلاً عمداً شل بود (--no-fatal-warnings) و در نتیجه هشت ایراد
+        # (دو هشدارِ `!` زائد و شش constِ جاافتاده) بی‌صدا انباشته شدند؛
+        # هر هشت در ۸ مهر تعمیر شدند. از حالا هشدار = CI قرمز. infoها
+        # (سبکِ سلیقه‌ای مثل prefer_const) هنوز کشنده نیستند تا نویزِ
+        # بی‌ضرر جریان را قفل نکند.
+        run: flutter analyze --no-fatal-infos
       - name: Widget tests
         run: |
           set -o pipefail

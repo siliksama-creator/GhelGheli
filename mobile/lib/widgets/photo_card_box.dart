@@ -444,8 +444,8 @@ class _PhotoCardBoxState extends State<PhotoCardBox> {
     // یک‌جا ظاهر می‌شد (پرشِ چیدمان). حالا یک نشانگرِ کوچک جای همان فضا را
     // نگه می‌دارد تا فرم بدونِ پرش بنشیند.
     if (_checking) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: Gaps.lg),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: Gaps.lg),
         child: Center(
           child: SizedBox(
             width: 22,

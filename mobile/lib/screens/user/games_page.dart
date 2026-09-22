@@ -1035,7 +1035,7 @@ class _CleanGameTile extends StatelessWidget {
                     ),
                     child: Text(
                       entry.id == 'memory' && mode == 0 ? 'رکوردی' : 'شروع',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF04101C),

@@ -869,8 +869,8 @@ class _LiveBattle extends StatelessWidget {
         // فازِ 'overtime' در cardDuelGame.jsx.
         if (session.resultHolding &&
             lastRound != null &&
-            lastRound!['overtime'] is Map)
-          _OvertimePanel(round: lastRound!, mine: mine),
+            lastRound['overtime'] is Map)
+          _OvertimePanel(round: lastRound, mine: mine),
         if (session.phase == GamePhase.playing) ...[
           Gaps.vSm,
           AppCard(
