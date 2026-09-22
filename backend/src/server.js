@@ -1114,6 +1114,23 @@ server.listen(port, async () => {
 // دو دقیقه «آنلاینِ روح» نمانند.
 for (const sig of ['SIGTERM', 'SIGINT']) {
   process.on(sig, () => {
-    presence.drain().catch(() => {}).finally(() => process.exit(0));
+    // خروجِ آرام (سخت‌سازیِ مقیاس، مهر ۱۴۰۵): در ری‌استارت/دیپلوی هیچ درخواستِ
+    // در جریانی نباید قطع شود. ترتیب: کلاینت‌های سوکت قطع می‌شوند (خودکار به
+    // گرهِ دیگر وصلِ مجدد می‌شوند)، پذیرشِ اتصالِ نو می‌ایستد و اتصال‌های
+    // keep-aliveِ بی‌کار بسته می‌شوند؛ وقتی درخواست‌های در جریان تمام شدند
+    // استخرِ DB آزاد و خارج می‌شویم. اگر بیش از ۴ ثانیه طول کشید، اتصال‌های
+    // باقی‌مانده بستهٔ اجباری می‌شوند و در ۸ ثانیه خروجِ بی‌قیدِ شرط —
+    // pm2 با kill_timeout: 9000 تا آن لحظه صبر می‌کند و SIGKILL نمی‌فرستد.
+    logger.info(`[shutdown] دریافتِ ${sig} — خروجِ آرام (حداکثر ۸ ثانیه)`);
+    let exited = false;
+    const finish = () => { if (!exited) { exited = true; process.exit(0); } };
+    setTimeout(finish, 8000).unref();
+    try { io.disconnectSockets(true); } catch (e) { logger.warn('[shutdown] io.disconnectSockets ناموفق', e.message); }
+    presence.drain().catch(() => {});
+    server.close(() => {
+      pool.end().catch(() => {}).then(finish, finish);
+    });
+    try { server.closeIdleConnections(); } catch (e) { /* node قدیمی */ }
+    setTimeout(() => { try { server.closeAllConnections(); } catch (e) { /* node قدیمی */ } }, 4000).unref();
   });
 }

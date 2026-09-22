@@ -73,6 +73,9 @@ function app(name, port, role) {
     // موقتاً ۲۵۰-۳۰۰ مگ به RSS اضافه کند و ری‌استارتِ وسطِ موج، مسابقهٔ
     // در جریان را می‌کشد.
     max_memory_restart: `${cap.memRestartMB}M`,
+    // خروجِ آرام: هندلرِ SIGTERM در server.js تا ۸ ثانیه فرصت دارد درخواست‌های
+    // در جریان را تمام کند؛ pm2 پیش از SIGKILL این‌قدر صبر می‌کند.
+    kill_timeout: 9000,
     // ⚠️ `node_args` تنها **کافی نیست**: روی سرورِ تولید دیدیم پنلِ PM2 مقدار
     // `node_args=['--max-old-space-size=923']` را نشان می‌داد ولی پروسهٔ واقعی
     // بدونِ آن فلگ بالا آمده بود (`/proc/<pid>/cmdline` فقط `node src/server.js`
