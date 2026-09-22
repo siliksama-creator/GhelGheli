@@ -100,12 +100,5 @@ router.post('/admin/notifications/send-segmented', adminAuth, requireRole('suppo
     });
   }));
 
-router.post('/admin/notifications/broadcast', adminAuth, requireRole('support'),
-  adminNotificationLimiter, asyncHandler(async (req, res) => {
-    const { title, body } = req.body;
-    await createNotification(null, 'broadcast', title, body);
-    await audit(req.admin.id,'broadcast_notification','notifications',null,null,{title});
-    res.json({ message: 'اطلاعیه همگانی ثبت شد' });
-  }));
   return router;
 };

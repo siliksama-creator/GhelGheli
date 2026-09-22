@@ -174,31 +174,6 @@ module.exports = function createAdminShopRoutes(deps) {
       res.json({ message: `«${cur.name}» از فروشگاه حذف شد` });
     }));
 
-  // ── ترتیب نمایش دسته‌ای ───────────────────────────────────────────────
-  router.patch('/admin/shop/reorder', adminAuth, requireRole(),
-    asyncHandler(async (req, res) => {
-      const list = Array.isArray(req.body?.items) ? req.body.items : [];
-      if (!list.length) return res.status(400).json({ message: 'فهرست ترتیب ارسال نشده' });
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        for (const item of list) {
-          if (!item || typeof item.id !== 'string') continue;
-          await client.query(
-            'UPDATE shop_items SET display_order=$2, updated_at=NOW() WHERE id=$1',
-            [item.id, Math.max(0, Math.round(Number(item.displayOrder) || 0))]);
-        }
-        await client.query('COMMIT');
-      } catch (e) {
-        await client.query('ROLLBACK').catch(() => {});
-        throw e;
-      } finally {
-        client.release();
-      }
-      await audit(req.admin.id, 'reorder_shop_items', 'shop_items', null, null, { count: list.length });
-      res.json({ message: 'ترتیب فروشگاه ذخیره شد', items: await listItems() });
-    }));
-
   // ── پلن‌های پلاس (قیمت/روز/مزایا) ──────────────────────────────────────
   router.get('/admin/shop/plus', adminAuth, asyncHandler(async (req, res) => {
     res.json(shop.plusPlansConfig());

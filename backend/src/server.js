@@ -2955,13 +2955,6 @@ app.use('/api', require('./routes/photoCards')({
   optimizeUpload, verifyUpload, UUID_RE,
 }));
 
-// Reward catalogue, grouping, and claim administration.
-app.use('/api', require('./routes/adminRewards')({
-  pool, adminAuth, requireRole, asyncHandler, audit, validateUuid,
-  rewardGroups, safeImageUrl, cashAmountInput, keepImage, createNotification,
-  walletService,
-}));
-
 // Wallet balances, settings, and withdrawal administration.
 app.use('/api', require('./routes/adminWallet')({
   pool, adminAuth, requireRole, asyncHandler, audit, validateUuid,
