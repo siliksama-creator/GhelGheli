@@ -919,11 +919,22 @@ if (PROCESS_ROLE !== 'http') {
 // ── کارهای زمان‌بندی‌شده — همه در src/cron.js (بندِ ۱ ممیزیِ ۸ مهر). ──
 // همان scheduleها با همان ترتیب و timezone ثبت می‌شوند؛ جزئیات و دلیلِ
 // هر job در همان ماژول آمده است.
-require('./cron')({
-  pool, logger, gameStakes, closeExpiredSeasons, addLeaguePoints,
-  wheelReminder, tapGame, cardDuel, coins, analytics,
-  imageUploadDir, thumbRoot, THUMB_WIDTHS, IMAGE_EXT_RE,
-});
+// فقط گرهٔ game کرون را ثبت می‌کند — ریشهٔ حادثهٔ ۲۰۲۶-۰۹-۲۲: با
+// افزایشِ ظرفیت، تعدادِ گره‌ها از ۳ به ۵ رسید و چون هر گره همهٔ jobهای
+// زمان‌بندی‌شده را ثبت می‌کرد، یادآورِ روزانهٔ چرخش (۱۸:۳۰) برای هر کاربر
+// ۵ بارِ هم‌زمان رفت — همان «چند نوتیفیکیشن هم‌زمان روی گوشی» که مالک
+// گزارش داد (روزهای سه‌گره‌ای: ۳ نوتیفیکیشن). PROCESS_ROLE را
+// ecosystem.config.cjs برای هر برنامه ست می‌کند و گرهٔ game همیشه
+// دقیقاً یکی است. در توسعه/استیجینگ این متغیر تنظیم نیست → پیش‌فرض
+// «game» → کرون فعال می‌ماند (یک پروسه، بدونِ تکرار).
+if ((process.env.PROCESS_ROLE || 'game') === 'game') {
+  require('./cron')({
+    pool, logger, gameStakes, closeExpiredSeasons, addLeaguePoints,
+    wheelReminder, tapGame, cardDuel, coins, analytics,
+    imageUploadDir, thumbRoot, THUMB_WIDTHS, IMAGE_EXT_RE,
+  });
+  logger.info('[cron] jobهای زمان‌بندی‌شده فقط روی گرهٔ game ثبت شدند');
+}
 // Centralized error handler. Previously this forwarded err.message straight
 // to the client, which meant raw PostgreSQL errors (unique/foreign-key
 // constraint names, column/table names, data types) leaked verbatim to
