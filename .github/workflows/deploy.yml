@@ -1,0 +1,55 @@
+# ═══════════════════════════════════════════════════════════════════════
+# دیپلویِ خودکار روی VPS — فقط بعدِ سبز شدنِ «Backend and Admin CI»
+# ═══════════════════════════════════════════════════════════════════════
+#
+# چرا workflow_run و نه on: push:
+#   دیپلوی باید بعد از اثباتِ commit در CI انجام شود. ممیزیِ ۸ مهر دقیقاً
+#   همین خطر را نشان داد: سه push پیاپی با CI قرمز (driftِ openapi) اگر
+#   on: push بودند مستقیم به تولید می‌رفتند. با workflow_run، دیپلوی فقط
+#   وقتی راه می‌افتد که همان CI روی main موفق تمام شده باشد.
+#
+# چرا runner خودمیزبان:
+#   runner با برچسب ghelgheli-vps روی خودِ سرور و با کاربرِ غیرroot
+#   (ghelgheli) نصب است. تنها عملیاتِ ممتاز، اسکریپتِ دیپلوی است و
+#   sudoers دقیقاً همان یک مسیر را بی‌رمز مجاز کرده:
+#     /etc/sudoers.d/ghelgheli-deploy
+#   (اعتمادِ ذاتیِ self-hosted: هر quien بتواند به main پوش کند عملاً
+#   همین اسکریپت را به‌عنوان root اجرا می‌کند — مخزن خصوصی است و PAT
+#   دستِ مالک.)
+#
+# کارِ اسکریپت (scripts/deploy.sh — از قبل battle-tested):
+#   بکاپِ دیتابیس ← fetch + reset --hard ← npm ci ← node --check ←
+#   migrate ← prewarm ← build admin ← build userweb ← pm2 reload (بدونِ
+#   downtime) ← حلقهٔ health (۲۰ ثانیه) ← در صورتِ شکست: rollback خودکار
+#   به commit قبلی ← بررسیِ TTL جلسه ← snippetهای nginx ← reload.
+#
+# اجرای دستی (workflow_dispatch) برای دیپلویِ اضطراری یا اولین تستِ مسیر
+# خودکار آزاد است.
+
+name: Deploy VPS
+
+on:
+  workflow_run:
+    workflows: ["Backend and Admin CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, ghelgheli-vps]
+    timeout-minutes: 45
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: دیپلوی (بکاپ ← build ← reload ← health ← rollback)
+        shell: bash
+        run: |
+          set -o pipefail
+          echo "trigger: ${{ github.event_name }}${{ github.event.workflow_run.head_sha }}"
+          sudo -n /var/www/GhelGheli/scripts/deploy.sh
