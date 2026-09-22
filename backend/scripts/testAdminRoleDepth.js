@@ -46,6 +46,21 @@ const ADMIN_PASS = process.env.E2E_ADMIN_PASS || process.env.ADMIN_DEFAULT_PASSW
 
 const PROD_HOSTS = ['api.ghelghelishop.ir', 'ghelghelishop.ir'];
 const host = (() => { try { return new URL(BASE).hostname; } catch { return ''; } })();
+
+// نگهبانِ ۲ — حادثهٔ ۲۰۲۶-۰۹-۲۲: روی VPS تولید، آدرسِ «لوکال»
+// (127.0.0.1:4000-4004) خودِ تولید است، ولی نگهبانِ hosts فقط دامنه‌های
+// .ir را می‌شناخت و باتریِ تست با .env تولید این‌جا را آلوده کرد: همهٔ
+// تنظیماتِ پنل (از جمله ماموریت‌های اختصاصی) با دادهٔ تست بازنویسی شد.
+// فایلِ پورت‌های ظرفیت فقط روی VPS تولید وجود دارد، پس اجرای لوکالِ
+// ماشینِ توسعه و استیجینگِ ۴۹۹۹ آزاد می‌مانند.
+try {
+  const prodPorts = require('fs').readFileSync('/etc/ghelgheli-capacity-ports', 'utf8').split(/\D+/).filter(Boolean);
+  const basePort = String(new URL(BASE).port || '');
+  if (prodPorts.includes(basePort) && process.env.ALLOW_PROD !== 'yes-i-know') {
+    console.error(`⛔ نگهبانِ ۲: پورتِ ${basePort || '(پیش‌فرض)'} گرهٔ تولیدِ همین سرور است — این تست مخرب است.\n   روی استیجینگ اجرا کنید: BASE=http://127.0.0.1:4999 (اجرای آگاهانه: ALLOW_PROD=yes-i-know)`);
+    process.exit(2);
+  }
+} catch (e) { if (e.code !== 'ENOENT') throw e; }
 if (PROD_HOSTS.includes(host) && process.env.ALLOW_PROD !== 'yes-i-know') {
   console.error(`
 ⛔ هدف این اجرا سرور production است (${host}).

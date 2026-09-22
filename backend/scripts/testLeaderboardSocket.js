@@ -35,6 +35,21 @@ const pg = (() => { try { return require('pg'); } catch { return null; } })();
 const BASE = process.env.BASE || `http://127.0.0.1:${process.env.PORT || 4000}`;
 const ALLOW_PROD = process.env.ALLOW_PROD === 'yes-i-know';
 
+// نگهبانِ ۲ — حادثهٔ ۲۰۲۶-۰۹-۲۲: روی VPS تولید، آدرسِ «لوکال»
+// (127.0.0.1:4000-4004) خودِ تولید است، ولی نگهبانِ hosts فقط دامنه‌های
+// .ir را می‌شناخت و باتریِ تست با .env تولید این‌جا را آلوده کرد: همهٔ
+// تنظیماتِ پنل (از جمله ماموریت‌های اختصاصی) با دادهٔ تست بازنویسی شد.
+// فایلِ پورت‌های ظرفیت فقط روی VPS تولید وجود دارد، پس اجرای لوکالِ
+// ماشینِ توسعه و استیجینگِ ۴۹۹۹ آزاد می‌مانند.
+try {
+  const prodPorts = require('fs').readFileSync('/etc/ghelgheli-capacity-ports', 'utf8').split(/\D+/).filter(Boolean);
+  const basePort = String(new URL(BASE).port || '');
+  if (prodPorts.includes(basePort) && process.env.ALLOW_PROD !== 'yes-i-know') {
+    console.error(`⛔ نگهبانِ ۲: پورتِ ${basePort || '(پیش‌فرض)'} گرهٔ تولیدِ همین سرور است — این تست مخرب است.\n   روی استیجینگ اجرا کنید: BASE=http://127.0.0.1:4999 (اجرای آگاهانه: ALLOW_PROD=yes-i-know)`);
+    process.exit(2);
+  }
+} catch (e) { if (e.code !== 'ENOENT') throw e; }
+
 let pass = 0; let fail = 0;
 function ok(name, cond, detail = '') {
   if (cond) { pass += 1; console.log('  ✓', name); }
