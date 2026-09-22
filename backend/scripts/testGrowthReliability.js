@@ -56,20 +56,14 @@ ok(shop.includes('purchaseHistory')
 
 const web = read('userweb/src/cardDuelGame.jsx');
 const android = read('mobile/lib/screens/user/games/card_duel_page.dart');
-ok(web.includes('renderResultCard') && web.includes('MVP') && web.includes('shareUrl'),
-  'Web result card includes MVP and challenge link');
-// ⚠️ نامِ API نباید سفت‌وسخت باشد: share_plus ۱۳ کلاسِ `Share` را منسوخ
-//    کرد و `SharePlus.instance.share(ShareParams(files: ...))` را
-//    جایگزینش کرد. ارتقا لازم بود چون نسخهٔ ۱۰ هنوز Kotlin Gradle Plugin
-//    را خودش اعمال می‌کرد و بیلد هشدارِ KGP می‌داد.
-//
-//    چیزی که واقعاً اهمیت دارد این است که «فایلِ تصویر به اشتراک گذاشته
-//    می‌شود»، نه اینکه با کدام امضا. هر دو شکل پذیرفته می‌شود تا ارتقای
-//    بعدیِ پکیج این تست را بی‌دلیل قرمز نکند.
-const sharesFile = android.includes('Share.shareXFiles')
-  || (android.includes('SharePlus.instance.share') && android.includes('files:'));
-ok(android.includes('_renderResultCard') && sharesFile && android.includes('shareUrl'),
-  'Android shares a real PNG result card and challenge link');
+const shareWeb = read('userweb/src/components/ShareResult.jsx');
+const shareStrip = read('mobile/lib/widgets/result_share_strip.dart');
+ok(web.includes('ShareResult') && shareWeb.includes('telegram') && shareWeb.includes('rubika')
+  && shareWeb.includes('bale') && shareWeb.includes('whatsapp') && shareWeb.includes('چرخش رایگان'),
+  'Web result share is messengers + invite spins, not Instagram/system sheet');
+ok(android.includes('ResultShareStrip') && shareStrip.includes('/api/referrals')
+  && shareStrip.includes('shareTargets') && !android.includes('اینستاگرام'),
+  'Android result share is messengers + invite code, not Instagram/system sheet');
 const webGrowth = read('userweb/src/GrowthHub.jsx');
 const mobileGrowth = read('mobile/lib/screens/user/games/growth_panel.dart');
 ok(webGrowth.includes('friend:challenge') && mobileGrowth.includes('friend:challenge'),
