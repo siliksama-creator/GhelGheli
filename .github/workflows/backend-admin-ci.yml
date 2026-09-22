@@ -34,6 +34,9 @@ jobs:
         with: { node-version: 24 }
       - run: npm install
       - run: node -c src/server.js
+      # نگهبانِ manifest: فهرستِ endpointها از خودِ routeها تولید می‌شود؛
+      # اگر route عوض شود و manifest نو نشود، CI قرمز می‌شود (ممیزی ۸ مهر).
+      - run: node scripts/genApiManifest.js --check
       # Rules + engine tests (matchmaking, bots, turn order, and the hostile
       # payload fuzz that guards against socket handlers crashing the API).
       - run: npm test

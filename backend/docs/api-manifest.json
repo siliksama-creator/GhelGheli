@@ -1,0 +1,1331 @@
+{
+ "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
+ "count": 265,
+ "endpoints": [
+  {
+   "method": "GET",
+   "path": "/api/admin/admins",
+   "source": "routes/adminSecurity.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/admins",
+   "source": "routes/adminSecurity.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/admins/:id/status",
+   "source": "routes/adminSecurity.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/analytics",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/audit-log",
+   "source": "routes/adminSecurity.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/audit-log/:id",
+   "source": "routes/adminSecurity.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/auth/login",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/bazaar-products",
+   "source": "routes/adminOps.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/card-box",
+   "source": "routes/adminCardBox.js"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/card-box",
+   "source": "routes/adminCardBox.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/card-box/purchases",
+   "source": "routes/adminCardBox.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/card-duel/balance",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/card-types",
+   "source": "routes/adminCardCatalog.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/canned",
+   "source": "routes/adminOps.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/chat/canned",
+   "source": "routes/adminOps.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/messages",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/chat/messages/:id/delete",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/chat/pinned",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/chat/pinned",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/chat/users/:id/ban",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/cloudflare",
+   "source": "routes/adminCloudflare.js"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/cloudflare",
+   "source": "routes/adminCloudflare.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/cloudflare/disable",
+   "source": "routes/adminCloudflare.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/cloudflare/enable",
+   "source": "routes/adminCloudflare.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/cloudflare/verify",
+   "source": "routes/adminCloudflare.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/crashes/:reportId",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/crashes/groups/:hash",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/custom-mission",
+   "source": "routes/adminCustomMission.js"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/custom-mission",
+   "source": "routes/adminCustomMission.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/custom-mission/:id/reset",
+   "source": "routes/adminCustomMission.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/dashboard",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/games/results",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/league",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/league-countdown",
+   "source": "routes/leagueCountdown.js"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/league-countdown",
+   "source": "routes/leagueCountdown.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/league/close",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/league/current/dates",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/league/current/prizes",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/league/payouts",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/league/payouts/:id",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/league/payouts/:id/approve",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/league/payouts/approve-all",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/league/seasons",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/league/seasons",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/league/seasons/:id",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/league/seasons/:id/close",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/metrics",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/missions",
+   "source": "routes/adminMissions.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/missions",
+   "source": "routes/adminMissions.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/missions/:key",
+   "source": "routes/adminMissions.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/missions/builtin/:key",
+   "source": "routes/adminMissions.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/missions/config",
+   "source": "routes/adminMissions.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/missions/scale-rewards",
+   "source": "routes/adminMissions.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/notifications/broadcast",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/notifications/send-segmented",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/notifications/status",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/pass",
+   "source": "routes/adminPass.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/pass/config",
+   "source": "routes/adminPass.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/pass/seasons",
+   "source": "routes/adminPass.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/pass/seasons/:id",
+   "source": "routes/adminPass.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/pass/seasons/:id",
+   "source": "routes/adminPass.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/pass/seasons/:id/scale-points",
+   "source": "routes/adminPass.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/pass/tiers",
+   "source": "routes/adminPass.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/pass/tiers/:id",
+   "source": "routes/adminPass.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/photo-cards/card-types/:id",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/photo-cards/card-types/:id",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/card-types/:id/add-codes",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/photo-cards/code-mismatch",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/photo-cards/designs",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/photo-cards/designs/:id",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/photo-cards/designs/:id",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/designs/:id/embedding",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/designs/:id/face-embedding",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/photo-cards/embedding-shadow",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/photo-cards/submissions",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/submissions/:id/decide",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/submissions/bulk-decide",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/points/search",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/points/top",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/points/user/:id",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/recommended-apps",
+   "source": "routes/recommendedApps.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/recommended-apps",
+   "source": "routes/recommendedApps.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/recommended-apps/:id",
+   "source": "routes/recommendedApps.js"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/recommended-apps/:id",
+   "source": "routes/recommendedApps.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/recommended-apps/:id/move",
+   "source": "routes/recommendedApps.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/recommended-apps/visibility",
+   "source": "routes/recommendedApps.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/referrals/purchase-commissions",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/reward-claims",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/reward-claims/:id",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/reward-groups",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/reward-groups",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/reward-groups/:id",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/reward-groups/:id",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/rewards",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/rewards",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/rewards/:id",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/rewards/:id",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/rewards/:id/cards",
+   "source": "routes/adminRewards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/chat",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/chat",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/client-config",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/client-config",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/engine",
+   "source": "routes/adminOps.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/game-economy",
+   "source": "routes/adminGameEconomy.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/game-economy",
+   "source": "routes/adminGameEconomy.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/games",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/games",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/levels",
+   "source": "routes/adminOps.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/live-content",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/settings/live-content/:key/revert",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/live-content/copy",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/live-content/defaults",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/live-content/history/:key",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/settings/live-content/preview",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/live-content/rules",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/nickname-filter",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/nickname-filter",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/ops-limits",
+   "source": "routes/adminOps.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/ops-limits",
+   "source": "routes/adminOps.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/photo-match",
+   "source": "routes/adminOps.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/settings/sms",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/sms",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/settings/streak",
+   "source": "routes/adminOps.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/shop",
+   "source": "routes/adminShop.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/shop",
+   "source": "routes/adminShop.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/shop/:id",
+   "source": "routes/adminShop.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/shop/:id",
+   "source": "routes/adminShop.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/shop/plus",
+   "source": "routes/adminShop.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/shop/plus",
+   "source": "routes/adminShop.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/shop/reorder",
+   "source": "routes/adminShop.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/signup-gift",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/signup-gift",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/support/tickets",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/support/tickets/:id/close",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/support/tickets/:id/messages",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/support/tickets/:id/messages",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/support/tickets/:id/reopen",
+   "source": "routes/adminCommunications.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/tap/leaderboard",
+   "source": "routes/adminGameEconomy.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/tap/reset",
+   "source": "routes/adminGameEconomy.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/tap/stats",
+   "source": "routes/adminGameEconomy.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/uploads/image",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/users",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/users/:id",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/users/:id/grant-item",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/users/:id/grant-plus",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/users/:id/notify",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/users/:id/points",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/users/:id/reset-password",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/users/:id/status",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/users/:id/unlimited-spins",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wallet/settings",
+   "source": "routes/adminWallet.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/wallet/settings",
+   "source": "routes/adminWallet.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wallet/stats",
+   "source": "routes/adminWallet.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/wallet/users/:id/adjust",
+   "source": "routes/adminWallet.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wallet/users/:id/transactions",
+   "source": "routes/adminWallet.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wallet/withdrawals",
+   "source": "routes/adminWallet.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/wallet/withdrawals/:id",
+   "source": "routes/adminWallet.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wheel/prizes",
+   "source": "routes/adminWheel.js"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/wheel/prizes",
+   "source": "routes/adminWheel.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/wheel/stats",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/analytics/events",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/forgot-password/reset",
+   "source": "routes/auth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login",
+   "source": "routes/auth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/login-otp",
+   "source": "routes/auth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/register",
+   "source": "routes/auth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/register-password",
+   "source": "routes/auth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/request-otp",
+   "source": "routes/auth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/auth/verify-otp",
+   "source": "routes/auth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/avatars",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/bootstrap",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/card-box/buy",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/card-box/history",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/card-box/overview",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/card-duel",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/card-duel/bot",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/card-duel/deck",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/chat/bootstrap",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/chat/canned-messages",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/chat/config",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/chat/messages",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/chat/messages",
+   "source": "server.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/chat/messages/:id/like",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/chat/messages/:id/like",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/chat/messages/:id/report",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/clubs",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/clubs/:slug/members",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/coins/history",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/config",
+   "source": "routes/clientConfig.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/friends",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/friends/:id",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/friends/:id/request",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/friends/requests/:id/accept",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/friends/search",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/friends/users/:id/block",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/games",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/games/:gameId/solo",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/games/tap/leaderboard",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/games/tap/progress",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/games/tap/progress",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/grants",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/grants/:id/open",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/growth/overview",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/league/countdown",
+   "source": "routes/leagueCountdown.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/league/current",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/level",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/login-streak",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/login-streak/claim",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/missions",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/missions/:key/claim",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/missions/custom/:id/claim",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/missions/custom/claim",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/missions/daily-bonus/claim",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/notifications",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/notifications/:id/read",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/pass",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/pass/claim-all",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/pass/claim/:tierId?",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/photo-cards/check-code",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/photo-cards/my-submissions",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/photo-cards/status",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/photo-cards/submit",
+   "source": "routes/photoCards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/points/history",
+   "source": "routes/adminUsers.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profile",
+   "source": "server.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/profile",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/profile/change-password",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profile/league-history",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/profile/trophies",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/purchase/catalog",
+   "source": "routes/payments.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/purchase/history",
+   "source": "routes/payments.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/purchase/verify",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/recommended-apps",
+   "source": "routes/recommendedApps.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/referrals",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/reward-groups",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/rewards",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/rewards/:id/claim",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/shop",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/shop/club-avatar",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/shop/equip",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/shop/history",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/shop/items/:id/buy",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/shop/plus",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/support/quota",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/support/tickets",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/tickets",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/support/tickets/:id/messages",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/tickets/:id/messages",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/support/uploads/image",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/telemetry/crash",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/users/:id/public",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/wallet",
+   "source": "server.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/wallet/bank-card",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/wallet/bank-card",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/wallet/topup/catalog",
+   "source": "routes/payments.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/wallet/topup/history",
+   "source": "routes/payments.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/wallet/topup/order",
+   "source": "routes/payments.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/wallet/topup/verify",
+   "source": "routes/payments.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/wallet/transactions",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/wallet/withdrawals",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/wallet/withdrawals",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/wallet/withdrawals/:id/cancel",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/wheel",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/wheel/history",
+   "source": "server.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/wheel/spin",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/health",
+   "source": "server.js"
+  },
+  {
+   "method": "GET",
+   "path": "/uploads/images/:file",
+   "source": "server.js"
+  }
+ ]
+}
