@@ -179,7 +179,12 @@ void _readabilityGuard() {
       const floor = 11.0;
       final offenders = <String>[];
       for (final path in [
-        'lib/screens/user/games/card_duel/card_duel_widgets.dart',
+        'lib/screens/user/games/card_duel/card_duel_battle.dart',
+        'lib/screens/user/games/card_duel/card_duel_scoreboard.dart',
+        'lib/screens/user/games/card_duel/card_duel_clash.dart',
+        'lib/screens/user/games/card_duel/card_duel_payout.dart',
+        'lib/screens/user/games/card_duel/card_duel_focus.dart',
+        'lib/screens/user/games/card_duel/card_duel_intro.dart',
         'lib/screens/user/games/card_duel_page.dart',
       ]) {
         final src = File(path).readAsStringSync();

@@ -39,9 +39,11 @@ void main() {
   });
 
   test('دست زنده ListView افقی ندارد', () {
-    final source = File(
-      'lib/screens/user/games/card_duel/card_duel_widgets.dart',
-    ).readAsStringSync();
+    final source = [
+      for (final f in ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart',
+        'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'])
+        File('lib/screens/user/games/card_duel/$f').readAsStringSync(),
+    ].join('\n');
     final live = source.substring(
       source.indexOf('class _LiveBattle'),
       source.indexOf('class _Scoreboard'),

@@ -46,7 +46,11 @@ void main() {
     final chat = File('lib/screens/user/chat_page.dart').readAsStringSync();
     final profile = File('lib/screens/user/profile_page.dart').readAsStringSync();
     final versus = File('lib/screens/user/games/versus_bar.dart').readAsStringSync();
-    final duel = File('lib/screens/user/games/card_duel/card_duel_widgets.dart').readAsStringSync();
+    final duel = [
+      for (final f in ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart',
+        'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'])
+        File('lib/screens/user/games/card_duel/$f').readAsStringSync(),
+    ].join('\n');
 
     expect(shop.contains('AnimatedNameText('), isTrue);
     expect(shop.contains('_ShopBadgeArtwork'), isTrue);

@@ -50,7 +50,7 @@ const rules = read('backend/src/games/rules/cardDuel.js');
 const engine = read('backend/src/games/engine.js');
 const webGame = read('userweb/src/cardDuelGame.jsx');
 const webSession = read('userweb/src/gameSession.js');
-const droidWidgets = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const droidWidgets = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile/lib/screens/user/games/card_duel/' + f)).join('\n');
 const droidSession = read('mobile/lib/screens/user/games/game_session.dart');
 
 console.log('\n══ ۱. سرور بعد از هر راند مکث دارد ══');

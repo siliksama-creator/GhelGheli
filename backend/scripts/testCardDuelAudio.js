@@ -100,7 +100,7 @@ const dartSession = read('mobile/lib/screens/user/games/game_session.dart');
 const webAudio = read('userweb/src/gameAudio.js');
 const webSession = read('userweb/src/gameSession.js');
 const engine = read('backend/src/games/engine.js');
-const mobileDuel = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const mobileDuel = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile/lib/screens/user/games/card_duel/' + f)).join('\n');
 const webDuel = read('userweb/src/cardDuelGame.jsx');
 assert(generator.includes('RNG = np.random.default_rng(20260814)'));
 assert(generator.includes('No samples or third-party music are used'));

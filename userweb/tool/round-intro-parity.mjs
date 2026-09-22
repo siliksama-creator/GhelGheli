@@ -23,7 +23,7 @@ import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..', '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
-const android = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const android = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile/lib/screens/user/games/card_duel/' + f)).join('\n');
 const jsx = read('userweb/src/cardDuelGame.jsx');
 function loadCssForRound() {
   const hub = read('userweb/src/style.css');

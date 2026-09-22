@@ -29,7 +29,7 @@ const cardsLib = read('userweb/src/lib/cards.js');
 const server = read('backend/src/server.js');
 const imageService = read('backend/src/services/imageService.js');
 const deploy = read('scripts/deploy.sh');
-const mobileDuel = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const mobileDuel = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile/lib/screens/user/games/card_duel/' + f)).join('\n');
 const mobileShell = read('mobile/lib/screens/user/home_shell.dart');
 const webDuel = read('userweb/src/cardDuelGame.jsx');
 

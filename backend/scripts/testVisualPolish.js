@@ -55,7 +55,7 @@ check(webShop.includes('showPlans') && webShop.includes('جمع کردن پلن�
   && mobileShop.includes('_showPlans') && mobileShop.includes('جمع کردن پلن‌ها'),
   'Plus plans use compact progressive disclosure on Web and Android');
 
-const duelWidgets = text('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const duelWidgets = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => text('mobile/lib/screens/user/games/card_duel/' + f)).join('\n');
 const mobileGames = text('mobile/lib/screens/user/games_page.dart');
 check(duelWidgets.includes('=> const AppCard('), 'card-duel const-constructor lint is fixed');
 check(!mobileGames.includes("'${faNum(s)}'"), 'unnecessary Flutter string interpolation is fixed');

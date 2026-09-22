@@ -27,7 +27,12 @@ import 'game_session.dart';
 import '../../../widgets/ui_icon.dart';
 import '../../../widgets/card_box.dart';
 
-part 'card_duel/card_duel_widgets.dart';
+part 'card_duel/card_duel_battle.dart';
+part 'card_duel/card_duel_scoreboard.dart';
+part 'card_duel/card_duel_clash.dart';
+part 'card_duel/card_duel_payout.dart';
+part 'card_duel/card_duel_focus.dart';
+part 'card_duel/card_duel_intro.dart';
 
 const _gold = Color(0xFFFFD166);
 const _cyan = Color(0xFF38BDF8);

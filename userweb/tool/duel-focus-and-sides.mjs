@@ -46,7 +46,7 @@ function loadCss() {
 
 const css = loadCss();
 const jsx = read('userweb/src/cardDuelGame.jsx');
-const dart = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const dart = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile/lib/screens/user/games/card_duel/' + f)).join('\n');
 const html = read('userweb/index.html');
 const baseCss = read('userweb/src/styles/base.css');
 

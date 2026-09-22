@@ -49,7 +49,7 @@ const web = {
 const android = {
   session: read('mobile/lib/screens/user/games/game_session.dart'),
   scaffold: read('mobile/lib/screens/user/games/game_scaffold.dart'),
-  duel: read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart'),
+  duel: ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile/lib/screens/user/games/card_duel/' + f)).join('\n'),
   award: read('mobile/lib/screens/user/games/coin_award.dart'),
   chip: read('mobile/lib/widgets/coin_chip.dart'),
   league: read('mobile/lib/screens/user/league_page.dart'),

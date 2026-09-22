@@ -106,7 +106,7 @@ check(/imageUrl/.test(webCardsLib) && /image_url/.test(webCardsLib)
 const mobileFrame = read('mobile/lib/widgets/rarity_card_frame.dart');
 const mobileInventory = read('mobile/lib/screens/user/inventory_page.dart');
 const mobileDetail = read('mobile/lib/screens/shared/card_detail_sheet.dart');
-const mobileDuel = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const mobileDuel = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile/lib/screens/user/games/card_duel/' + f)).join('\n');
 check(['معمولی','نقره‌ای','طلایی','پرمیوم','لجند'].every(label => mobileFrame.includes(label)),
   'Android rarity frame carries the same five Persian tier labels');
 check(/AnimationController/.test(mobileFrame) && /SweepGradient/.test(mobileFrame)

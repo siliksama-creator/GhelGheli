@@ -6,7 +6,7 @@ const path = require('path');
 const root = path.join(__dirname, '..', '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-const mobile = read('mobile/lib/screens/user/games/card_duel/card_duel_widgets.dart');
+const mobile = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile/lib/screens/user/games/card_duel/' + f)).join('\n');
 const mobilePage = read('mobile/lib/screens/user/games/card_duel_page.dart');
 const web = read('userweb/src/cardDuelGame.jsx');
 let webStyle = read('userweb/src/style.css');

@@ -24,7 +24,7 @@ const mobileChat = read('mobile', 'lib', 'screens', 'user', 'chat_page.dart');
 const mobileShop = read('mobile', 'lib', 'screens', 'user', 'shop_page.dart');
 const mobileGames = read('mobile', 'lib', 'screens', 'user', 'games', 'game_scaffold.dart');
 const mobileDuel = read('mobile', 'lib', 'screens', 'user', 'games', 'card_duel_page.dart');
-const mobileDuelWidgets = read('mobile', 'lib', 'screens', 'user', 'games', 'card_duel', 'card_duel_widgets.dart');
+const mobileDuelWidgets = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile', 'lib', 'screens', 'user', 'games', 'card_duel', f)).join('\n');
 const mobileMotion = read('mobile', 'lib', 'widgets', 'cosmetic_motion.dart');
 const mobileProfile = read('mobile', 'lib', 'screens', 'user', 'profile_page.dart');
 const mobilePublicProfile = read('mobile', 'lib', 'screens', 'shared', 'public_profile_sheet.dart');
