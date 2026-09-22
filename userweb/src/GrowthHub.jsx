@@ -119,9 +119,9 @@ export default function GrowthHub({ api, token, onSocketGame }) {
     if (!code) return;
     const spins = data?.referral?.spinsPerReferral ?? 3;
     const pct = data?.referral?.purchaseCommissionPercent ?? 5;
-    const text = `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن؛ هر دومون ${spins} چرخش هدیه می‌گیریم و من از خرید مستقیم تو ${pct}٪ درآمد معرفی می‌گیرم.\nhttps://ghelghelishop.ir`;
+    const text = `کد دعوت من به قلقلی: ${code}\nبا این کد ثبت‌نام کن؛ هر دومون ${spins} چرخش هدیه می‌گیریم و من از خرید مستقیم تو ${pct}٪ درآمد معرفی می‌گیرم.\nhttps://user.ghelghelishop.com`;
     try {
-      if (navigator.share) await navigator.share({ title:'دعوت به قلقلی', text, url:'https://ghelghelishop.ir' });
+      if (navigator.share) await navigator.share({ title:'دعوت به قلقلی', text, url:'https://user.ghelghelishop.com' });
       else { await navigator.clipboard.writeText(text); setNotice('متن دعوت کپی شد'); }
     } catch (error) { if (error?.name !== 'AbortError') setNotice('اشتراک دعوت انجام نشد'); }
   };
