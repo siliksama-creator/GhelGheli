@@ -12,7 +12,7 @@
 //     web_push_subscriptions می‌نشیند؛ از آن پس هر اعلانی که به گوشی
 //     می‌رود (یادآورِ چرخش، نتیجهٔ کارت، پیام‌های ادمین…) به این
 //     مرورگر هم می‌رسد — همان مسیرِ notificationService.
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { req } from '../lib/api.js';
 import { liveConfig, loadLiveConfig } from '../lib/liveConfig.js';
 import { SvgIcon } from './IconAsset.jsx';
