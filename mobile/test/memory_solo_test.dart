@@ -126,11 +126,15 @@ void main() {
   group('memory board density', () {
     test('versus board is compact enough to live inside the fixed game viewport', () {
       final src = File('lib/screens/user/games/memory_board.dart').readAsStringSync();
-      expect(src.contains('maxWidth: 340'), isTrue,
-          reason: 'جفت‌یاب نباید با بورد ۳۸۰px صفحهٔ بازی را اسکرول‌دار کند');
+      // عددِ ۲۹۶ و فاصلهٔ ۵ خواستهٔ صریحِ مالک است (۳۱ شهریور ۱۴۰۵:
+      // «عکس‌های بازی کوچیک‌تر و جمع‌وجورتر») و آینهٔ وب در brand-mark.css
+      // (min(296px,90vw,42vh)) و games.css است؛ این گارد همان آینه را
+      // نگه می‌دارد: نه بوردِ اسکرول‌ساز، نه عددِ تک‌کلاینتی.
+      expect(src.contains('maxWidth: 296'), isTrue,
+          reason: 'جفت‌یاب نباید با بوردِ عریض صفحهٔ بازی را اسکرول‌دار کند');
       expect(src.contains('childAspectRatio: 1.0'), isTrue,
           reason: 'کارت‌های بسیار بلند، نتیجه و دکمه‌ها را از صفحه بیرون می‌برند');
-      expect(src.contains('mainAxisSpacing: 6'), isTrue,
+      expect(src.contains('mainAxisSpacing: 5'), isTrue,
           reason: 'فاصلهٔ شبکه باید کنترل‌شده باشد، نه اسکرول‌ساز');
     });
   });
