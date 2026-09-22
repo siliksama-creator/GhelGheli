@@ -336,8 +336,12 @@ test('a global prune function exists and is exported', () => {
 });
 
 test('the server schedules the sweep', () => {
+  // scheduleها به src/cron.js منتقل شدند (بندِ ۱ ممیزی ۸ مهر) — هر دو
+  // خوانده می‌شوند تا این تست نسبت به جابه‌جاییِ ماژول‌ها کور نشود.
   const src = require('fs').readFileSync(
-    require('path').join(__dirname, '../src/server.js'), 'utf8');
+    require('path').join(__dirname, '../src/server.js'), 'utf8')
+    + '\n' + require('fs').readFileSync(
+    require('path').join(__dirname, '../src/cron.js'), 'utf8');
   assert.ok(/pruneNonces\(\)/.test(src), 'server must call pruneNonces');
   assert.ok(/cron\.schedule\('[^']*'[^)]*\)/.test(src), 'must be on a schedule');
 });

@@ -216,11 +216,13 @@ console.log('\n== ساعات استراحت یادآور گردونه ==');
   ok(quiet(at(21)) === false, 'ساعت ۲۱: هنوز مجاز');
   ok(quiet(at(22)) === true, 'ساعت ۲۲: شروع سکوت ✓');
 
-  ok(/timezone:\s*'Asia\/Tehran'/.test(
-      fs.readFileSync(path.join(__dirname, '..', 'src', 'server.js'), 'utf8')),
+  // scheduleها به src/cron.js منتقل شدند (بندِ ۱ ممیزی ۸ مهر) — هر دو
+  // پرونده خوانده می‌شوند تا این بررسی نسبت به جابه‌جاییِ ماژول‌ها کور نشود.
+  const cronSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'server.js'), 'utf8')
+    + '\n' + fs.readFileSync(path.join(__dirname, '..', 'src', 'cron.js'), 'utf8');
+  ok(/timezone:\s*'Asia\/Tehran'/.test(cronSrc),
     'cron با منطقهٔ زمانی تهران تنظیم شده');
-  ok(/cron\.schedule\('30 18 \* \* \*'/.test(
-      fs.readFileSync(path.join(__dirname, '..', 'src', 'server.js'), 'utf8')),
+  ok(/cron\.schedule\('30 18 \* \* \*'/.test(cronSrc),
     'یادآور ساعت ۱۸:۳۰ اجرا می‌شود، نه نیمه‌شب');
 }
 
