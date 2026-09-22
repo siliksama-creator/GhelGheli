@@ -127,10 +127,14 @@ ok('اندروید برچسب‌ها را از منبعِ مشترک می‌گی
 //
 // گاردی که فقط کلاینت را ببیند، می‌تواند دو کلاینتِ هماهنگ را تأیید کند
 // که هر دو یک روتِ ناموجود را صدا می‌زنند.
+// ماژولار شدنِ server.js (مهر ۱۴۰۵): روت‌ها به routes/commerce.js رفتند؛
+// mount در server.js + بدنه در ماژول = هر دو نیمهٔ مسیرِ کامل بررسی می‌شوند.
 const server = read('backend/src/server.js');
-for (const route of ['/api/card-box/overview', '/api/card-box/buy',
-  '/api/card-box/history']) {
-  ok(`سرور روتِ ${route} را دارد`, server.includes(route));
+const commerce = read('backend/src/routes/commerce.js');
+for (const route of ['/card-box/overview', '/card-box/buy',
+  '/card-box/history']) {
+  ok(`سرور روتِ /api${route} را دارد`,
+    server.includes("require('./routes/commerce')") && commerce.includes("'" + route + "'"));
 }
 
 // ── ۸. تصویرِ صندوق در هر دو مقصد واقعاً وجود دارد ────────────────────

@@ -72,7 +72,9 @@ check(/width: row\.width/.test(grouping) && /height: row\.height/.test(grouping)
   && /analysis_complete/.test(grouping),
   'grouping retains dimensions and computes whole-card analyzer completeness');
 
-const server = read('backend/src/server.js');
+// ماژولار شدنِ server.js (مهر ۱۴۰۵): این مسیرها به routes/ منتقل شدند؛
+// هر دو پرونده خوانده می‌شوند تا بررسی نسبت به جابه‌جاییِ ماژول‌ها کور نماند.
+const server = read('backend/src/server.js') + read('backend/src/routes/profile.js');
 check((server.match(/t\.duel_attack, t\.duel_defense, t\.duel_speed/g) || []).length >= 3,
   'profile, bootstrap, and public profile expose card duel metadata');
 check((server.match(/t\.description/g) || []).length >= 3,

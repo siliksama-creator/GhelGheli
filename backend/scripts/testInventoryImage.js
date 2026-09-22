@@ -48,7 +48,10 @@ function ck(name, cond, detail = '') {
 }
 
 const ROOT = path.join(__dirname, '..');
-const serverSrc = fs.readFileSync(path.join(ROOT, 'src/server.js'), 'utf8');
+// ماژولار شدنِ server.js (مهر ۱۴۰۵): این مسیرها به routes/ منتقل شدند؛
+// هر دو پرونده خوانده می‌شوند تا بررسی نسبت به جابه‌جاییِ ماژول‌ها کور نماند.
+const serverSrc = fs.readFileSync(path.join(ROOT, 'src/server.js'), 'utf8')
+  + fs.readFileSync(path.join(ROOT, 'src/routes/profile.js'), 'utf8');
 const svcSrc = fs.readFileSync(
   path.join(ROOT, 'src/services/photoCardService.js'), 'utf8');
 const migrations = fs.readdirSync(path.join(ROOT, 'migrations'))

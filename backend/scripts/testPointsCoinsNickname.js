@@ -308,7 +308,9 @@ class FakeClient {
   const stake = src('src/services/gameStakeService.js');
   ok(/coinLedger\.record\(client/.test(stake) && /source: 'game'/.test(stake),
     'سکهٔ بازی در دفتر ثبت می‌شود');
-  const server = src('src/server.js');
+  // ماژولار شدنِ server.js (مهر ۱۴۰۵): این مسیرها به routes/ منتقل شدند؛
+// هر دو پرونده خوانده می‌شوند تا بررسی نسبت به جابه‌جاییِ ماژول‌ها کور نماند.
+const server = src('src/server.js') + src('src/routes/games.js') + src('src/routes/profile.js');
   ok(/source: 'tap'/.test(server), 'سکهٔ ضربه‌زن در دفتر ثبت می‌شود');
   ok(/nickCheck/.test(server) && /status\(400\)\.json\(\{ message: nickCheck\.error/.test(server),
     'PATCH /api/profile نامِ نامردود را با پیامِ فارسی رد می‌کند');

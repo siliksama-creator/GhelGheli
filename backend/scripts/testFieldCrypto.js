@@ -270,7 +270,9 @@ behaviorPromise.then(() => {
     ok(walletSrc.includes('fieldCrypto.decrypt(user.bank_card_number)'),
       'خلاصهٔ کیف پول مقدار را باز می‌کند');
 
-    const serverSrc = stripComments(read('src', 'server.js'));
+    const serverSrc = stripComments(read('src', 'server.js'))
+      + stripComments(read('src', 'routes', 'profile.js'))
+      + stripComments(read('src', 'routes', 'wallet.js'));
     ok(serverSrc.includes("fieldCrypto.encrypt(boundedText(b.bankAccount, 40))"),
       'ذخیرهٔ حسابِ قدیمی رمز می‌شود');
     ok(serverSrc.includes('bank_account: rest.bank_account ? fieldCrypto.decrypt'),
@@ -303,6 +305,7 @@ behaviorPromise.then(() => {
     const candidates = [
       'src/services/walletService.js', 'src/services/withdrawalService.js',
       'src/routes/adminUsers.js', 'src/routes/adminLeague.js', 'src/server.js',
+      'src/routes/profile.js', 'src/routes/wallet.js',
     ];
     let leaked = 0;
     for (const f of candidates) {

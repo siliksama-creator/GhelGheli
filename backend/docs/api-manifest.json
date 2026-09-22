@@ -785,87 +785,87 @@
   {
    "method": "GET",
    "path": "/api/bootstrap",
-   "source": "server.js"
+   "source": "routes/profile.js"
   },
   {
    "method": "POST",
    "path": "/api/card-box/buy",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "GET",
    "path": "/api/card-box/history",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "GET",
    "path": "/api/card-box/overview",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "GET",
    "path": "/api/card-duel",
-   "source": "server.js"
+   "source": "routes/games.js"
   },
   {
    "method": "POST",
    "path": "/api/card-duel/bot",
-   "source": "server.js"
+   "source": "routes/games.js"
   },
   {
    "method": "POST",
    "path": "/api/card-duel/deck",
-   "source": "server.js"
+   "source": "routes/games.js"
   },
   {
    "method": "GET",
    "path": "/api/chat/bootstrap",
-   "source": "server.js"
+   "source": "routes/chat.js"
   },
   {
    "method": "GET",
    "path": "/api/chat/canned-messages",
-   "source": "server.js"
+   "source": "routes/chat.js"
   },
   {
    "method": "GET",
    "path": "/api/chat/config",
-   "source": "server.js"
+   "source": "routes/chat.js"
   },
   {
    "method": "GET",
    "path": "/api/chat/messages",
-   "source": "server.js"
+   "source": "routes/chat.js"
   },
   {
    "method": "POST",
    "path": "/api/chat/messages",
-   "source": "server.js"
+   "source": "routes/chat.js"
   },
   {
    "method": "DELETE",
    "path": "/api/chat/messages/:id/like",
-   "source": "server.js"
+   "source": "routes/chat.js"
   },
   {
    "method": "POST",
    "path": "/api/chat/messages/:id/like",
-   "source": "server.js"
+   "source": "routes/chat.js"
   },
   {
    "method": "POST",
    "path": "/api/chat/messages/:id/report",
-   "source": "server.js"
+   "source": "routes/chat.js"
   },
   {
    "method": "GET",
    "path": "/api/clubs",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "GET",
    "path": "/api/clubs/:slug/members",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "GET",
@@ -910,37 +910,37 @@
   {
    "method": "GET",
    "path": "/api/games",
-   "source": "server.js"
+   "source": "routes/games.js"
   },
   {
    "method": "GET",
    "path": "/api/games/:gameId/solo",
-   "source": "server.js"
+   "source": "routes/games.js"
   },
   {
    "method": "GET",
    "path": "/api/games/tap/leaderboard",
-   "source": "server.js"
+   "source": "routes/games.js"
   },
   {
    "method": "GET",
    "path": "/api/games/tap/progress",
-   "source": "server.js"
+   "source": "routes/games.js"
   },
   {
    "method": "POST",
    "path": "/api/games/tap/progress",
-   "source": "server.js"
+   "source": "routes/games.js"
   },
   {
    "method": "GET",
    "path": "/api/grants",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "POST",
    "path": "/api/grants/:id/open",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "GET",
@@ -955,22 +955,22 @@
   {
    "method": "GET",
    "path": "/api/league/current",
-   "source": "server.js"
+   "source": "routes/progression.js"
   },
   {
    "method": "GET",
    "path": "/api/level",
-   "source": "server.js"
+   "source": "routes/profile.js"
   },
   {
    "method": "GET",
    "path": "/api/login-streak",
-   "source": "server.js"
+   "source": "routes/progression.js"
   },
   {
    "method": "POST",
    "path": "/api/login-streak/claim",
-   "source": "server.js"
+   "source": "routes/progression.js"
   },
   {
    "method": "GET",
@@ -1000,27 +1000,27 @@
   {
    "method": "GET",
    "path": "/api/notifications",
-   "source": "server.js"
+   "source": "routes/notifications.js"
   },
   {
    "method": "PATCH",
    "path": "/api/notifications/:id/read",
-   "source": "server.js"
+   "source": "routes/notifications.js"
   },
   {
    "method": "GET",
    "path": "/api/pass",
-   "source": "server.js"
+   "source": "routes/progression.js"
   },
   {
    "method": "POST",
    "path": "/api/pass/claim-all",
-   "source": "server.js"
+   "source": "routes/progression.js"
   },
   {
    "method": "POST",
    "path": "/api/pass/claim/:tierId?",
-   "source": "server.js"
+   "source": "routes/progression.js"
   },
   {
    "method": "GET",
@@ -1050,27 +1050,27 @@
   {
    "method": "GET",
    "path": "/api/profile",
-   "source": "server.js"
+   "source": "routes/profile.js"
   },
   {
    "method": "PATCH",
    "path": "/api/profile",
-   "source": "server.js"
+   "source": "routes/profile.js"
   },
   {
    "method": "POST",
    "path": "/api/profile/change-password",
-   "source": "server.js"
+   "source": "routes/profile.js"
   },
   {
    "method": "GET",
    "path": "/api/profile/league-history",
-   "source": "server.js"
+   "source": "routes/profile.js"
   },
   {
    "method": "GET",
    "path": "/api/profile/trophies",
-   "source": "server.js"
+   "source": "routes/profile.js"
   },
   {
    "method": "GET",
@@ -1085,7 +1085,7 @@
   {
    "method": "POST",
    "path": "/api/purchase/verify",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "GET",
@@ -1095,82 +1095,82 @@
   {
    "method": "GET",
    "path": "/api/referrals",
-   "source": "server.js"
+   "source": "routes/progression.js"
   },
   {
    "method": "GET",
    "path": "/api/reward-groups",
-   "source": "server.js"
+   "source": "routes/rewardsUser.js"
   },
   {
    "method": "GET",
    "path": "/api/rewards",
-   "source": "server.js"
+   "source": "routes/rewardsUser.js"
   },
   {
    "method": "POST",
    "path": "/api/rewards/:id/claim",
-   "source": "server.js"
+   "source": "routes/rewardsUser.js"
   },
   {
    "method": "GET",
    "path": "/api/shop",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "POST",
    "path": "/api/shop/club-avatar",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "POST",
    "path": "/api/shop/equip",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "GET",
    "path": "/api/shop/history",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "POST",
    "path": "/api/shop/items/:id/buy",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "POST",
    "path": "/api/shop/plus",
-   "source": "server.js"
+   "source": "routes/commerce.js"
   },
   {
    "method": "GET",
    "path": "/api/support/quota",
-   "source": "server.js"
+   "source": "routes/support.js"
   },
   {
    "method": "GET",
    "path": "/api/support/tickets",
-   "source": "server.js"
+   "source": "routes/support.js"
   },
   {
    "method": "POST",
    "path": "/api/support/tickets",
-   "source": "server.js"
+   "source": "routes/support.js"
   },
   {
    "method": "GET",
    "path": "/api/support/tickets/:id/messages",
-   "source": "server.js"
+   "source": "routes/support.js"
   },
   {
    "method": "POST",
    "path": "/api/support/tickets/:id/messages",
-   "source": "server.js"
+   "source": "routes/support.js"
   },
   {
    "method": "POST",
    "path": "/api/support/uploads/image",
-   "source": "server.js"
+   "source": "routes/support.js"
   },
   {
    "method": "POST",
@@ -1180,22 +1180,22 @@
   {
    "method": "GET",
    "path": "/api/users/:id/public",
-   "source": "server.js"
+   "source": "routes/profile.js"
   },
   {
    "method": "GET",
    "path": "/api/wallet",
-   "source": "server.js"
+   "source": "routes/wallet.js"
   },
   {
    "method": "DELETE",
    "path": "/api/wallet/bank-card",
-   "source": "server.js"
+   "source": "routes/wallet.js"
   },
   {
    "method": "POST",
    "path": "/api/wallet/bank-card",
-   "source": "server.js"
+   "source": "routes/wallet.js"
   },
   {
    "method": "GET",
@@ -1220,37 +1220,37 @@
   {
    "method": "GET",
    "path": "/api/wallet/transactions",
-   "source": "server.js"
+   "source": "routes/wallet.js"
   },
   {
    "method": "GET",
    "path": "/api/wallet/withdrawals",
-   "source": "server.js"
+   "source": "routes/wallet.js"
   },
   {
    "method": "POST",
    "path": "/api/wallet/withdrawals",
-   "source": "server.js"
+   "source": "routes/wallet.js"
   },
   {
    "method": "POST",
    "path": "/api/wallet/withdrawals/:id/cancel",
-   "source": "server.js"
+   "source": "routes/wallet.js"
   },
   {
    "method": "GET",
    "path": "/api/wheel",
-   "source": "server.js"
+   "source": "routes/wheel.js"
   },
   {
    "method": "GET",
    "path": "/api/wheel/history",
-   "source": "server.js"
+   "source": "routes/wheel.js"
   },
   {
    "method": "POST",
    "path": "/api/wheel/spin",
-   "source": "server.js"
+   "source": "routes/wheel.js"
   },
   {
    "method": "GET",

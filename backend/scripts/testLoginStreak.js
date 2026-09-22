@@ -17,7 +17,11 @@ const root = path.join(__dirname, '..', '..');
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 
 const svc = read('backend/src/services/loginStreakService.js');
-const server = read('backend/src/server.js');
+// ماژولار شدنِ server.js (مهر ۱۴۰۵): این مسیرها به routes/ منتقل شدند؛
+// هر دو پرونده خوانده می‌شوند تا بررسی نسبت به جابه‌جاییِ ماژول‌ها کور نماند.
+const server = read('backend/src/server.js')
+  + read('backend/src/routes/profile.js')
+  + read('backend/src/routes/progression.js');
 const migration = read('backend/migrations/046_login_streak.sql');
 const mobileCard = read('mobile/lib/screens/user/login_streak_card.dart');
 const dashboard = read('mobile/lib/screens/user/dashboard_page.dart');
@@ -75,7 +79,7 @@ console.log('\n== دیتابیس و API ==');
     'bootstrap وضعیت استریک را بدون شکستن داشبورد برمی‌گرداند');
   ok(/loginStreak:\s*streakState/.test(server),
     'کلاینت‌ها loginStreak را از /api/bootstrap می‌گیرند');
-  ok(/app\.post\('\/api\/login-streak\/claim'/.test(server)
+  ok(/router\.post\('\/login-streak\/claim'/.test(server)
      && /loginStreakLimiter/.test(server),
     'مسیر claim محدودکنندهٔ نرخ دارد');
 }

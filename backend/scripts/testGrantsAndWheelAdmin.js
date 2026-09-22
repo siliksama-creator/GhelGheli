@@ -47,9 +47,14 @@ ok(/router\.put\('\/admin\/wheel\/prizes'/.test(routes)
   && /requireRole\(\)/.test(routes),
   'PUT گردونه فقط برای سوپرادمین است');
 
-const server = read('backend/src/server.js');
-ok(/app\.get\('\/api\/grants'/.test(server)
-  && /app\.post\('\/api\/grants\/:id\/open'/.test(server),
+// ماژولار شدنِ server.js (مهر ۱۴۰۵): این مسیرها به routes/ منتقل شدند؛
+// هر دو پرونده خوانده می‌شوند تا بررسی نسبت به جابه‌جاییِ ماژول‌ها کور نماند.
+const server = read('backend/src/server.js')
+  + read('backend/src/routes/commerce.js')
+  + read('backend/src/routes/wheel.js')
+  + read('backend/src/routes/profile.js');
+ok(/router\.get\('\/grants'/.test(server)
+  && /router\.post\('\/grants\/:id\/open'/.test(server),
   'مسیر باز کردن صندوقِ جایزه وجود دارد');
 ok(/pendingGrants/.test(server),
   'bootstrap جایزه‌های بازنشده را می‌فرستد');

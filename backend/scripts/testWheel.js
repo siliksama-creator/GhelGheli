@@ -223,10 +223,11 @@ test('مبلغ جایزه هرگز از بدنهٔ درخواست خوانده �
   // اگر endpoint مبلغ را از کلاینت بگیرد، هر کسی با curl هر مبلغی برای
   // خودش واریز می‌کند. این تست سورس را می‌خواند چون همین یک خط، تفاوت
   // بین یک قابلیت و یک در پشتی است.
+  // مسیرِ اسپین به routes/wheel.js منتقل شد (ماژولار شدنِ server.js، مهر ۱۴۰۵).
   const src = require('fs').readFileSync(
-    require('path').join(__dirname, '../src/server.js'), 'utf8');
-  const spinRoute = src.slice(src.indexOf("app.post('/api/wheel/spin'"),
-    src.indexOf("app.get('/api/wheel/history'"));
+    require('path').join(__dirname, '../src/routes/wheel.js'), 'utf8');
+  const spinRoute = src.slice(src.indexOf("router.post('/wheel/spin'"),
+    src.indexOf("router.get('/wheel/history'"));
   assert.ok(!/req\.body\.(amount|value|prize)/.test(spinRoute),
     'مسیر چرخش نباید هیچ مقداری از بدنه بخواند');
   assert.ok(/wheel\.spin\(req\.user\.id/.test(spinRoute),
@@ -480,8 +481,8 @@ test('مسیرهای ثبتِ کارت و ضربه‌زن کمیسیونِ ام�
 
   // سیستمِ قدیمیِ «ثبت کد کارت» حذف شد (مایگریشن ۰۸۰)؛ server.js فقط
   // بازیِ ضربه‌زن را کمیسیون می‌دهد.
-  assert.strictEqual(countPointCalls(read('src/server.js')), 1,
-    'server.js باید دقیقاً یک کمیسیونِ امتیازی بدهد: ضربه‌زن');
+  assert.strictEqual(countPointCalls(read('src/server.js') + read('src/routes/games.js')), 1,
+    'سمتِ سرور باید دقیقاً یک کمیسیونِ امتیازی بدهد: ضربه‌زن — بازیِ ضربه‌زن');
 
   // مسیرِ عکسی باید بدهد — ثبتِ کارت فقط از همین مسیر ممکن است.
   assert.strictEqual(countPointCalls(read('src/services/photoCardService.js')), 1,
@@ -506,7 +507,7 @@ test('کارتِ نقدی هیچ کمیسیونی نمی‌دهد — مسیرِ
   const fs = require('fs');
   const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 
-  const server = read('src/server.js');
+  const server = read('src/server.js') + read('src/routes/games.js');
   const photo = read('src/services/photoCardService.js');
   // مسیرِ عکسی: متغیرِ محلیِ `cash` همان `Number(type.cash_amount || 0)` است.
   assert.ok(/const cash = Number\(type\.cash_amount \|\| 0\)/.test(photo),

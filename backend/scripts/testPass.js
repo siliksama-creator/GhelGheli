@@ -114,8 +114,12 @@ console.log('\n== 🔒 سقف سخت ۲ پله در روز — ایراد مال
   ok(/dayCapReached/.test(svc), 'وضعیت می‌گوید سقف امروز پر شده یا نه');
   ok(/pendingTiers/.test(svc), 'پله‌های معلق (XP دارد ولی سقف پر) گزارش می‌شود');
 
+  // بوت‌استرپ و پسِ بازی به routes/profile.js و routes/progression.js منتقل
+  // شدند (ماژولار شدنِ server.js، مهر ۱۴۰۵) — هر سه پرونده خوانده می‌شوند.
   const srv = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'server.js'), 'utf8');
+    path.join(__dirname, '..', 'src', 'server.js'), 'utf8')
+    + fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'profile.js'), 'utf8')
+    + fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'progression.js'), 'utf8');
   ok(/tiersToday: st\.tiersToday/.test(srv),
     'بوت‌استرپ شمارندهٔ امروز را می‌فرستد — نشانِ نوار بالا به آن نیاز دارد');
 
@@ -363,7 +367,8 @@ console.log('\n== محافظ‌های امنیتی ==');
 
   // مسیرِ قدیمیِ ثبت کد هم همین‌طور: بلوکِ /api/cards/redeem را جدا کن.
   const serverSrc = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'server.js'), 'utf8');
+    path.join(__dirname, '..', 'src', 'server.js'), 'utf8')
+    + fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'progression.js'), 'utf8');
   const redeemStart = serverSrc.indexOf("app.post('/api/cards/redeem'");
   const redeemEnd = serverSrc.indexOf("app.post('/api/cards/", redeemStart + 10);
   const redeemBlock = serverSrc.slice(

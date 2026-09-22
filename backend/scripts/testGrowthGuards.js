@@ -24,7 +24,9 @@ const root = path.join(__dirname, '..');
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 
 const engine = read('src/games/engine.js');
-const server = read('src/server.js');
+// ماژولار شدنِ server.js (مهر ۱۴۰۵): این مسیرها به routes/ منتقل شدند؛
+// هر دو پرونده خوانده می‌شوند تا بررسی نسبت به جابه‌جاییِ ماژول‌ها کور نماند.
+const server = read('src/server.js') + read('src/routes/games.js');
 const adminMissions = read('src/routes/adminMissions.js');
 const levelSvc = read('src/services/levelService.js');
 const memoryRules = read('src/games/rules/memory.js');

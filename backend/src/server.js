@@ -848,10 +848,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Catalogue of playable games, so the mobile/web clients can render the hub
-// dynamically instead of shipping a hardcoded list that drifts out of sync.
-app.get('/api/games', (req, res) => res.json(require('./games').CATALOG));
-
 // Strips everything the client must never see. The bank card number is as
 // sensitive as the password hash: /api/profile is fetched on every app start
 // and ends up in HTTP caches, crash reports and debug logs, so the full PAN
@@ -985,143 +981,6 @@ const tapBatchLimiter = opsRateLimit('tapBatch',
     message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کن' },
   });
 
-app.get('/api/games/tap/progress', auth, asyncHandler(async (req, res) => {
-  const progress = await tapGame.getProgress(req.user.id);
-  // صفحهٔ ضربه‌زن با همین یک درخواست هم پیشرفتش را می‌گیرد، هم می‌فهمد
-  // قفل است یا نه — پس کارتِ شماره معکوس بدونِ رفت‌وبرگشتِ اضافه نشان داده
-  // می‌شود (الگویِ `/api/bootstrap`).
-  const gate = leagueCountdown.cached();
-  res.json({ ...progress, leagueLocked: gate.blocks.tap, countdown: gate });
-}));
-
-app.post('/api/games/tap/progress', auth, tapBatchLimiter.mw, asyncHandler(async (req, res) => {
-  const play = await require('./services/featureFlags').checkPlayable('tap', pool);
-  if (!play.ok) return res.status(503).json({ message: play.message });
-  // ── شماره معکوسِ لیگ ──────────────────────────────────────────────────
-  // ضربه‌زن منبعِ سکه است و خواستهٔ مالک این بود که تا شروعِ لیگ بسته بماند.
-  // ۴۲۳ (Locked) و نه ۴۰۳: کلاینت باید بفهمد «الان بسته است، خرابی نیست»
-  // و کارتِ شماره معکوس را نشان بدهد، نه پیامِ خطای عمومی.
-  const gate = leagueCountdown.cached();
-  if (gate.blocks.tap) {
-    return res.status(423).json({
-      message: gate.message,
-      code: 'league_countdown',
-      countdown: gate,
-    });
-  }
-  // The raw token doubles as the HMAC key material, so the signature can only
-  // be produced by whoever holds a live session for this user.
-  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  // لولِ قبل از ارسال، تا بعداً بفهمیم چند لول در همین بسته تمام شد.
-  // payload فقط لولِ فعلی را می‌دهد نه اختلاف را.
-  const lvlBefore = await tapGame.getProgress(req.user.id)
-    .then(p => Number(p?.level || 0)).catch(() => 0);
-  const { status, payload } = await tapGame.submitBatch(
-    req.user.id, token, req.body || {},
-    // ── امتیاز بازی ضربه‌زن ──────────────────────────────────────────────
-    //
-    // هر ضربه یک امتیاز. سرویس خودش حساب می‌کند چند ضربه واقعاً *شمرده*
-    // شده (بعد از اعمال سقف روزانه) و همان عدد را اینجا می‌فرستد، نه
-    // چیزی که کلاینت ادعا کرده.
-    //
-    // روی همان تراکنشِ ذخیرهٔ پیشرفت اجرا می‌شود: اگر یکی شکست بخورد هر
-    // دو برمی‌گردند، وگرنه یک کرش وسط کار یا دوبار پول می‌دهد یا لول را
-    // بالا می‌برد بدون پرداخت.
-    async (client, userId, points) => {
-      // نامِ پارامتر اینجا `points` است و ماژولِ دفتر را سایه می‌اندازد،
-      // پس با مسیرِ کاملش صدا زده می‌شود. (تغییرِ نامِ پارامتر، امضای
-      // callback را می‌شکست.)
-      await require('./services/pointService').credit(client, {
-        userId,
-        points,
-        source: 'game',
-        referenceType: 'tap_game',
-        description: 'بازی ضربه‌زن',
-        // `league:false` چون `addLeaguePoints` پایین‌تر خودش این کار را
-        // می‌کند؛ دوباره‌شمردن یعنی رتبهٔ لیگ دو برابر بالا می‌رود.
-        league: false,
-      });
-      await addLeaguePoints(client, userId, points);
-      // رتبه‌های لیگ عوض شد؛ جدولِ بیننده‌ها بی‌درنگ تازه شود (نه با poll).
-      leaderboardSignal.leaderboardChanged();
-      // کمیسیونِ امتیازیِ ۵٪ به معرف — «بازی ضربه‌زنِ دوستان».
-      //
-      // بدونِ شرط، برخلافِ مسیرِ کارت: بازیِ ضربه‌زن هیچ‌وقت پولِ نقد
-      // نمی‌دهد، فقط امتیاز. پس استثنای «کارتِ نقدی» اینجا موضوعیت ندارد.
-      //
-      // روی همین تراکنش است تا اگر ثبتِ امتیازِ کاربر برگردد، کمیسیونِ
-      // معرف هم برگردد و دو دفتر از هم جدا نیفتند.
-      await referrals.payCommission(client, userId, points, 'tap');
-    },
-    // ── سکهٔ لول‌های تمام‌شده (دورِ ۲۶) ───────────────────────────────────
-    //
-    // روی همان تراکنشِ پیشرفت. `levels` فهرستِ لول‌هایی است که در همین
-    // بسته تمام شده‌اند و سرویس آن را بعد از سقفِ روزانه حساب کرده.
-    //
-    // ⚠️ `awardCoins` بدونِ لیگِ فعال صفر برمی‌گرداند و خطا نمی‌دهد — یعنی
-    //    بینِ دو فصل، ضربه‌زن امتیازش را می‌دهد ولی سکه‌ای نمی‌سازد. این
-    //    درست است: سکه فقط داخلِ یک فصل معنا دارد.
-    async (client, userId, levels) => {
-      const amount = coins.tapCoinsFor(levels);
-      if (amount <= 0) return 0;
-      // ⚠️ باید همان عددی برگردد که واقعاً در دفتر نشسته. اگر لیگِ
-      //    فعالی نباشد `awardCoins` صفر می‌دهد؛ برگرداندنِ `amount`
-      //    یعنی کلاینت «+۵ سکه» نشان می‌دهد در حالی که موجودی‌اش
-      //    تکان نخورده.
-      const paid = await coins.awardCoins(client, userId, amount);
-      // ── دفترِ سکه: ضربه‌زن ───────────────────────────────────────────
-      // فقط عددی که **واقعاً** واریز شده ثبت می‌شود (`paid`)، نه `amount`:
-      // اگر لیگِ فعالی نباشد یا سهمیه پر باشد، `awardCoins` صفر می‌دهد و
-      // دفتر نباید سکهٔ واریزشدهٔ خیالی نشان بدهد.
-      if (paid > 0) {
-        await coinLedger.record(client, {
-          userId,
-          delta: paid,
-          source: 'tap',
-          referenceType: 'tap_levels',
-          description: `سکهٔ لول‌های ضربه‌زن (${Array.isArray(levels) ? levels.length : 0} لول)`,
-        });
-      }
-      return paid;
-    },
-  );
-  // XP گذر نبرد به ازای هر لولی که در همین بستهٔ ارسالی تمام شده.
-  // سقف روزانهٔ منبع (۶۰) خودش جلوی سوءاستفاده را می‌گیرد.
-  const lvlUp = Math.max(0, Number(payload?.level || 0) - lvlBefore);
-  if (lvlUp > 0) {
-    pass.grantXp(req.user.id, 'tap_level', { multiplier: lvlUp }).catch(() => {});
-    // ── ضربه‌زن و ماموریت‌هایScoped به ربات (خواستهٔ مالک) ──
-    // یک لولِ تمام‌شدهٔ ضربه‌زن یک «بازیِ واقعیِ شمارشی» است. مالک: ماموریتی
-    // که برای بازی با ربات ساخته شده اشکالی ندارد با ضربه‌زن هم پیشرفت
-    // کند. ماموریت‌های مشخص‌نشده (match_completed) از ضربه‌زن چیزی نمی‌گیرند
-    // — دقیقاً مثلِ قبل، چون رویدادشان اینجا منتشر نمی‌شود.
-    require('./services/missionService')
-      .record(req.user.id, 'bot_match').catch(() => {});
-  }
-  res.status(status).json(payload);
-}));
-
-app.get('/api/games/tap/leaderboard', auth, asyncHandler(async (req, res) => {
-  // فهرستِ مشترک برای همهٔ بیننده‌ها یکسان است؛ ۸ ثانیه کش (هم‌مقدار بین
-  // پروسه‌ها با Redis) تا این مسیر داغ هم در هر درخواست جدول را مرتب نکند.
-  const lim = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
-  const cacheKey = `lb:tap:${lim}`;
-  const shared = await cacheGet(cacheKey) || await (async () => {
-    const full = await tapGame.leaderboard(lim, null); // فقط فهرست، بدون me
-    await cacheSet(cacheKey, full, 8000);
-    return full;
-  })();
-  // رتبهٔ خودِ بیننده تازه (مثل مسیر لیگ)؛ اگر در فهرست کش‌شده نباشد،
-  // تابع کامل فقط برای گرفتنِ me صدا زده می‌شود.
-  const inTop = (shared.entries || []).find(e => e.userId === req.user.id);
-  let me = inTop ? { ...inTop, inTop: true } : null;
-  if (!me) {
-    const fresh = await tapGame.leaderboard(lim, req.user.id);
-    me = fresh.me || null;
-  }
-  res.json({ ...shared, me });
-}));
-
 // ── دوئل پنج‌کارتی زنده ──────────────────────────────────────────────────
 // The REST surface prepares a user's authoritative deck and supports old
 // clients' free bot practice. New bot/online/lobby matches all run through the
@@ -1130,278 +989,11 @@ const cardDuelLimiter = opsRateLimit('cardDuel',
   { windowMs: 60_000, limit: 24 },
   { keyGenerator: perUserKey, message: { message: 'تعداد دوئل زیاد است؛ کمی صبر کن' } });
 
-app.get('/api/card-duel', auth, asyncHandler(async (req, res) => {
-  res.json(await cardDuel.status(req.user.id));
-}));
-
-app.post('/api/card-duel/deck', auth, cardDuelLimiter.mw, asyncHandler(async (req, res) => {
-  res.json(await cardDuel.saveDeck(
-    req.user.id,
-    req.body?.cardTypeIds || req.body?.cards || [],
-  ));
-}));
-
-app.post('/api/card-duel/bot', auth, cardDuelLimiter.mw, asyncHandler(async (req, res) => {
-  res.json(await cardDuel.botBattle(req.user.id,
-    Array.isArray(req.body?.cardTypeIds) ? req.body.cardTypeIds : null));
-}));
-
-// Solo (time-attack) records: my personal best + the public leaderboard, in
-// one round trip so the solo screen never has to fan out two requests.
-// Solo awards NO points on purpose — the record IS the reward.
-app.get('/api/games/:gameId/solo', auth, asyncHandler(async (req, res) => {
-  const rules = require('./games').RULES[req.params.gameId];
-  if (!rules || !rules.solo) return res.status(404).json({ message: 'این بازی حالت تک‌نفره ندارد' });
-  res.json(await require('./services/soloRecordService').summary(req.user.id, req.params.gameId));
-}));
-
-app.get('/api/profile', auth, asyncHandler(async (req, res) => {
-  // همان ستون‌های bootstrap تا دو مسیر هرگز از هم جدا نیفتند.
-  // INVENTORY_IMAGE_SQL: طرحی که در لحظهٔ ثبت قرعه خورده (رو یا پشت).
-  // ⚠️ اینجا عمداً FRONT_IMAGE_SQL نیست — آن مالِ آرنای دوئل است.
-  // توضیحِ کاملِ تفاوت و باگی که از یکی‌کردنشان آمد در cardDuelService.
-  const inv = await pool.query(
-    `SELECT i.*, t.name, ${cardDuel.INVENTORY_IMAGE_SQL} AS image_url,
-            t.point_value, t.cash_amount, t.description,
-            t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
-            t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect,
-            t.is_collectible
-       FROM user_card_inventory i
-       JOIN card_types t ON t.id = i.card_type_id
-      WHERE i.user_id=$1 AND i.consumed_in_reward=false ORDER BY t.name`,
-    [req.user.id]);
-  const leaguePayouts = await pool.query(`SELECT p.*, s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.user.id]);
-  const profileCosmetics = await shop.cosmeticsFor([req.user.id]);
-  res.json({
-    user: safeUser(req.user),
-    inventory: inv.rows,
-    leaguePayouts: leaguePayouts.rows,
-    cosmetics: profileCosmetics.get(req.user.id) || null,
-  });
-}));
-// ── بوت‌استرپ: هر چیزی که اپ بلافاصله بعد از ورود لازم دارد ──────────────
-//
-// چرا این endpoint وجود دارد
-//
-// اپ بعد از ورود سه درخواست جدا می‌زد: profile، rewards و wheel. هر سه
-// روی سرور در مجموع کمتر از ۵ میلی‌ثانیه کار می‌برند — اندازه‌گیری شد —
-// ولی هرکدام حدود ۵۰۰ میلی‌ثانیه طول می‌کشند چون تأخیر شبکه تا ایران
-// همین‌قدر است. یعنی ۹۹٪ زمان انتظار کاربر، رفت‌وبرگشت است نه محاسبه.
-//
-// موازی کردنشان کمک کرد (۱۸۴۸ به ۸۲۱ میلی‌ثانیه)، ولی کف همچنان یک
-// رفت‌وبرگشت کامل است. یکی کردنشان آن کف را به یک رفت‌وبرگشت می‌رساند و
-// دو تای دیگر را کاملاً حذف می‌کند.
-//
-// حجم پاسخ‌ها ناچیز است (۰.۸ تا ۱.۸ کیلوبایت)، پس یکی کردنشان هیچ هزینهٔ
-// پهنای باندی ندارد.
-//
-// Promise.all و نه await پشت سر هم: سه کوئری مستقل‌اند و سریالی کردنشان
-// همان اشتباهی است که این endpoint قرار است حل کند.
-app.get('/api/bootstrap', auth, asyncHandler(async (req, res) => {
-  const [inv, payouts, rewards, wheelState, streakState] = await Promise.all([
-    // ── چرا `cash_amount` و `created_at` هم برمی‌گردند ──
-    //
-    // اینونتوری بازطراحی شد: کاربر می‌تواند نزدیک به ۵۰ نوع کارت داشته
-    // باشد و صفحهٔ جدید امکانِ مرتب‌سازی («تازه‌ترین»، «باارزش‌ترین») و
-    // نمایشِ ارزشِ نقدی را می‌دهد.
-    //
-    // `i.created_at` لحظهٔ **اولین** ثبتِ آن نوع کارت است و
-    // `i.updated_at` آخرین بار که تعدادش زیاد شده. برای «تازه‌ترین»
-    // دومی درست است — کاربر می‌خواهد کارتی را ببیند که همین حالا ثبت
-    // کرده، حتی اگر نسخهٔ اولش را ماه‌ها پیش گرفته باشد.
-    // INVENTORY_IMAGE_SQL: طرحِ رو/پشتی که در لحظهٔ ثبت قرعه خورده و در
-    // `display_design_id` ثابت شده. اگر کارت طرحی نداشته باشد (سیستمِ
-    // قدیمی) به تصویرِ پیش‌فرضِ نوعِ کارت برمی‌گردد، نه هیچ.
-    pool.query(
-      `SELECT i.*, t.name, ${cardDuel.INVENTORY_IMAGE_SQL} AS image_url,
-              t.point_value, t.cash_amount, t.description,
-              t.duel_attack, t.duel_defense, t.duel_speed, t.duel_technique,
-              t.duel_goal_chance, t.duel_energy, t.duel_rarity, t.duel_effect,
-              t.is_collectible
-         FROM user_card_inventory i
-         JOIN card_types t ON t.id = i.card_type_id
-        WHERE i.user_id = $1 AND i.consumed_in_reward = false
-        ORDER BY t.name`, [req.user.id]),
-    pool.query(
-      `SELECT p.*, s.month_year FROM league_payouts p
-         JOIN league_seasons s ON s.id = p.league_season_id
-        WHERE p.user_id = $1 ORDER BY p.created_at DESC LIMIT 20`,
-      [req.user.id]),
-    pool.query(
-      `SELECT * FROM reward_tiers WHERE is_active = true
-        ORDER BY required_points`),
-    // شکست گردونه نباید کل بوت‌استرپ را ببرد: نشانِ چرخش یک زینت است،
-    // پروفایل نیست.
-    wheel.status(req.user.id).catch(() => null),
-    // استریک روزانه باید در اولین فریم داشبورد حاضر باشد. جدا خواندنش
-    // باعث می‌شد کارت بعد از بقیهٔ صفحه بپرد و روی اینترنت موبایل حس
-    // «وصله‌ای» بدهد؛ شکستش هم نباید بوت‌استرپ را خراب کند.
-    loginStreak.status(req.user.id).catch(() => null),
-  ]);
-
-  // XP ورود روزانه. سقف منبع ۲۰ است، پس هر بار باز کردن اپ در یک روز
-  // فقط یک بار حساب می‌شود — بقیه بی‌اثرند.
-  pass.grantXp(req.user.id, 'daily_login').catch(() => {});
-
-  // خلاصهٔ گذر نبرد برای نشانِ نوار بالا. کل وضعیت اینجا فرستاده
-  // نمی‌شود (۵۰ پله × ۲ مسیر حجیم است)؛ فقط چیزی که برای نشان لازم
-  // است. صفحهٔ گذر خودش /api/pass را می‌خواند.
-  // ── ظاهرِ خودِ کاربر (ستارهٔ پلاس، قاب، رنگ اسم) ────────────────────
-  //
-  // درخواست مالک: «افرادی که اشتراک پلاس گرفتن در همه جای پلتفرم برای
-  // خودشون و افراد دیگه ستارشون مشخص باشه».
-  //
-  // «برای خودشون» بخش فراموش‌شده بود: چت و لیگ ستارهٔ **بقیه** را نشان
-  // می‌دادند، ولی داشبورد خودِ کاربر نام را خام چاپ می‌کرد. یعنی کسی که
-  // پول داده بود، در اولین صفحه‌ای که بعد از ورود می‌بیند هیچ نشانی از
-  // خریدش نداشت.
-  let myCosmetics = null;
-  try {
-    const m = await shop.cosmeticsFor([req.user.id]);
-    myCosmetics = m.get(req.user.id) || null;
-  } catch { /* ظاهر یک زینت است؛ نباید بوت‌استرپ را بشکند */ }
-
-  let passBrief = null;
-  try {
-    const st = await pass.status(req.user.id);
-    if (st.active) {
-      passBrief = {
-        tier: st.tier, tierCount: st.tierCount, claimable: st.claimable,
-        hasPlus: st.hasPlus, daysLeft: st.season.daysLeft,
-        intoTier: st.intoTier, tierNeeds: st.tierNeeds,
-        // نشانِ قرمز کنار آیکون: تعداد پله‌ای که **امروز** باز شده.
-        // مالک: «وقتی بتل پس کاربر باز میشه کنار آیکون بتل پس ۱ قرمز
-        // میاد اگه دوتا باز شده ۲ میاد ولی سقف باز شدن ۲ هستش».
-        tiersToday: st.tiersToday,
-        maxTiersPerDay: st.maxTiersPerDay,
-        dayCapReached: st.dayCapReached,
-      };
-    }
-  } catch { /* گذر نبرد نباید بوت‌استرپ را بشکند */ }
-
-  res.json({
-    user: safeUser(req.user),
-    inventory: inv.rows,
-    leaguePayouts: payouts.rows,
-    rewards: rewards.rows,
-    wheel: wheelState,
-    loginStreak: streakState,
-    pass: passBrief,
-    cosmetics: myCosmetics,
-    // لولِ خودِ کاربر — صفحهٔ بازی‌ها و هدرِ داشبورد از همین می‌خوانند،
-    // پس هیچ درخواستِ اضافه‌ای لازم نیست.
-    level: await level.statusFor(req.user.id),
-    // سهمیهٔ سکهٔ امروز — سوار بر همان bootstrap تا صفحهٔ بازی‌ها بتواند
-    // «۳۰ از ۳۰ بازی سکه‌دار» را بدونِ درخواستِ اضافه نشان بدهد.
-    coinQuota: await coins.getQuota(req.user.id),
-    // اقتصادِ بازی‌ها برای متن‌های راهنمای داخلِ اپ/وب — از تنظیماتِ
-    // ادمین می‌آید، پس حتی اپ‌های قدیمی هم متنِ جدید می‌بینند.
-    economy: await gameEconomy.publicView().catch(() => null),
-    gamePoints: await getGameRewardSettings().catch(() => null),
-    pendingGrants: await grants.pendingFor(req.user.id).catch(() => []),
-  });
-}));
-
 // ═══════════════════════════════════════════════════════════════════════════
 // `/api/coins/quota` حذف شد (چرخهٔ ۲۴): هیچ کلاینتی صدایش نمی‌زد —
 // سهمیهٔ سکه در bootstrap هست و بعد از هر بازی هم کلاینت‌ها `/api/level`
 // را می‌خوانند. یک کوئریِ بی‌مصرف فقط سطحِ حمله را زیاد می‌کرد.
 
-// ═══════════════════════════════════════════════════════════════════════════
-// وضعیتِ کاملِ لول — برای صفحهٔ بازی‌ها
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// bootstrap خلاصه را دارد، ولی صفحهٔ بازی‌ها بعد از هر بازی باید عددِ
-// تازه را بگیرد بدون اینکه کلِ bootstrap (که سنگین است) دوباره خوانده
-// شود.
-app.get('/api/level', auth, asyncHandler(async (req, res) => {
-  res.json(await level.statusFor(req.user.id));
-}));
-
-app.patch('/api/profile', auth, asyncHandler(async (req, res) => {
-  const b = req.body || {};
-  // EVERY field is validated here rather than trusted. Before this, three
-  // separate inputs produced a 500 Server Error instead of a clear message:
-  //   age:-5 / age:99999  -> CHECK constraint violation  (23514)
-  //   age:"abc"           -> invalid integer syntax      (22P02)
-  //   a 3000-char nickname-> value too long              (22001)
-  // and `profileAvatarKey: "../../etc/passwd"` was accepted outright.
-  let age = null;
-  if (b.age !== undefined && b.age !== null && b.age !== '') {
-    const n = Number(b.age);
-    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 5 || n > 120) {
-      return res.status(400).json({ message: 'سن باید عددی بین ۵ تا ۱۲۰ باشد' });
-    }
-    age = n;
-  }
-  if (b.profileAvatarKey !== undefined && b.profileAvatarKey !== null
-      && b.profileAvatarKey !== '' && !safeAvatarKey(b.profileAvatarKey)) {
-    return res.status(400).json({ message: 'آواتار انتخابی معتبر نیست' });
-  }
-  // Shape alone is not enough for a club crest: without this check any user
-  // could PATCH `profileAvatarKey: "club:real_madrid"` and wear a badge they
-  // never bought. The dedicated endpoint checks membership, so this generic
-  // one has to as well.
-  if (typeof b.profileAvatarKey === 'string'
-      && b.profileAvatarKey.startsWith('club:')) {
-    const slug = b.profileAvatarKey.slice(5);
-    if (!await clubs.isMember(req.user.id, slug)) {
-      return res.status(403).json({ message: 'عضو این باشگاه نیستی' });
-    }
-  }
-  // BUG FIX: آواتار محافظ صریح داشت ولی آدرس عکس نداشت. safeImageUrl برای
-  // ورودی خطرناک (javascript: / data: / http) مقدار null برمی‌گرداند، و
-  // COALESCE در کوئری پایین آن را «تغییری نده» تفسیر می‌کرد — یعنی سرور
-  // ۲۰۰ OK برمی‌گرداند و کاربر فکر می‌کرد عکسش ذخیره شده، در حالی که
-  // بی‌صدا نادیده گرفته شده بود. حالا مثل آواتار، صریحاً ۴۰۰ می‌دهد.
-  if (b.profileImageUrl !== undefined && b.profileImageUrl !== null
-      && b.profileImageUrl !== '' && !safeImageUrl(b.profileImageUrl)) {
-    return res.status(400).json({ message: 'آدرس عکس پروفایل معتبر نیست' });
-  }
-
-  // ── نامِ مستعار: حداکثر ۸ نویسه + فیلترِ فحش‌های فارسی/انگلیسی ────────
-  //
-  // خواستهٔ مالک (۱۷ شهریور): «در قسمت نامِ مستعار ... تا ۸ حرف نهایت، شامل
-  // حرف و عدد و تمامی کاراکترهای خاص باشد. باید یک لیست از کلماتِ فارسی و
-  // انگلیسیِ رکیک جمع‌آوری کنی که اگر کاربر آن‌ها را انتخاب کرد، به کاربر
-  // بگوید انتخابِ این نام موردِ قبول نیست.»
-  //
-  // ⚠️ خالی/null یعنی «نامم را عوض نکن» (همان رفتارِ COALESCE)، پس
-  //    `allowEmpty` روشن است؛ ولی اگر چیزی فرستاد و نامردود بود، صریحاً
-  //    ۴۰۰ با پیامِ فارسی برمی‌گردد (نه سکوت و نه کوتاه‌شدنِ خودکار).
-  const nickCheck = await nicknamePolicy.validateWithSettings(b.nickname, { allowEmpty: true });
-  if (!nickCheck.ok) {
-    return res.status(400).json({ message: nickCheck.error, code: nickCheck.code });
-  }
-
-  const { rows } = await pool.query(
-    `UPDATE users SET
-       first_name=COALESCE($1,first_name), last_name=COALESCE($2,last_name),
-       nickname=COALESCE($3,nickname), profile_image_url=COALESCE($4,profile_image_url),
-       profile_avatar_key=COALESCE($5,profile_avatar_key),
-       bank_account=COALESCE($6,bank_account), age=COALESCE($7,age),
-       city=COALESCE($8,city), province=COALESCE($9,province),
-       fcm_token=COALESCE($10,fcm_token), updated_at=NOW()
-     WHERE id=$11 RETURNING *`,
-    [
-      boundedText(b.firstName, 60),
-      boundedText(b.lastName, 60),
-      nickCheck.value,
-      safeImageUrl(b.profileImageUrl),
-      safeAvatarKey(b.profileAvatarKey),
-      // ورودیِ کاربر قبل از نوشتن رمز می‌شود. `boundedText` اول طول را
-      // می‌بُرد و بعد رمز می‌شود — ترتیب مهم است، وگرنه بُرش روی متنِ
-      // رمزشده می‌افتد و داده را خراب می‌کند.
-      fieldCrypto.encrypt(boundedText(b.bankAccount, 40)),
-      age,
-      boundedText(b.city, 60),
-      boundedText(b.province, 60),
-      boundedText(b.fcmToken, 500),
-      req.user.id,
-    ],
-  );
-  res.json({ user: safeUser(rows[0]) });
-}));
 // Self-service password change while logged in. Added alongside the
 // register-password account-takeover fix: since real "forgot password" via
 // SMS OTP isn't available yet, a logged-in user still needs *some* safe way
@@ -1432,173 +1024,8 @@ const changePasswordLimiter = rateLimit({
   keyGenerator: perUserKey,
   message: { message: 'تعداد تلاش‌ها زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
 });
-app.post('/api/profile/change-password', auth, changePasswordLimiter, asyncHandler(async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  if (!isValidPasswordLength(newPassword)) return res.status(400).json({ message: 'رمز جدید باید بین ۶ تا ۷۲ کاراکتر باشد' });
-  if (!req.user.password_hash || !currentPassword || !(await bcrypt.compare(String(currentPassword), req.user.password_hash))) {
-    return res.status(401).json({ message: 'رمز فعلی درست نیست' });
-  }
-  // ═══════════════════════════════════════════════════════════════════════
-  // تغییرِ رمز ⇒ بالا رفتنِ نسخهٔ جلسه ⇒ همهٔ دستگاه‌های دیگر بیرون
-  // ═══════════════════════════════════════════════════════════════════════
-  // خواستهٔ مالک این بود که کاربر «همیشه وارد بماند»، پس اگر فقط توکن‌ها را
-  // می‌کشتیم، خودِ کاربری که همین حالا رمزش را عوض کرده هم پرت می‌شد و این
-  // شبیهِ خرابی به‌نظر می‌رسید. پس همین دستگاه توکنِ تازه می‌گیرد و بقیه
-  // می‌میرند. کلاینتی که پیام را نادیده بگیرد هم چیزِ بدی نمی‌بیند: در
-  // درخواستِ بعدی ۴۰۱ می‌گیرد و (مثلِ قبل) صفحهٔ ورود می‌آید.
-  const { rows } = await pool.query(
-    'UPDATE users SET password_hash=$1, session_epoch=session_epoch+1, updated_at=NOW() WHERE id=$2 RETURNING *',
-    [await bcrypt.hash(String(newPassword), 12), req.user.id],
-  );
-  res.json({
-    message: 'رمز عبور با موفقیت تغییر کرد — بقیهٔ دستگاه‌ها از حساب خارج شدند',
-    token: signUser(rows[0]),
-  });
-}));
-
-app.get('/api/users/:id/public', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT id,nickname,profile_image_url,profile_avatar_key,lifetime_points,current_points,monthly_league_points,coins,joined_at FROM users WHERE id=$1', [req.params.id]);
-  if (!rows[0]) return res.status(404).json({ message: 'کاربر پیدا نشد' });
-  const rewards = await pool.query(`SELECT c.claimed_at,c.status,r.name,r.image_url,r.reward_type,r.reward_value FROM user_reward_claims c JOIN reward_tiers r ON r.id=c.reward_tier_id WHERE c.user_id=$1 AND c.status IN ('approved','paid') ORDER BY c.claimed_at DESC LIMIT 50`, [req.params.id]);
-  // ═══════════════════════════════════════════════════════════════════════
-  // کارت‌های عمومی: از **اینونتوری**، نه از جدولِ کدها
-  // ═══════════════════════════════════════════════════════════════════════
-  //
-  // نسخهٔ قبلی فقط `card_codes` را می‌خواند — یعنی جدولِ سیستمِ قدیمی.
-  // نتیجه: کارتی که کاربر با **عکس** ثبت کرده بود در پروفایلِ عمومی
-  // اصلاً دیده نمی‌شد. کاربر کارت را در «کارت‌های من» می‌دید ولی
-  // حریفش در چت یا لیگ چیزی نمی‌دید — انگار کارتی نخریده.
-  //
-  // `user_card_inventory` منبعِ واحدِ حقیقت است: هر دو مسیرِ ثبت
-  // (کد تنها، و عکس+کد) در همان جدول می‌نویسند. پس این کوئری هر دو را
-  // با هم نشان می‌دهد و فردا اگر مسیرِ سومی اضافه شود، خودبه‌خود
-  // پوشش داده می‌شود.
-  //
-  // `consumed_in_reward=false`: کارتی که خرجِ جایزه شده دیگر در
-  // مجموعهٔ کاربر نیست.
-  // همان COALESCE مسیرهای دیگر: پروفایلِ عمومی باید **دقیقاً** همان
-  // تصویری را نشان دهد که خودِ کاربر در «کارت‌های من» می‌بیند. اگر این
-  // یکی به‌روز نمی‌شد، کارتی که کاربر «پشت» می‌بیند برای حریفش «رو»
-  // دیده می‌شد — همان دسته ناهماهنگی که قبلاً باعث شد کارتِ عکسی اصلاً
-  // در پروفایلِ عمومی دیده نشود.
-  const cards = await pool.query(
-    `SELECT t.id AS card_type_id, t.name,
-            ${cardDuel.INVENTORY_IMAGE_SQL} AS image_url, t.point_value,
-            t.description, t.duel_attack, t.duel_defense, t.duel_speed,
-            t.duel_technique, t.duel_goal_chance, t.duel_energy,
-            t.duel_rarity, t.duel_effect, t.is_collectible,
-            i.quantity::int AS registered_count,
-            i.updated_at AS last_registered_at
-       FROM user_card_inventory i
-       JOIN card_types t ON t.id = i.card_type_id
-      WHERE i.user_id = $1 AND i.consumed_in_reward = false AND i.quantity > 0
-      ORDER BY i.quantity DESC, t.name
-      LIMIT 50`, [req.params.id]);
-  const leaguePayouts = await pool.query(`SELECT p.rank,p.amount,p.payment_status,p.created_at,s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.params.id]);
-
-  // Everything a visitor should see when they tap someone in chat or the
-  // league table: their finishes, their prizes, and their cosmetics.
-  const leagueHistory = await pool.query(
-    `SELECT month_year, rank, points, prize_amount
-       FROM user_league_history WHERE user_id=$1
-      ORDER BY created_at DESC LIMIT 24`, [req.params.id]);
-
-  // Physical trophies keep their own snapshot, so they survive a tier being
-  // edited or deleted — the JOIN above would lose them.
-  const trophies = await pool.query(
-    `SELECT reward_name AS name, reward_image AS image_url, status, claimed_at
-       FROM user_reward_claims
-      WHERE user_id=$1 AND reward_type='physical'
-      ORDER BY claimed_at DESC LIMIT 50`, [req.params.id]);
-
-  const cosmeticsMap = await shop.cosmeticsFor([req.params.id]);
-  const cosmetics = cosmeticsMap.get(req.params.id) || {};
-  // صفحهٔ پروفایلِ عمومی جزئیاتِ کاملِ لول را نشان می‌دهد (نوار
-  // پیشرفت)، نه فقط عدد — پس `statusFor` و نه `levelsFor`.
-  const levelInfo = await level.statusFor(req.params.id);
-
-  // Best rank ever, for the headline medal.
-  const best = leagueHistory.rows.reduce(
-    (acc, r) => (acc === null || r.rank < acc ? r.rank : acc), null);
-
-  // ⚠️ ترتیب باید **دقیقاً** همان getLeaderboard باشد: (coins, points).
-  //    اگر اینجا فقط points می‌ماند، کاربر در جدولِ لیگ رتبهٔ ۱ می‌دید و
-  //    در پروفایلِ خودش رتبهٔ ۴ — دو عددِ متناقض از یک حقیقت.
-  const currentRankRow = await pool.query(
-    `SELECT sub.rank, sub.coins FROM (
-       SELECT user_id, coins,
-              DENSE_RANK() OVER(ORDER BY coins DESC, points DESC) AS rank
-         FROM league_leaderboard_entries
-        WHERE league_season_id = (SELECT id FROM league_seasons WHERE status='active' ORDER BY starts_at DESC LIMIT 1)
-     ) sub WHERE sub.user_id = $1`,
-    [req.params.id]
-  );
-  const currentRank = currentRankRow.rows[0]?.rank ? Number(currentRankRow.rows[0].rank) : null;
-  // سکهٔ فصلِ جاری از جدولِ رتبه‌بندی می‌آید (منبعِ حقیقت)، و اگر هیچ
-  // لیگِ فعالی نبود از شمارندهٔ users خوانده می‌شود.
-  const seasonCoins = currentRankRow.rows[0]?.coins != null
-    ? Number(currentRankRow.rows[0].coins)
-    : Number(rows[0].coins || 0);
-
-  res.json({
-    currentLeagueRank: currentRank,
-    ...rows[0],
-    coins: seasonCoins,
-    rewards: rewards.rows,
-    cards: cards.rows,
-    leaguePayouts: leaguePayouts.rows,
-    leagueHistory: leagueHistory.rows.map(r => ({
-      monthYear: r.month_year, rank: r.rank,
-      points: r.points, prizeAmount: Number(r.prize_amount),
-    })),
-    trophies: trophies.rows,
-    bestRank: best,
-    totalPrizeAmount: leagueHistory.rows
-      .reduce((a, r) => a + Number(r.prize_amount || 0), 0),
-    cosmetics,
-    level: levelInfo,
-  });
-}));
-
-app.get('/api/rewards', auth, asyncHandler(async (req, res) => {
-  // ⚠️ این کوئری یک بار شکسته شد و هیچ‌کس نفهمید. کامیت 4f67a5e که دربارهٔ
-  // دوئل کارت بود، بی‌ربط این خط را به
-  //     ... FROM reward_tiers WHERErequired_points
-  // تبدیل کرد (WHERE به required_points چسبید). پستگرس **خطا نداد**، چون
-  // `WHERErequired_points` را نامِ مستعارِ جدول خواند. یعنی کوئری معتبر
-  // ماند، ۲۰۰ برگرداند، و فقط بی‌صدا شرطِ فیلتر و ترتیب را انداخت: کاربر
-  // هر ۶۳ جایزهٔ غیرفعال را می‌دید و روی هرکدام می‌زد ۴۰۴ می‌گرفت.
-  //
-  // درسِ ماندگار: خطای داخلِ رشتهٔ SQL نه از `node -c` رد می‌شود نه از
-  // ESLint. تنها نگهبانش تستِ زنده است — `testE2E.js` که حالا به
-  // `npm test` اضافه شده تا اگر دوباره شکست، جلوی deploy را بگیرد.
-  const { rows } = await pool.query(
-    'SELECT *, ($1 >= required_points) AS eligible FROM reward_tiers '
-    + 'WHERE is_active = true ORDER BY display_order, required_points',
-    [req.user.current_points],
-  );
-  res.json(rows);
-}));
 // Reward groups: the user-facing catalogue with per-group progress.
 const rewardGroups = require('./services/rewardGroupService');
-
-app.get('/api/reward-groups', auth, asyncHandler(async (req, res) => {
-  res.json(await rewardGroups.userView(req.user.id));
-}));
-
-// ── Shop: cosmetics + GhelGheli Plus ───────────────────────────────────────
-app.get('/api/shop', auth, asyncHandler(async (req, res) => {
-  // `shape=groups|items` نصفِ پاسخ را حذف می‌کند؛ توضیح در shopService.
-  // بدونِ پارامتر هر دو می‌آید تا APKهای منتشرشده نشکنند.
-  res.json(await shop.catalogue(req.user.id, req.query.shape));
-}));
-
-app.get('/api/shop/history', auth, asyncHandler(async (req, res) => {
-  res.json(await shop.purchaseHistory(req.user.id, {
-    limit: req.query.limit,
-    offset: req.query.offset,
-  }));
-}));
 
 // Buying spends from the wallet, so it is rate-limited like other money paths.
 const shopLimiter = rateLimit({
@@ -1622,174 +1049,6 @@ const shopLimiter = rateLimit({
 //
 // کلاینت باید `settled` را ببیند: اگر true بود نباید پنجرهٔ پرداخت را
 // باز کند.
-
-app.post('/api/shop/items/:id/buy', auth, validateUuid('id'), shopLimiter, asyncHandler(async (req, res) => {
-  try {
-    res.json(await shop.buyShopItem(req.user.id, req.params.id, {
-      useWallet: req.body?.useWallet === true,
-    }));
-  } catch (e) {
-    res.status(e.status || 500).json({ message: e.message || 'خطا در خرید' });
-  }
-}));
-
-app.post('/api/shop/plus', auth, shopLimiter, asyncHandler(async (req, res) => {
-  try {
-    res.json(await shop.buyPlusSubscription(
-      req.user.id,
-      req.body?.billingCycle || req.body?.cycle || 'monthly',
-    ));
-  } catch (e) {
-    res.status(e.status || 500).json({ message: e.message || 'خطا در خرید اشتراک' });
-  }
-}));
-
-// ── صندوق کارت ─────────────────────────────────────────────────────────
-//
-// مسیرِ ورودِ کاربری که کارتِ فیزیکی ندارد. بدونِ کارت، دوئلِ کارت اصلاً
-// باز نمی‌شود — نه نسخهٔ ضعیف‌تری از بازی، بلکه هیچ. صندوق همان در است.
-//
-// ⚠️ اینجا هیچ کارتی تحویل داده نمی‌شود. `buy` فقط سفارشِ pending
-//    می‌سازد؛ قرعه‌کشی و تحویل داخلِ تراکنشِ `/api/purchase/verify`
-//    انجام می‌شود، بعد از آنکه کافه‌بازار پرداخت را تأیید کرد.
-app.get('/api/card-box/overview', auth, asyncHandler(async (req, res) => {
-  res.json(await cardBox.overview(req.user.id));
-}));
-
-app.post('/api/card-box/buy', auth, shopLimiter, asyncHandler(async (req, res) => {
-  try {
-    res.json(await shop.buyCardBox(req.user.id, {
-      useWallet: req.body?.useWallet === true,
-    }));
-  } catch (e) {
-    res.status(e.status || 500)
-      .json({ message: e.message || 'خطا در ساخت سفارش صندوق' });
-  }
-}));
-
-app.get('/api/card-box/history', auth, asyncHandler(async (req, res) => {
-  res.json(await cardBox.history(req.user.id, req.query.limit));
-}));
-
-// ── جایزه‌های بازنشده (صندوقِ گردونه/لیگ) ──────────────────────────────
-app.get('/api/grants', auth, asyncHandler(async (req, res) => {
-  res.json({ grants: await grants.pendingFor(req.user.id) });
-}));
-
-app.post('/api/grants/:id/open', auth, validateUuid('id'), shopLimiter,
-  asyncHandler(async (req, res) => {
-    try {
-      const result = await grants.open(req.user.id, req.params.id);
-      res.json({
-        message: result.alreadyOpened ? 'این صندوق قبلاً باز شده' : 'صندوق باز شد',
-        ...result,
-      });
-    } catch (e) {
-      res.status(e.status || 500).json({ message: e.message || 'باز کردن صندوق ناموفق بود' });
-    }
-  }));
-
-// ── خرید: مرحلهٔ ۳ (راستی‌آزمایی و تحویل) ─────────────────────────────
-//
-// یک روتِ واحد برای هر دو نوع خرید. نوعِ سفارش از دیتابیس خوانده می‌شود
-// نه از بدنهٔ درخواست — کلاینت نمی‌تواند با فرستادن kind دلخواه، سفارشِ
-// ۹٬۰۰۰ تومانی را به پلاس سالانه تبدیل کند.
-app.post('/api/purchase/verify', auth, shopLimiter, asyncHandler(async (req, res) => {
-  try {
-    const result = await shop.verifyPurchase(
-      req.user.id,
-      String(req.body?.orderId || ''),
-      String(req.body?.purchaseToken || ''),
-    );
-    res.json({
-      ok: true,
-      ...result,
-      message: result.alreadyProcessed
-        ? 'این خرید قبلاً ثبت شده بود'
-        : 'خرید با موفقیت انجام شد',
-    });
-  } catch (e) {
-    res.status(e.status || 500).json({ message: e.message || 'خطا در تأیید خرید' });
-  }
-}));
-
-app.post('/api/shop/equip', auth, asyncHandler(async (req, res) => {
-  try {
-    // `kind` scopes an unequip to one slot. Without it "برداشتن" under the
-    // badges also wiped the user's frame and name colour.
-    res.json(await shop.equip(
-      req.user.id, req.body?.slug || null, req.body?.kind || null));
-  } catch (e) {
-    res.status(e.status || 500).json({ message: e.message || 'خطا در انتخاب' });
-  }
-}));
-
-// Use a club crest as the profile picture. Membership is checked server-side.
-app.post('/api/shop/club-avatar', auth, asyncHandler(async (req, res) => {
-  try {
-    res.json(await shop.useClubAvatar(
-      req.user.id, String(req.body?.club || '').slice(0, 64)));
-  } catch (e) {
-    res.status(e.status || 500).json({ message: e.message || 'خطا در تغییر عکس' });
-  }
-}));
-
-// ── Clubs ──────────────────────────────────────────────────────────────────
-// The league page's club tab: who belongs where. (clubService is required at
-// the top, next to the other services.)
-app.get('/api/clubs', auth, asyncHandler(async (req, res) => {
-  res.json({
-    clubs: await clubs.rosterSummary(),
-    mine: await clubs.myClubs(req.user.id),
-  });
-}));
-
-app.get('/api/clubs/:slug/members', auth, asyncHandler(async (req, res) => {
-  const slug = String(req.params.slug || '').slice(0, 64);
-  // Reject anything that is not a real club rather than returning an empty
-  // roster, so a typo in the client shows up instead of looking like a club
-  // nobody joined.
-  const known = await clubs.clubCatalogue();
-  const club = known.find(c => c.slug === slug);
-  if (!club) return res.status(404).json({ message: 'باشگاه پیدا نشد' });
-  res.json({ club, members: await clubs.members(slug, req.query.limit) });
-}));
-
-// Physical prizes won — rendered as a trophy shelf on the profile.
-app.get('/api/profile/trophies', auth, asyncHandler(async (req, res) => {
-  res.json({ trophies: await rewardGroups.trophies(req.user.id) });
-}));
-
-// Past league finishes. monthly_league_points is wiped when a season closes,
-// so without this the user loses all evidence of "I came 3rd in Mordad".
-app.get('/api/profile/league-history', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT month_year, rank, points, prize_amount, created_at
-       FROM user_league_history
-      WHERE user_id=$1
-      ORDER BY created_at DESC
-      LIMIT 24`,
-    [req.user.id]);
-  res.json({ seasons: rows.map(r => ({
-    monthYear: r.month_year,
-    rank: r.rank,
-    points: r.points,
-    prizeAmount: Number(r.prize_amount),
-    at: r.created_at,
-  })) });
-}));
-
-app.post('/api/rewards/:id/claim', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  // Delegated to rewardGroupService, which (unlike the previous inline
-  // version) credits cash rewards to the wallet, consumes only the cards the
-  // tier actually requires instead of the user's entire inventory, and
-  // restarts that group's progress bar.
-  try {
-    res.json(await rewardGroups.claim(req.user.id, req.params.id));
-  } catch (e) {
-    res.status(e.status || 500).json({ message: e.message || 'خطا در ثبت جایزه' });
-  }
-}));
 
 // `/api/rewards/claims/me` حذف شد (چرخهٔ ۲۴): بدون مصرف‌کننده در هر سه
 // کلاینت؛ وضعیتِ ادعاها (claimed/status) از /api/reward-groups می‌آید و
@@ -1818,44 +1077,6 @@ const bankCardLimiter = rateLimit({
   keyGenerator: perUserKey,
   message: { message: 'تعداد تلاش برای ثبت کارت زیاد است؛ کمی بعد دوباره تلاش کنید' },
 });
-
-// خلاصهٔ کیف پول: موجودی، آمار، کارت ماسک‌شده، قوانین و دلیل مسدودی برداشت
-app.get('/api/wallet', auth, asyncHandler(async (req, res) => {
-  res.json(await walletService.summary(req.user.id));
-}));
-
-// دفتر تراکنش‌ها با صفحه‌بندی
-app.get('/api/wallet/transactions', auth, asyncHandler(async (req, res) => {
-  res.json(await walletService.transactions(req.user.id, {
-    limit: req.query.limit,
-    offset: req.query.offset,
-  }));
-}));
-
-// ذخیره/به‌روزرسانی کارت بانکی (اعتبارسنجی Luhn + شبا + تشخیص بانک)
-app.post('/api/wallet/bank-card', auth, bankCardLimiter, asyncHandler(async (req, res) => {
-  const card = await withdrawalService.saveBankCard(req.user.id, req.body || {});
-  res.json({ message: 'کارت بانکی ذخیره شد', card });
-}));
-
-app.delete('/api/wallet/bank-card', auth, asyncHandler(async (req, res) => {
-  res.json(await withdrawalService.deleteBankCard(req.user.id));
-}));
-
-// ثبت درخواست برداشت (مبلغ همان لحظه بلوکه می‌شود)
-app.post('/api/wallet/withdrawals', auth, withdrawalLimiter.mw, asyncHandler(async (req, res) => {
-  const request = await withdrawalService.createRequest(req.user.id, req.body?.amount);
-  res.json({ message: 'درخواست برداشت ثبت شد و در انتظار بررسی مدیریت است', request });
-}));
-
-app.get('/api/wallet/withdrawals', auth, asyncHandler(async (req, res) => {
-  res.json(await withdrawalService.listForUser(req.user.id));
-}));
-
-// لغو توسط کاربر — فقط تا قبل از تأیید مدیر
-app.post('/api/wallet/withdrawals/:id/cancel', auth, validateUuid('id'), withdrawalLimiter.mw, asyncHandler(async (req, res) => {
-  res.json(await withdrawalService.cancelRequest(req.user.id, req.params.id));
-}));
 
 // نقطهٔ اتصال گردونهٔ شانس (طراحی UI بعداً انجام می‌شود).
 //
@@ -1895,10 +1116,6 @@ module.exports.creditWheelPrize = creditWheelPrize;
 // هیچ مبلغی از بدنهٔ درخواست خوانده نمی‌شود. کلاینت فقط می‌گوید «چرخاندم»؛
 // جایزه را wheelService از روی جدول وزن‌دار سرور انتخاب می‌کند.
 
-app.get('/api/wheel', auth, asyncHandler(async (req, res) => {
-  res.json(await wheel.status(req.user.id));
-}));
-
 // محدودکنندهٔ نرخ: سهمیهٔ روزانه و قید یکتای دیتابیس کار اصلی را می‌کنند،
 // ولی این جلوی کوبیدن endpoint را می‌گیرد — هر تلاش یک تراکنش با قفل ردیف
 // باز می‌کند و بدون این، یک اسکریپت می‌تواند ردیف کاربر را قفل نگه دارد.
@@ -1916,185 +1133,9 @@ opsLimits.onChange(() => {
   }
 });
 
-app.post('/api/wheel/spin', auth, wheelLimiter.mw, asyncHandler(async (req, res) => {
-  const wheelOk = await require('./services/featureFlags').checkWheel(pool);
-  if (!wheelOk.ok) return res.status(503).json({ message: wheelOk.message });
-  const result = await wheel.spin(req.user.id, {
-    // پرداخت نقدی از همان مسیر امن کیف پول می‌رود: spinId مرجع یکتاست، پس
-    // حتی اگر این تابع دو بار صدا زده شود، واریز دوم duplicate تشخیص داده
-    // می‌شود و پول دو بار داده نمی‌شود.
-    creditCash: async (client, userId, amount, spinId, label) => {
-      await walletService.credit(client, {
-        userId,
-        amount,
-        source: 'wheel',
-        referenceType: 'wheel_spins',
-        referenceId: spinId,
-        description: `گردونهٔ شانس — ${label}`,
-      });
-    },
-    // امتیاز گردونه کمیسیون معرف **نمی‌سازد**.
-    //
-    // مالک دامنه را محدود کرد به «ثبت کارت» و «بازی ضربه‌زن». گردونه
-    // هیچ‌کدام نیست — و اگر بود، هر چرخش رایگانِ دعوت‌شونده برای معرف هم
-    // پول می‌ساخت، یعنی دقیقاً همان حلقهٔ خودتغذیه‌ای که باید بسته بماند.
-    addPoints: async (client, userId, amount, source) => {
-      await points.credit(client, {
-        userId,
-        points: amount,
-        source: 'wheel',
-        referenceType: 'wheel_spins',
-        description: source ? `گردونهٔ شانس — ${source}` : 'گردونهٔ شانس',
-        // `addLeaguePoints` پایین خودش امتیازِ لیگ را اضافه می‌کند.
-        league: false,
-      });
-      await addLeaguePoints(client, userId, amount);
-      // امتیازِ لیگ عوض شد؛ جدولِ بیننده‌ها بی‌درنگ تازه شود.
-      leaderboardSignal.leaderboardChanged();
-    },
-  });
-
-  // اعلان فقط برای جوایز نقدی: یک اعلان روزانه بابت ۱۰۰ امتیاز، نوتیفیکیشن
-  // را به نویز تبدیل می‌کند و کاربر خاموشش می‌کند.
-  if (result.prize.kind === 'cash') {
-    createNotification(
-      req.user.id, 'wallet', 'برندهٔ گردونه شدی',
-      `${result.prize.label} به کیف پولت اضافه شد.`).catch(() => {});
-  } else if (result.prize.kind === 'card_box') {
-    createNotification(
-      req.user.id, 'reward', 'صندوق کارت بردی',
-      'صندوق کارت برنده‌ای — از کلکسیون بازش کن.').catch(() => {});
-  } else if (result.prize.kind === 'shop_item' || result.prize.kind === 'plus_days') {
-    createNotification(
-      req.user.id, 'reward', 'جایزهٔ گردونه',
-      `${result.prize.label} به حسابت اضافه شد.`).catch(() => {});
-  }
-  pass.grantXp(req.user.id, 'wheel_spin').catch(() => {});
-  res.json(result);
-}));
-
 // `/api/wheel/count` حذف شد (چرخهٔ ۲۴): هر دو کلاینت نوارِ گردونه را از
 // GET /api/wheel (که spinsLeft دارد) می‌سازند؛ شمارندهٔ جدا فقط یک مسیرِ
 // تکراریِ احراز‌شده بود.
-
-// ── گذر نبرد ─────────────────────────────────────────────────────────────
-app.get('/api/pass', auth, asyncHandler(async (req, res) => {
-  res.json(await pass.status(req.user.id));
-}));
-
-// Login streak is a separate, explicit claim from Battle Pass XP. Opening
-// the app only reads the status; points are awarded exactly once after the
-// user taps the button, inside a row-locked transaction.
-app.get('/api/login-streak', auth, asyncHandler(async (req, res) => {
-  res.json(await loginStreak.status(req.user.id));
-}));
-app.post('/api/login-streak/claim', auth, loginStreakLimiter,
-  asyncHandler(async (req, res) => {
-    res.json(await loginStreak.claim(req.user.id));
-  }));
-
-app.post('/api/pass/claim/:tierId?', auth,
-  asyncHandler(async (req, res) => {
-    const tierId = req.params.tierId || req.body.tierId;
-    if (!tierId || !UUID_RE.test(String(tierId))) {
-      return res.status(400).json({ message: 'شناسه پله نامعتبر است' });
-    }
-    const granted = await pass.claim(req.user.id, tierId);
-    res.json({ message: 'جایزه دریافت شد', granted });
-  }));
-
-app.post('/api/pass/claim-all', auth, asyncHandler(async (req, res) => {
-  const r = await pass.claimAll(req.user.id);
-  res.json({ message: `${r.claimed} جایزه دریافت شد`, ...r });
-}));
-
-app.get('/api/wheel/history', auth, asyncHandler(async (req, res) => {
-  res.json({ spins: await wheel.history(req.user.id, req.query.limit) });
-}));
-
-// ── معرفی دوستان ─────────────────────────────────────────────────────────
-app.get('/api/referrals', auth, asyncHandler(async (req, res) => {
-  res.json(await referrals.summary(req.user.id));
-}));
-
-app.get('/api/league/current', auth, asyncHandler(async (req, res) => {
-  // ── کشِ فهرستِ مشترکِ لیدربورد ──────────────────────────────────
-  // وب این مسیر را هر ۱۲ ثانیه برای هر کاربرِ بازِ صفحه می‌کوبد، و هر
-  // بار یک DENSE_RANK + کوئری برندگانِ دوره قبل اجرا می‌شد. فهرست برای
-  // همهٔ بیننده‌ها یکسان است (رتبهٔ خودِ کاربر تازه می‌ماند)، پس بخشِ
-  // مشترک را ۸ ثانیه کش می‌کنیم؛ با Redis بین همهٔ پروسه‌ها هم‌مقدار
-  // است و بدونش هم در حافظهٔ پروسه. کهنگیِ ۸ ثانیه برای جدولِ زنده
-  // کاملاً نامحسوس است و بارِ این مسیر را >۹۵٪ کم می‌کند.
-  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 100);
-  const seasonKey = String(req.query.seasonId || 'current');
-  const cacheKey = `lb:league:${seasonKey}:${limit}`;
-  const data = await cacheGet(cacheKey)
-    || await (async () => {
-      const fresh = await getLeaderboard(limit, req.query.seasonId || null, null);
-      // قطعاتِ مشترکی که برای همه یکسان‌اند را پیش‌محاسبه و کش می‌کنیم.
-      const cos = await shop.cosmeticsFor(fresh.entries.map(e => e.user_id));
-      const lvl = await level.levelsFor(fresh.entries.map(e => e.user_id));
-      const { rows: prev } = await pool.query(
-        `SELECT h.user_id, h.month_year, h.rank, h.points, h.prize_amount,
-                u.nickname, u.first_name, u.profile_image_url, u.profile_avatar_key
-           FROM user_league_history h
-           JOIN users u ON u.id = h.user_id
-          WHERE h.season_id = (
-                  SELECT id FROM league_seasons
-                   WHERE status='closed' ORDER BY ends_at DESC LIMIT 1)
-            AND h.rank <= 3
-          ORDER BY h.rank`);
-      const payload = {
-        season: fresh.season,
-        activeLeagues: fresh.activeLeagues,
-        previousWinners: fresh.previousWinners,
-        entries: fresh.entries.map(e => ({
-          ...e,
-          cosmetics: cos.get(e.user_id) || null,
-          level: lvl[e.user_id]?.level ?? 0,
-        })),
-        previousSeason: prev.length ? {
-          monthYear: prev[0].month_year,
-          winners: prev.map(p => ({
-            userId: p.user_id, rank: p.rank, points: p.points,
-            prizeAmount: Number(p.prize_amount),
-            nickname: p.nickname || p.first_name || 'کاربر',
-            profileImageUrl: p.profile_image_url,
-            profileAvatarKey: p.profile_avatar_key,
-          })),
-        } : null,
-      };
-      await cacheSet(cacheKey, payload, 60000);
-      return payload;
-    })();
-
-  // رتبهٔ خودِ بیننده همیشه تازه (کوئریِ سبکِ ایندکس‌دار، کش نمی‌شود).
-  const myEntry = req.user?.id
-    ? (await getLeaderboard(limit, req.query.seasonId || null, req.user.id)).myEntry
-    : null;
-
-  res.json({
-    ...data,
-    myEntry,
-  });
-}));
-
-app.get('/api/chat/config', auth, asyncHandler(async (req, res) => {
-  const minLifetimePoints = await getChatMinLifetimePoints();
-  const [cooldown, pinned, emotePacks] = await Promise.all([
-    getChatCooldownSeconds(),
-    getChatPinnedMessage(),
-    shop.emotePacksFor(req.user.id),
-  ]);
-  res.json({
-    minLifetimePoints,
-    messageCooldownSeconds: cooldown,
-    eligible: Number(req.user.lifetime_points || 0) >= minLifetimePoints,
-    userLifetimePoints: req.user.lifetime_points,
-    pinned,
-    emotePacks,
-  });
-}));
 
 async function isAllowedChatMessage(text, userId) {
   if (!text || !String(text).trim()) return false;
@@ -2193,178 +1234,6 @@ function cannedMessages() {
     .slice(0, 60);
 }
 
-app.get('/api/chat/bootstrap', auth, asyncHandler(async (req, res) => {
-  const minLifetimePoints = await getChatMinLifetimePoints();
-  const eligible = Number(req.user.lifetime_points || 0) >= minLifetimePoints;
-  const [cooldownSec, pinned, emotePacks, stickers] = await Promise.all([
-    getChatCooldownSeconds(),
-    getChatPinnedMessage(),
-    shop.emotePacksFor(req.user.id),
-    activeStickers(),
-  ]);
-
-  const config = {
-    minLifetimePoints,
-    messageCooldownSeconds: cooldownSec,
-    eligible,
-    userLifetimePoints: req.user.lifetime_points,
-    pinned,
-    emotePacks,
-  };
-
-  if (!eligible) {
-    return res.json({
-      config,
-      messages: [],
-      stickers,
-      cannedMessages: cannedMessages(),
-    });
-  }
-
-  const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
-      rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
-      s.image_url AS sticker_url, s.title AS sticker_title,
-      (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
-      EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me,
-      (m.user_id=$1) AS is_mine
-    FROM chat_messages m
-    JOIN users u ON u.id=m.user_id
-    LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
-    LEFT JOIN users ru ON ru.id=rm.user_id
-    LEFT JOIN chat_stickers s ON s.id=m.sticker_id
-    WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 60`, [req.user.id]);
-
-  const ids = [...new Set(rows.map(r => r.user_id))];
-  const [cos, lvl] = await Promise.all([
-    shop.cosmeticsFor(ids),
-    level.levelsFor(ids),
-  ]);
-
-  const messages = rows.reverse().map(r => ({
-    ...r,
-    cosmetics: cos.get(r.user_id) || null,
-    level: lvl[r.user_id]?.level ?? 0,
-  }));
-
-  res.json({
-    config,
-    messages,
-    stickers,
-    cannedMessages: cannedMessages(),
-  });
-}));
-
-app.get('/api/chat/canned-messages', asyncHandler(async (req, res) => {
-  res.json(cannedMessages());
-}));
-
-app.get('/api/chat/messages', auth, asyncHandler(async (req, res) => {
-  const minLifetimePoints = await getChatMinLifetimePoints();
-  if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ورود به چت باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`, minLifetimePoints });
-  const { rows } = await pool.query(`SELECT m.*, u.nickname,u.first_name,u.last_name,u.profile_image_url,u.profile_avatar_key,
-      rm.message_text AS reply_text, rm.message_type AS reply_type, ru.nickname AS reply_nickname,
-      s.image_url AS sticker_url, s.title AS sticker_title,
-      (SELECT count(*)::int FROM chat_message_likes l WHERE l.message_id=m.id) AS like_count,
-      EXISTS(SELECT 1 FROM chat_message_likes l WHERE l.message_id=m.id AND l.user_id=$1) AS liked_by_me,
-      (m.user_id=$1) AS is_mine
-    FROM chat_messages m
-    JOIN users u ON u.id=m.user_id
-    LEFT JOIN chat_messages rm ON rm.id=m.reply_to_message_id
-    LEFT JOIN users ru ON ru.id=rm.user_id
-    LEFT JOIN chat_stickers s ON s.id=m.sticker_id
-    WHERE m.is_deleted=false ORDER BY m.sent_at DESC LIMIT 100`, [req.user.id]);
-  // Attach cosmetics so the club badge and name colour render next to each
-  // message. Resolved server-side because an equipped item stops applying the
-  // moment Plus lapses unless the user actually bought it.
-  const ids = [...new Set(rows.map(r => r.user_id))];
-  const [cos, lvl] = await Promise.all([
-    shop.cosmeticsFor(ids),
-    level.levelsFor(ids),
-  ]);
-  res.json(rows.reverse().map(r => ({
-    ...r,
-    cosmetics: cos.get(r.user_id) || null,
-    level: lvl[r.user_id]?.level ?? 0,
-  })));
-}));
-app.post('/api/chat/messages', auth, chatLimiter.mw, asyncHandler(async (req, res) => {
-  const minLifetimePoints = await getChatMinLifetimePoints();
-  if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ارسال پیام باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید` });
-  if (req.user.chat_banned_until && new Date(req.user.chat_banned_until) > new Date()) return res.status(403).json({ message: 'شما موقتاً از چت محروم هستید' });
-  const cd = await ensureChatCooldown(req.user.id);
-  if (cd.remaining > 0) return res.status(429).json({ message: `برای جلوگیری از اسپم، ${cd.remaining} ثانیه دیگر پیام بدهید`, cooldownSeconds: cd.cooldown, remainingSeconds: cd.remaining });
-  const stickerId = req.body.stickerId || req.body.sticker_id || null;
-  const replyTo = req.body.replyTo || req.body.reply_to_message_id || null;
-  const clean = String(req.body.message || req.body.text || '').trim();
-  // استیکر متنِ آزاد ندارد؛ اعتبارش فقط عضویت در فهرستِ فعالِ
-  // chat_stickers است. کولدون و بن و سقف امتیاز همچنان یکسان اعمال می‌شوند.
-  const sticker = stickerId ? await activeStickerById(stickerId) : null;
-  if (stickerId && !sticker) {
-    return res.status(400).json({ message: 'استیکر معتبر نیست' });
-  }
-  const messageType = sticker ? 'sticker' : 'text';
-  // Validate reply target up front instead of letting a bad/deleted id hit
-  // the DB's foreign key constraint, which previously bubbled up as a raw
-  // Postgres error message to the client (see friendlyDbError note above).
-  if (replyTo) {
-    const rm = await pool.query('SELECT id FROM chat_messages WHERE id=$1 AND is_deleted=false', [replyTo]);
-    if (!rm.rows[0]) return res.status(400).json({ message: 'پیام موردنظر برای پاسخ پیدا نشد' });
-  }
-  if (messageType === 'text') {
-    if (!clean) return res.status(400).json({ message: 'متن پیام خالی است' });
-    if (!await isAllowedChatMessage(clean, req.user.id)) {
-      return res.status(400).json({ message: 'فقط پیام‌های آماده و ایموجی‌ها مجاز هستند.' });
-    }
-    await assertNoBadWords(clean);
-  }
-  // CHECK constraint: length(trim(message_text)) BETWEEN 1 AND 1000
-  // برای استیکر متن آزاد نیست — یک placeholder غیرخالی می‌گذاریم
-  // تا constraint نشکند (قبلاً '' باعث crash بک‌اند می‌شد).
-  const storedText = messageType === 'sticker'
-    ? (sticker.title ? String(sticker.title).slice(0, 80) : 'استیکر')
-    : clean.slice(0, 1000);
-  const { rows } = await pool.query(
-    'INSERT INTO chat_messages(user_id,message_text,reply_to_message_id,sticker_id,message_type) VALUES($1,$2,$3,$4,$5) RETURNING *',
-    [req.user.id, storedText, replyTo, sticker ? sticker.id : null, messageType]);
-  // سقفِ ۲۰۰ پیامِ سراسری — هر دو مسیرِ درج (REST و سوکت) باید صدایش
-  // بزنند، وگرنه کاربرِ وب که از REST می‌فرستد از سقف فرار می‌کند.
-  chatRetention.onMessageInserted().catch(() => {});
-  // BUG: the message BROADCAST carried no cosmetics, while GET /api/chat
-  // does. A paying user's club badge and name colour therefore appeared on
-  // every old message but vanished from their own new one until the page was
-  // reloaded — reading as "my badge stopped working".
-  const cosNew = await shop.cosmeticsFor([req.user.id]);
-  const msg = { ...rows[0], nickname: req.user.nickname, first_name: req.user.first_name, last_name: req.user.last_name, profile_image_url: req.user.profile_image_url, profile_avatar_key: req.user.profile_avatar_key, like_count: 0, liked_by_me: false, is_mine: true, cosmetics: cosNew.get(req.user.id) || null };
-  if (sticker) {
-    msg.sticker_url = sticker.image_url;
-    msg.sticker_title = sticker.title;
-  }
-  // `is_mine` مخصوصِ گیرنده است. اگر همین شیء broadcast شود، همهٔ کاربران
-  // پیام را «مالِ خودم» می‌بینند و در سمتِ چپ با رنگِ آبی رندر می‌کنند.
-  // پس نسخهٔ عمومی بدون این پرچم می‌رود و فقط پاسخِ HTTP آن را دارد.
-  const { is_mine: _mine, ...publicMsg } = msg;
-  io.to('chat:public').emit('chat:new', publicMsg);
-  res.json(msg);
-}));
-
-app.post('/api/chat/messages/:id/report', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  await pool.query('UPDATE chat_messages SET is_reported=true, report_count=report_count+1 WHERE id=$1', [req.params.id]);
-  res.json({ message: 'گزارش ثبت شد' });
-}));
-
-app.post('/api/chat/messages/:id/like', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  await pool.query('INSERT INTO chat_message_likes(message_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [req.params.id, req.user.id]);
-  const c = await pool.query('SELECT count(*)::int AS count FROM chat_message_likes WHERE message_id=$1', [req.params.id]);
-  io.to('chat:public').emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
-  res.json({ liked: true, likeCount: c.rows[0].count });
-}));
-app.delete('/api/chat/messages/:id/like', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM chat_message_likes WHERE message_id=$1 AND user_id=$2', [req.params.id, req.user.id]);
-  const c = await pool.query('SELECT count(*)::int AS count FROM chat_message_likes WHERE message_id=$1', [req.params.id]);
-  io.to('chat:public').emit('chat:liked', { messageId: req.params.id, likeCount: c.rows[0].count });
-  res.json({ liked: false, likeCount: c.rows[0].count });
-}));
-
 // ── Support tickets ───────────────────────────────────────────────────────
 // Rules:
 //   * one OPEN ticket at a time, and at most one NEW ticket per calendar day
@@ -2422,18 +1291,6 @@ const uploadLimiter = rateLimit({
   message: { message: 'تعداد آپلود زیاد است؛ کمی بعد دوباره تلاش کنید' },
 });
 
-app.post('/api/support/uploads/image', auth, uploadLimiter, imageUpload.single('image'), asyncHandler(async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: 'فقط فایل تصویری (PNG/JPG/WEBP/GIF) مجاز است' });
-  // محتوای واقعیِ فایل راستی‌آزمایی شود، نه فقط اعلامِ فرستنده — چراییِ کامل
-  // روی خودِ verifyUpload در imageService نوشته شده است. خطایش status:400
-  // دارد و از همان error handlerِ عمومی پاسِ درست می‌گیرد.
-  await verifyUpload(req.file);
-  // Phone photos are multi-megabyte; shrink before anyone has to download it.
-  const r = await optimizeUpload(req.file);
-  logger.info(`[upload] support ${kb(r.bytesBefore)} -> ${kb(r.bytesAfter)}`);
-  res.json({ url: `/uploads/images/${r.filename}`, bytes: r.bytesAfter });
-}));
-
 // Tells the client whether the "new ticket" form should be enabled, and why
 // not — so the app can explain the rule instead of just failing on submit.
 async function ticketQuota(userId) {
@@ -2471,69 +1328,64 @@ async function ticketQuota(userId) {
   return { canCreate: true, reason: null, message: null, openTicket: null };
 }
 
-app.get('/api/support/quota', auth, asyncHandler(async (req, res) => {
-  res.json({ ...(await ticketQuota(req.user.id)), maxAttachments: ticketMaxAttachments() });
+// ── مسیرهای کاربری — ماژول‌های routes/ (بیرون آمده از این فایل؛ بندِ ۱ نقشهٔ
+// راه، مهر ۱۴۰۵). mount عمداً این‌جاست: بعدِ همهٔ کمک‌تابع‌ها و محدودکننده‌ها
+// تا هیچ وابستگیِ const در TDZ نباشد؛ مسیرها با هم تداخل ندارند و ترتیبِ
+// ثبت بینِ گروه‌ها معنایی تغییر نمی‌دهد.
+app.use('/api', require('./routes/games')({
+  pool, auth, asyncHandler, referrals,
+  leagueCountdown, tapGame, addLeaguePoints, coinLedger,
+  coins, leaderboardSignal, pass, points,
+  tapBatchLimiter, cacheGet, cacheSet, cardDuel,
+  cardDuelLimiter,
 }));
-
-app.post('/api/support/tickets', auth, asyncHandler(async (req, res) => {
-  const { subject, message } = req.body;
-  const attachments = sanitizeAttachments(req.body.attachments);
-  if (!String(subject || '').trim()) return res.status(400).json({ message: 'موضوع تیکت را وارد کنید' });
-  if (!String(message || '').trim() && !attachments.length) {
-    return res.status(400).json({ message: 'متن پیام یا حداقل یک عکس لازم است' });
-  }
-  const quota = await ticketQuota(req.user.id);
-  if (!quota.canCreate) return res.status(429).json({ ...quota });
-
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const ticket = await client.query('INSERT INTO support_tickets(user_id,subject) VALUES($1,$2) RETURNING *', [req.user.id, String(subject).trim().slice(0, 180)]);
-    await client.query(
-      "INSERT INTO support_ticket_messages(ticket_id,sender_type,sender_user_id,message_text,attachments) VALUES($1,'user',$2,$3,$4)",
-      [ticket.rows[0].id, req.user.id, String(message || '').trim(), JSON.stringify(attachments)]
-    );
-    await client.query('COMMIT');
-    res.json(ticket.rows[0]);
-  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+app.use('/api', require('./routes/profile')({
+  pool, auth, asyncHandler, validateUuid,
+  boundedText, safeUser, safeAvatarKey, safeImageUrl,
+  isValidPasswordLength, cardDuel, shop, coins,
+  gameEconomy, getGameRewardSettings, grants, level,
+  loginStreak, pass, wheel, clubs,
+  fieldCrypto, nicknamePolicy, bcrypt, changePasswordLimiter,
+  signUser, points, rewardGroups,
 }));
-
-app.get('/api/support/tickets', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM support_tickets WHERE user_id=$1 ORDER BY updated_at DESC', [req.user.id]);
-  res.json(rows);
+app.use('/api', require('./routes/rewardsUser')({
+  pool, auth, asyncHandler, validateUuid,
+  rewardGroups,
 }));
-
-app.get('/api/support/tickets/:id/messages', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT m.* FROM support_ticket_messages m JOIN support_tickets t ON t.id=m.ticket_id WHERE t.id=$1 AND t.user_id=$2 ORDER BY m.created_at', [req.params.id, req.user.id]);
-  res.json(rows);
+app.use('/api', require('./routes/commerce')({
+  auth, asyncHandler, validateUuid, shop,
+  shopLimiter, cardBox, grants, clubs,
 }));
-
-app.post('/api/support/tickets/:id/messages', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  const attachments = sanitizeAttachments(req.body.attachments);
-  const text = String(req.body.message || '').trim();
-  if (!text && !attachments.length) return res.status(400).json({ message: 'متن پیام یا حداقل یک عکس لازم است' });
-
-  // A closed ticket is final: replying would silently reopen a conversation
-  // support considers finished (and would bypass the one-ticket-a-day rule).
-  const t = await pool.query('SELECT status FROM support_tickets WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
-  if (!t.rows[0]) return res.status(404).json({ message: 'تیکت پیدا نشد' });
-  if (t.rows[0].status === 'closed') {
-    return res.status(409).json({ message: 'این تیکت بسته شده است. در صورت نیاز تیکت جدیدی ثبت کنید.' });
-  }
-
-  await pool.query(
-    "INSERT INTO support_ticket_messages(ticket_id,sender_type,sender_user_id,message_text,attachments) VALUES($1,'user',$2,$3,$4)",
-    [req.params.id, req.user.id, text, JSON.stringify(attachments)]
-  );
-  await pool.query("UPDATE support_tickets SET status='open', updated_at=NOW() WHERE id=$1 AND user_id=$2", [req.params.id, req.user.id]);
-  res.json({ message: 'پیام ارسال شد' });
+app.use('/api', require('./routes/wallet')({
+  auth, asyncHandler, validateUuid, walletService,
+  bankCardLimiter, withdrawalService, withdrawalLimiter,
 }));
-
-app.get('/api/notifications', auth, asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM notifications WHERE user_id=$1 OR user_id IS NULL ORDER BY created_at DESC LIMIT 100', [req.user.id]); res.json(rows);
+app.use('/api', require('./routes/wheel')({
+  pool, auth, asyncHandler, createNotification,
+  wheel, addLeaguePoints, leaderboardSignal, pass,
+  points, walletService, wheelLimiter,
 }));
-app.patch('/api/notifications/:id/read', auth, validateUuid('id'), asyncHandler(async (req, res) => {
-  await pool.query('UPDATE notifications SET is_read=true WHERE id=$1 AND (user_id=$2 OR user_id IS NULL)', [req.params.id, req.user.id]); res.json({ message: 'خوانده شد' });
+app.use('/api', require('./routes/progression')({
+  pool, auth, asyncHandler, referrals,
+  pass, loginStreak, loginStreakLimiter, UUID_RE,
+  cacheGet, cacheSet, getLeaderboard, level,
+  points, shop,
+}));
+app.use('/api', require('./routes/chat')({
+  pool, auth, asyncHandler, validateUuid,
+  io, ensureChatCooldown, assertNoBadWords, getChatPinnedMessage,
+  getChatCooldownSeconds, getChatMinLifetimePoints, shop, activeStickers,
+  cannedMessages, level, activeStickerById, chatLimiter,
+  chatRetention, isAllowedChatMessage,
+}));
+app.use('/api', require('./routes/support')({
+  pool, logger, auth, asyncHandler,
+  validateUuid, kb, imageUpload, optimizeUpload,
+  uploadLimiter, verifyUpload, ticketMaxAttachments, ticketQuota,
+  sanitizeAttachments,
+}));
+app.use('/api', require('./routes/notifications')({
+  pool, auth, asyncHandler, validateUuid,
 }));
 
 // ورودِ مدیر — ماژولِ routes/adminAuth.js (بیرون آمده از این فایل؛ بندِ ۱ ممیزی ۸ مهر).

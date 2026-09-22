@@ -29,7 +29,9 @@ const routes   = R('src/routes/payments.js');
 const walletSvc= R('src/services/walletService.js');
 const shopSvc  = R('src/services/shopService.js');
 const referral = R('src/services/referralService.js');
-const server   = R('src/server.js');
+// ماژولار شدنِ server.js (مهر ۱۴۰۵): این مسیرها به routes/ منتقل شدند؛
+// هر دو پرونده خوانده می‌شوند تا بررسی نسبت به جابه‌جاییِ ماژول‌ها کور نماند.
+const server   = R('src/server.js') + R('src/routes/commerce.js') + R('src/routes/games.js');
 const mig067   = R('migrations/067_payment_orders.sql');
 const mig068   = R('migrations/068_direct_purchase.sql');
 
@@ -98,9 +100,9 @@ ok('verifyAndDeliver مبلغ را از سفارشِ ذخیره‌شده می‌
 // مبلغِ برداشت را کاربر تعیین می‌کند و درست است؛ فقط مسیرهای *خرید*
 // نباید قیمت را از کلاینت بگیرند.
 const buyRoutes = (server.match(
-  /app\.post\('\/api\/(?:shop\/items\/:id\/buy|shop\/plus|purchase\/verify)'[\s\S]*?\n\}\)\);/g
+  /router\.post\('\/(?:shop\/items\/:id\/buy|shop\/plus|purchase\/verify)'[\s\S]*?\n\}\)\);/g
 ) || []).join('\n');
-ok('هر سه مسیر خرید پیدا شدند', (buyRoutes.match(/app\.post/g) || []).length === 3);
+ok('هر سه مسیر خرید پیدا شدند', (buyRoutes.match(/router\.post/g) || []).length === 3);
 ok('هیچ مبلغی در مسیرهای خرید از req.body خوانده نمی‌شود',
   !/req\.body[^\n]*\b(amount|price|مبلغ)\b/.test(buyRoutes));
 ok('نوع خرید از سفارش خوانده می‌شود نه از بدنهٔ درخواست',
@@ -213,10 +215,10 @@ for (const r of ['/purchase/catalog', '/purchase/history']) {
     new RegExp(`'${r.replace(/\//g, '\\/')}',\\s*auth`).test(routes));
 }
 ok('/api/purchase/verify احراز هویت و محدودکنندهٔ نرخ دارد',
-  /'\/api\/purchase\/verify', auth, shopLimiter/.test(server));
+  /'\/purchase\/verify', auth, shopLimiter/.test(server));
 ok('روت‌های خرید محدودکنندهٔ نرخ دارند',
-  /'\/api\/shop\/items\/:id\/buy', auth, validateUuid\('id'\), shopLimiter/.test(server)
-  && /'\/api\/shop\/plus', auth, shopLimiter/.test(server));
+  /'\/shop\/items\/:id\/buy', auth, validateUuid\('id'\), shopLimiter/.test(server)
+  && /'\/shop\/plus', auth, shopLimiter/.test(server));
 
 console.log(`\n${fail ? '✗' : '✓'} ${pass} تست موفق، ${fail} ناموفق`);
 process.exit(fail ? 1 : 0);

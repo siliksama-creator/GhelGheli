@@ -151,7 +151,8 @@ console.log('\n══ ۲) معیارِ بستن: «هرچه سکه می‌دهد
   ok('سکه فقط از تسویهٔ سهم می‌آید (پس بستنِ مسیرهای سهم = بستنِ سکه)',
     /coins\.awardCoins/.test(stakeSvc) && /coin_reward_win/.test(stakeSvc));
 
-  const server = stripComments(read('backend/src/server.js'));
+  const server = stripComments(read('backend/src/server.js'))
+    + stripComments(read('backend/src/routes/games.js'));
   ok('ضربه‌زن (منبعِ سکه) هم بسته است و کدِ ماشینی می‌دهد',
     /gate\.blocks\.tap/.test(server) && /code: 'league_countdown'/.test(server));
   ok('و ۴۲۳ (Locked) برمی‌گرداند، نه ۴۰۳ — کلاینت باید «بسته است» را از «اجازه نداری» جدا کند',
