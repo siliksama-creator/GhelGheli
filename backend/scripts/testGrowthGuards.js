@@ -38,13 +38,19 @@ ok(/if \(resolvedWinner === symbol\) \{\s*growth\.missions\.record\(player\.id, 
 ok(!/growth\.missions\.record\(player\.id, 'match_completed'\)\.catch\(\(\) => \{\}\);\s*if \(!room\.vsBot && resolvedWinner === symbol\)/.test(engine),
   'الگوی بی‌شرطِ قدیمیِ match_completed برنگشته است');
 
-console.log('\n== ۲. ضربه‌زن: فقط ماموریتِ scoped به ربات ==');
+console.log('\n== ۲. ریمچ: ماموریتِ «همان حریف» فقط با کاربرِ واقعی ==');
+ok(/if \(!contract\.vsBot\) \{\s*growth\.missions\.record\(player\.id, 'rematch'\)/.test(engine),
+  'ریمچ با ربات ماموریتِ rematch را پر نمی‌کند');
+ok(!/^\s{6}growth\.missions\.record\(player\.id, 'rematch'\)/m.test(engine),
+  'الگوی بی‌شرطِ قدیمیِ ریمچ برنگشته است');
+
+console.log('\n== ۳. ضربه‌زن: فقط ماموریتِ scoped به ربات ==');
 ok(/if \(lvlUp > 0\) \{[\s\S]{0,600}'bot_match'/.test(server),
   'لولِ تمام‌شدهٔ ضربه‌زن bot_match منتشر می‌کند');
 ok(!/record\(req\.user\.id, 'match_completed'\)/.test(server),
   'ضربه‌زن هرگز match_completed منتشر نمی‌کند');
 
-console.log('\n== ۳. XP لول: فقط بازی آنلاین ==');
+console.log('\n== ۴. XP لول: فقط بازی آنلاین ==');
 // تصمیمِ مستندِ محصول (scripts/testLevel.js، دورهای قبل): XP لول و گذرِ
 // نبرد فقط از مسابقهٔ آنلاینِ ورودی‌دار می‌آید — رایگان و ربات صفر.
 // خواستهٔ ۳۱ شهریور مالک («با ربات نباید بالا بره») با همین شکل برقرار
@@ -61,7 +67,7 @@ ok(/pass\.grantXp\(info\.id, 'game_play'\)/.test(engine),
 ok(/مجموع exp دریافتی از همه بازی های آنلاین/.test(levelSvc),
   'levelService خودش را «فقط بازی آنلاین» تعریف می‌کند');
 
-console.log('\n== ۴. رویدادِ جدید در پنل ادمین قابلِ انتخاب است ==');
+console.log('\n== ۵. رویدادِ جدید در پنل ادمین قابلِ انتخاب است ==');
 ok(/const EVENTS = \[[^\]]*'bot_match'[^\]]*\]/.test(adminMissions),
   'bot_match در EVENTS پنل ادمین هست');
 

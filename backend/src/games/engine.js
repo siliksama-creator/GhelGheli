@@ -1092,7 +1092,16 @@ async function requestRematch(io, socket, roomId) {
         platform: 'server', gameId: contract.gameId, matchId: started.id,
         metadata: { previousMatchId: contract.roomId, stake: contract.stake },
       }).catch(() => {});
-      growth.missions.record(player.id, 'rematch').catch(() => {});
+      // ── قانونِ دامنهٔ ماموریت، بخشِ ریمچ (خواستهٔ مالک، ۳۱ شهریور) ──
+      // ماموریت‌های ریمچ («فرصت جبران»، «رقابت ادامه‌دار»، …) می‌گویند
+      // «مسابقهٔ دوباره با همان **حریف**» — حریف یعنی کاربرِ واقعی.
+      // پیش‌تر این رویداد بی‌شرط ثبت می‌شد و ریمچ با ربات هم آن‌ها را
+      // پر می‌کرد (در دیتابیسِ زنده هم مشاهده شد: daily_rematch/
+      // weekly_rematch دقیقاً بعد از ریمچِ ربات جلو رفتند). آنالیتیکسِ
+      // ریمچ ولی بی‌شرط می‌ماند — دادهٔ خام است و پاداشی به آن وصل نیست.
+      if (!contract.vsBot) {
+        growth.missions.record(player.id, 'rematch').catch(() => {});
+      }
     }
   }
   return started;
