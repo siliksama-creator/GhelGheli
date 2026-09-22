@@ -55,6 +55,9 @@ const Referral = lazy(() => import('./screens/Referral.jsx'));
 const Pass = lazy(() => import('./screens/Pass.jsx'));
 const GamesHub = lazy(() => import('./games.jsx'));
 const GrowthHub = lazy(() => import('./GrowthHub.jsx'));
+// پرسشِ اعلانِ وب — فقط برای کاربرِ لاگین‌کرده، یک‌بار (کدِ تنبل تا
+// به باندلِ اصلیِ ورود اضافه نشود؛ خودش هم بی‌صدا شرط‌ها را چک می‌کند).
+const WebPushPrompt = lazy(() => import('./components/WebPushPrompt.jsx'));
 const Support = lazy(() => import('./support.jsx'));
 const Wallet = lazy(() => import('./wallet.jsx'));
 // برنامه‌های پیشنهادی — صفحهٔ مستقل، از «بیشتر» باز می‌شود (خواستهٔ مالک).
@@ -1132,6 +1135,14 @@ function Club({ token, openProfile, meId, openGames = false, launchGame = null, 
         setExternalLaunch({ socket, start, nonce: Date.now() });
         setSub('games');
       }} />}
+      {/* اعلانِ وب: وقتی توکن هست یعنی کاربر لاگین است — همان «اولین
+          ورود» که مالک خواست پرسشِ اجازه نمایش داده شود. مهمان هرگز
+          پرسش نمی‌بیند (بدونِ توکن، رندر نمی‌شود). */}
+      {token ? (
+        <Suspense fallback={null}>
+          <WebPushPrompt token={token} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

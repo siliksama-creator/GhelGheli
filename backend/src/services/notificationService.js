@@ -71,8 +71,20 @@ async function createNotification(userId, type, title, body, opts = {}) {
     [userId || null, type, cleanTitle, cleanBody]
   );
   if (opts.push === false) return rows[0];
-  if (userId) await sendPushToUser(userId, cleanTitle, cleanBody, { type });
-  else await sendPushToAll(cleanTitle, cleanBody, { type });
+  // لایهٔ موبایل (FCM) و لایهٔ وب (Web Push) موازی فرستاده می‌شوند؛
+  // هیچ‌کدام نباید دیگری را بلوک یا خراب کند (allSettled — خطای هر کدام
+  // در تابعِ خودش فقط warn می‌شود).
+  if (userId) {
+    await Promise.allSettled([
+      sendPushToUser(userId, cleanTitle, cleanBody, { type }),
+      sendWebPushToUser(userId, cleanTitle, cleanBody, { type }),
+    ]);
+  } else {
+    await Promise.allSettled([
+      sendPushToAll(cleanTitle, cleanBody, { type }),
+      sendWebPushToAll(cleanTitle, cleanBody, { type }),
+    ]);
+  }
   return rows[0];
 }
 
@@ -280,6 +292,11 @@ async function sendSegmented({ segment, title, body }) {
     totals.transportErrors += r.transportErrors || 0;
     if (r.configured === false) totals.configured = false;
   });
+  // لایهٔ وبِ سگمنت هم موازیِ موبایل — پیامِ گروهیِ ادمین نباید
+  // فقط-موبایل باشد. شکستِ این لایه کلِ عملیات را شکست نمی‌دهد.
+  const webSeg = await sendWebPushSegment(segment, cleanTitle, cleanBody, { type: 'segmented', segment })
+    .catch(() => ({ sent: 0, failed: 0 }));
+
   return {
     segment,
     targetCount,
@@ -287,11 +304,180 @@ async function sendSegmented({ segment, title, body }) {
     pushFailed: totals.failed,
     pushTransportErrors: totals.transportErrors,
     fcmConfigured: totals.configured,
+    webPushSent: webSeg.sent || 0,
+    webPushFailed: webSeg.failed || 0,
   };
+}
+
+// ── Web Push (اعلانِ مرورگر — VAPID) — ۲۰۲۶-۰۹-۲۲ ──────────────────────
+// همان اعلان‌هایی که با FCM به گوشی می‌رود، برای کاربرهای وب هم برود
+// (خواستهٔ مالک). اشتراک‌ها در جدولِ web_push_subscriptions (مهاجرتِ ۰۹۵)
+// و ارسال با پکیجِ `webpush` + کلیدهای VAPID از .env است. اگر کلیدها
+// تنظیم نباشند این لایه **بی‌صدا غیرفعال** است (configured:false) و
+// لایهٔ موبایل مثل قبل کار می‌کند — پس نبودِ کلید هرگز اعلانِ واقعی را
+// نمی‌شکند. خطاهای ارسال هم فقط warn می‌شوند: پای وب نباید پای موبایل
+// را بلوک یا خراب کند.
+let webpushLib = null;
+let webpushTried = false;
+function getWebpush() {
+  if (webpushLib) return webpushLib;
+  if (webpushTried) return null;
+  webpushTried = true;
+  const pub = process.env.VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  if (!pub || !priv) return null;
+  try {
+    const wp = require('web-push');
+    wp.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@ghelghelishop.com', pub, priv);
+    webpushLib = wp;
+    return wp;
+  } catch (e) {
+    console.warn('[webpush] disabled:', e.message);
+    return null;
+  }
+}
+
+function webPushPublicKey() {
+  return getWebpush() ? process.env.VAPID_PUBLIC_KEY : null;
+}
+
+const MAX_SUBS_PER_USER = 12;
+
+async function subscribeWebPush(userId, sub) {
+  const endpoint = String(sub?.endpoint || '').trim();
+  const p256dh = String(sub?.keys?.p256dh || '').trim();
+  const authKey = String(sub?.keys?.auth || '').trim();
+  if (!/^https:\/\//.test(endpoint) || endpoint.length > 1200 || !p256dh || !authKey) {
+    throw Object.assign(new Error('اشتراکِ نامعتبر'), { status: 400 });
+  }
+  await pool.query(
+    `INSERT INTO web_push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
+     VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (endpoint) DO UPDATE
+       SET user_id=EXCLUDED.user_id, p256dh=EXCLUDED.p256dh,
+           auth=EXCLUDED.auth, user_agent=EXCLUDED.user_agent`,
+    [userId, endpoint, p256dh, authKey, String(sub?.userAgent || '').slice(0, 300) || null]);
+  // سقفِ هر کاربر: مرورگر/دستگاهِ کهنه که دیگر استفاده نمی‌شود، به‌مرور
+  // جمع می‌شود تا ارسال‌ها بیهوده سنگین نشوند (قدیمی‌ترین‌ها حذف).
+  await pool.query(
+    `DELETE FROM web_push_subscriptions
+      WHERE user_id=$1
+        AND id NOT IN (SELECT id FROM web_push_subscriptions
+                        WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2)`,
+    [userId, MAX_SUBS_PER_USER]);
+  return { ok: true };
+}
+
+async function unsubscribeWebPush(userId, endpoint) {
+  const { rowCount } = await pool.query(
+    'DELETE FROM web_push_subscriptions WHERE user_id=$1 AND endpoint=$2',
+    [userId, String(endpoint || '')]);
+  return { ok: true, removed: rowCount };
+}
+
+function webPushPayload(title, body, data) {
+  return JSON.stringify({
+    title,
+    body,
+    url: '/',
+    data: Object.fromEntries(Object.entries(data || {}).map(([k, v]) => [k, String(v)])),
+  });
+}
+
+async function sendToSubs(rows, title, body, data) {
+  const wp = getWebpush();
+  if (!wp || !rows.length) return { sent: 0, failed: 0 };
+  const payload = webPushPayload(title, body, data);
+  const results = await Promise.allSettled(rows.map((s) => wp.sendNotification(
+    { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)));
+  const dead = [];
+  let sent = 0; let failed = 0;
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') { sent += 1; return; }
+    failed += 1;
+    const code = r.reason?.statusCode;
+    // ۴۰۴/۴۱۰ از سرویسِ پوش = اشتراکِ مرده؛ پاکش کن تا دوباره تلاش نشود
+    // (همان قاعدهٔ clearInvalidTokens در FCM).
+    if (code === 404 || code === 410) dead.push(rows[i].endpoint);
+  });
+  if (dead.length) {
+    await pool.query('DELETE FROM web_push_subscriptions WHERE endpoint = ANY($1::text[])', [dead])
+      .catch((e) => console.warn('[webpush] stale cleanup failed:', e.message));
+  }
+  return { sent, failed };
+}
+
+async function sendWebPushToUser(userId, title, body, data = {}) {
+  if (!getWebpush()) return { sent: 0, failed: 0, configured: false };
+  try {
+    const { rows } = await pool.query(
+      'SELECT endpoint, p256dh, auth FROM web_push_subscriptions WHERE user_id=$1',
+      [userId]);
+    const r = await sendToSubs(rows, title, body, data);
+    return { ...r, configured: true };
+  } catch (e) {
+    console.warn('[webpush] user send failed:', e.message);
+    return { sent: 0, failed: 1, configured: true };
+  }
+}
+
+// صفحه‌بندیِ keyset روی اشتراک‌ها — همان الگوی forEachUserPage ولی با
+// مکان‌نما روی s.id (uuid) تا broadcastهای بزرگ حافظه نگیرند.
+async function forEachSubPage(baseSql, onPage) {
+  let cursor = null;
+  for (;;) {
+    const params = [PUSH_PAGE_SIZE];
+    let where = '';
+    if (cursor) { params.push(cursor); where = ` AND s.id > $${params.length}`; }
+    const { rows } = await pool.query(`${baseSql}${where} ORDER BY s.id LIMIT $1`, params);
+    if (!rows.length) break;
+    await onPage(rows);
+    if (rows.length < PUSH_PAGE_SIZE) break;
+    cursor = rows[rows.length - 1].id;
+  }
+}
+
+const WEB_SUBS_BASE = `SELECT s.id, s.endpoint, s.p256dh, s.auth
+                         FROM web_push_subscriptions s
+                         JOIN users u ON u.id = s.user_id AND u.status='active'
+                        WHERE true`;
+
+async function sendWebPushToAll(title, body, data = {}) {
+  if (!getWebpush()) return { sent: 0, failed: 0, configured: false };
+  const totals = { sent: 0, failed: 0 };
+  try {
+    await forEachSubPage(WEB_SUBS_BASE, async (rows) => {
+      const r = await sendToSubs(rows, title, body, data);
+      totals.sent += r.sent; totals.failed += r.failed;
+    });
+  } catch (e) { console.warn('[webpush] broadcast failed:', e.message); }
+  return { ...totals, configured: true };
+}
+
+async function sendWebPushSegment(segment, title, body, data = {}) {
+  if (!getWebpush()) return { sent: 0, failed: 0, configured: false };
+  const base = `SELECT s.id, s.endpoint, s.p256dh, s.auth
+                  FROM web_push_subscriptions s
+                  JOIN (${segmentSql(segment)}) sel ON sel.id = s.user_id
+                 WHERE true`;
+  const totals = { sent: 0, failed: 0 };
+  try {
+    await forEachSubPage(base, async (rows) => {
+      const r = await sendToSubs(rows, title, body, data);
+      totals.sent += r.sent; totals.failed += r.failed;
+    });
+  } catch (e) { console.warn('[webpush] segment failed:', e.message); }
+  return { ...totals, configured: true };
 }
 
 module.exports = {
   createNotification,
+  subscribeWebPush,
+  unsubscribeWebPush,
+  sendWebPushToUser,
+  sendWebPushToAll,
+  sendWebPushSegment,
+  webPushPublicKey,
   sendPushToUser,
   sendPushToAll,
   sendSegmented,

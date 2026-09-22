@@ -61,3 +61,47 @@ self.addEventListener('fetch', (event) => {
     return response;
   })());
 });
+
+
+// ── Web Push (۲۰۲۶-۰۹-۲۲) — همان اعلان‌های اپِ موبایل روی مرورگر ──────
+// پیلودِ سمتِ سرور (notificationService.sendToSubs):
+//   { title, body, url, data: { type, ... } }
+// این هندلرها به سرویس‌ورکرِ موجود اضافه شده‌اند چون دامنه/اسکوپِ همین
+// یکی SW کلِ سایت را پوشش می‌دهد؛ SW دومی در همان اسکوپ ممکن نیست.
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { title: 'قلقلی', body: event.data ? event.data.text() : '' };
+  }
+  const title = payload.title || 'قلقلی';
+  const options = {
+    body: payload.body || '',
+    icon: '/favicon.png',
+    badge: '/favicon.png',
+    lang: 'fa',
+    data: { url: payload.url || '/' },
+    // اعلان‌های هم‌نوع همدیگر را به‌روز می‌کنند (صف نمی‌شوند) و نوع‌های
+    // متفاوت جدا می‌مانند — همان حسِ اپِ موبایل.
+    tag: (payload.data && payload.data.type) ? `gg-${payload.data.type}` : 'gg-push',
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if ('focus' in client) {
+          try { client.navigate(url); } catch { /* مرورگرِ قدیمی */ }
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+      return undefined;
+    }),
+  );
+});

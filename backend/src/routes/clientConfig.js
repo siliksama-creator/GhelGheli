@@ -10,6 +10,7 @@
  */
 const express = require('express');
 const featureFlags = require('../services/featureFlags');
+const notificationService = require('../services/notificationService');
 
 // شناسه‌های مجازِ تب‌ها — یک قراردادِ مشترک بین وب و اندروید. هر کلاینت
 // تب‌های خودش را با همین idها نگاشت می‌کند و ترتیبِ ارسالیِ سرور را
@@ -277,6 +278,10 @@ module.exports = function createClientConfigRoutes(deps) {
     };
     res.json({
       smsEnabled,
+      // کلیدِ عمومیِ Web Push — مرورگر برای pushManager.subscribe به آن
+      // نیاز دارد. null وقتی VAPID در .env تنظیم نباشد → فرانت پرسشِ
+      // فعال‌سازی را نشان نمی‌دهد (rollout بی‌خطر).
+      webPush: { vapidPublicKey: notificationService.webPushPublicKey() },
       ...cfg,
       app,
       wallet: { enabled: wallet.enabled !== false },

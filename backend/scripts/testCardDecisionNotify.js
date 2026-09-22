@@ -164,9 +164,16 @@ behavior()
       // قراردادِ لایهٔ اعلان: دروازهٔ `push:false` باید **پیش از** ارسال باشد.
       const svc = stripComments(read('src', 'services', 'notificationService.js'));
       const guardAt = svc.indexOf('opts.push === false');
-      const pushAt = svc.indexOf('await sendPushToUser(');
+      // از ۲۰۲۶-۰۹-۲۲ ارسال دو لایهٔ موازی است (FCM موبایل + Web Push
+      // مرورگر، هر دو در Promise.allSettled)؛ پین روی خودِ فراخوانی‌هاست
+      // و قراردادِ اصلی — تقدمِ دروازهٔ push:false بر هر دو ارسال —
+      // دست‌نخورده می‌ماند.
+      const pushAt = svc.indexOf('sendPushToUser(userId');
+      const webPushAt = svc.indexOf('sendWebPushToUser(userId');
       ok(guardAt !== -1 && pushAt !== -1 && guardAt < pushAt,
         'createNotification پیش از فرستادنِ پوش، درخواستِ «بدونِ پوش» را می‌پذیرد');
+      ok(webPushAt !== -1 && guardAt < webPushAt,
+        'دروازهٔ «بدونِ پوش» پیش از لایهٔ وب هم هست');
 
       // اعلان در مسیرِ صف باید *بعد* از COMMIT باشد (وگرنه ممکن است
       // تراکنش برگردد و کاربر برای کارتی که ثبت نشده پیام بگیرد).

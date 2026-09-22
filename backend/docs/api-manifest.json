@@ -1003,6 +1003,16 @@
    "source": "routes/notifications.js"
   },
   {
+   "method": "POST",
+   "path": "/api/notifications/web-push/subscribe",
+   "source": "routes/notifications.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/notifications/web-push/unsubscribe",
+   "source": "routes/notifications.js"
+  },
+  {
    "method": "PATCH",
    "path": "/api/notifications/:id/read",
    "source": "routes/notifications.js"

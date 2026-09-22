@@ -59,6 +59,7 @@
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.8.3",
     "swagger-ui-express": "^5.0.1",
+    "web-push": "^3.6.7",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
