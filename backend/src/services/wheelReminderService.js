@@ -64,7 +64,8 @@ function withinQuietHours(now = new Date()) {
  *
  * فقط به کاربرانی می‌رود که:
  *   • حساب فعال دارند،
- *   • توکن پوش دارند (وگرنه اعلان درون‌برنامه‌ای انباشته می‌شود),
+ *   • توکن پوشِ موبایل یا اشتراکِ نوتیفیکیشنِ وب دارند (وگرنه اعلان
+ *     درون‌برنامه‌ای انباشته می‌شود),
  *   • **امروز اصلاً نچرخانده‌اند** — کسی که چرخانده نباید پیام بگیرد،
  *   • در ۳۰ روز گذشته فعال بوده‌اند؛ کاربر رهاکرده را با اعلان
  *     نمی‌شود برگرداند، فقط آزارش می‌دهد.
@@ -80,7 +81,14 @@ async function sendDailyReminder({ force = false } = {}) {
     `SELECT u.id
        FROM users u
       WHERE u.status = 'active'
-        AND u.fcm_token IS NOT NULL
+        -- سهمِ وب (۲۰۲۶-۰۹-۲۲): کاربرِ فقط-مرورگری که اشتراکِ
+        -- نوتیفیکیشنِ وب دارد هم پوش می‌گیرد؛ وگرنه یادآورِ چرخش
+        -- فقط به گوشی‌ها می‌رفت و وب با وجودِ فعال‌بودنِ اعلان‌ها
+        -- سهمی نداشت.
+        AND (u.fcm_token IS NOT NULL OR EXISTS (
+              SELECT 1 FROM web_push_subscriptions w
+               WHERE w.user_id = u.id
+            ))
         AND u.updated_at > NOW() - INTERVAL '30 days'
         AND NOT EXISTS (
               -- spun_day همان روزِ تهران است که wheelService موقع ثبت
