@@ -156,7 +156,9 @@ module.exports = function zarinpalRoutes({
     }));
 
   // ── تنظیمِ زنده از پنل ادمین ─────────────────────────────────────────
-  router.get('/admin/payments/zarinpal', adminAuth, asyncHandler(async (req, res) => {
+  // خواندنِ وضعیت برای پشتیبان مجاز است؛ ناظر نباید مرچنت‌کد/آمار
+  // پرداخت را ببیند. تغییرات همچنان فقط requireRole() یعنی super_admin است.
+  router.get('/admin/payments/zarinpal', adminAuth, requireRole('support'), asyncHandler(async (req, res) => {
     const s = await zp.readSettings();
     const { rows } = await pool.query(
       `SELECT status, count(*) FROM payment_orders WHERE provider='zarinpal' GROUP BY status`);
