@@ -103,7 +103,9 @@ ok(/deckInsights: activeInsights/.test(service) && /suggestedDeck: suggestedDeck
   'وضعیت دوئل تحلیل بالانس و ترکیب پیشنهادی را برمی‌گرداند');
 ok(/recommendedLeadReason/.test(service) && /recommendedOrder/.test(service),
   'تحلیل دوئل اوپنر و ترتیب پیشنهادی راندها را هم می‌دهد');
-ok(/\/api\/admin\/card-duel\/balance/.test(server) && /balanceSnapshot/.test(service),
+// مسیر از server.js به routes/adminDashboard.js منتقل شد (بندِ ۱ ممیزی ۸ مهر)
+ok(/\/admin\/card-duel\/balance/.test(read('backend/src/routes/adminDashboard.js'))
+  && /balanceSnapshot/.test(service),
   'اسنپ‌شات بالانس برای تنظیم حرفه‌ای دوئل وجود دارد');
 ok(/league: false/.test(read('backend/src/services/gameStakeService.js')),
   'تسویه مسابقه رتبه لیگ را دستکاری نمی‌کند');

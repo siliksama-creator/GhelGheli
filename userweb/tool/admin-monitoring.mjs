@@ -29,6 +29,8 @@ function strip(src) {
 const read = p => strip(fs.readFileSync(path.join(root, p), 'utf8'));
 
 const server = read('backend/src/server.js');
+// سنجه‌ها/لاگِ pm2 از server.js به ماژولِ داشبورد منتقل شدند (بندِ ۱ ممیزی ۸ مهر)
+const backend = server + '\n' + read('backend/src/routes/adminDashboard.js');
 const admin = read('admin/src/pages/metrics.jsx');
 
 let checks = 0;
@@ -41,10 +43,10 @@ const ok = (label, cond) => {
 console.log('\n== اندپوینت لاگ PM2 در بک‌اند ==');
 // هر دو گره خوانده شوند؛ وگرنه خطای گره http در پنل دیده نمی‌شود.
 ok('هر دو گرهٔ game و http خوانده می‌شوند',
-  /ghelgheli-api-http/.test(server) && /ghelgheli-api/.test(server));
+  /ghelgheli-api-http/.test(backend) && /ghelgheli-api/.test(backend));
 // «لاگ خالی» باید به یک متنِ صریحِ «بدون خطا» تبدیل شود، نه رشتهٔ خالی.
 ok('حالتِ بدونِ خطا متنِ صریح برمی‌گرداند (نه رشتهٔ خالی)',
-  /هیچ خطایی در لاگ نیست|هیچ خطایی در لاگ سرور ثبت نشده/.test(server));
+  /هیچ خطایی در لاگ نیست|هیچ خطایی در لاگ سرور ثبت نشده/.test(backend));
 
 console.log('\n== صفحهٔ مانیتورینگ در پنل ادمین ==');
 // بارگذاری فقط تا رسیدنِ داده، نه تا پر شدنِ لاگ.

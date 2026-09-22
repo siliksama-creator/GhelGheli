@@ -47,7 +47,11 @@ const serverRaw = [
   read('src', 'server.js'),
   read('src', 'routes', 'adminCommunications.js'),
   read('src', 'routes', 'adminWallet.js'),
-  read('src', 'routes', 'adminRewards.js'),
+  // adminRewards.js حذف شد (routeهای مردهٔ جوایز، ممیزیِ ۸ مهر)؛ ماژول‌های
+  // تازهٔ مدیری جایگزینِ بخش‌های اینلاینِ server.js هستند و برای پوششِ
+  // اعلان‌های آینده اینجا خوانده می‌شوند.
+  read('src', 'routes', 'adminDashboard.js'),
+  read('src', 'routes', 'adminSettings.js'),
   read('src', 'routes', 'adminLeague.js'),
   read('src', 'services', 'photoCardService.js'),
 ].join('\n');
@@ -87,11 +91,9 @@ console.log('\n== ۲. برداشت از کیف پول ==');
 console.log('\n== ۳. رسیدن به جایزهٔ فردی ==');
 {
   ok(/reward_threshold/.test(server), 'اعلانِ رسیدن به سطحِ جایزه هست');
-  // و تصمیمِ مدیر روی درخواستِ جایزه هم باید خبر بدهد.
-  ok(/درخواست جایزه رد شد/.test(serverRaw),
-    'ردِ درخواستِ جایزه اعلان دارد');
-  ok(/جایزهٔ نقدی به کیف پول اضافه شد/.test(serverRaw),
-    'واریزِ جایزهٔ نقدی اعلان دارد');
+  // دو بررسیِ «اعلانِ ردِ درخواستِ جایزه» و «اعلانِ واریزِ جایزهٔ نقدی»
+  // اینجا بود؛ بخشِ جوایز به دستورِ مالک کامل حذف شد (تسک ۱۳) و routeهای
+  // مدیریِ مرده‌اش هم در ممیزیِ ۸ مهر پاک شدند — کدی برای سنجیدن نمانده.
 }
 
 console.log('\n== ۴. برندهٔ لیگ در پایان ماه ==');
