@@ -39,7 +39,10 @@ const ok = (name, cond, detail = '') => {
 };
 
 const SRC = path.join(__dirname, '..', 'src');
-const serverSrc = fs.readFileSync(path.join(SRC, 'server.js'), 'utf8');
+// تعریف‌ها به lib/ منتقل شدند (گامِ پایانیِ ماژولار شدن، مهر ۱۴۰۵) — هر دو خوانده می‌شوند.
+const serverSrc = fs.readFileSync(path.join(SRC, 'server.js'), 'utf8')
+  + fs.readFileSync(path.join(SRC, 'lib', 'limiters.js'), 'utf8')
+  + fs.readFileSync(path.join(SRC, 'lib', 'auth.js'), 'utf8');
 
 /** همهٔ فایل‌هایی که ممکن است limiter تعریف کنند. */
 const files = [['server.js', serverSrc]];

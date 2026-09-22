@@ -107,6 +107,15 @@ if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process
 const app = express();
 const server = http.createServer(app);
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+// UUID_RE عمداً این‌جا (بالای فایل) می‌ماند: چند ماژولِ lib/ آن را تزریق
+// می‌گیرند و تعریفش باید پیش از همهٔ destructureها باشد (TDZ).
+/// Every `:id` in this API is a Postgres UUID. Passing a non-UUID straight to
+/// a query makes Postgres raise 22P02, which surfaced as a **500 Server
+/// Error** — telling the client "we broke" when the truth is "you sent
+/// nonsense". Proven live: GET /api/support/tickets/abc/messages returned 500.
+/// Worse, it burns a database round trip and a pool connection on garbage,
+/// which is a cheap denial-of-service lever.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // CORS_ORIGIN must be an explicit comma-separated allow-list in production.
 // Previously this fell back to '*' (any origin) whenever the env var was
@@ -339,416 +348,36 @@ const imageUpload = multer({
 });
 
 const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-// ═══════════════════════════════════════════════════════════════════════════
-// جلسهٔ کاربر «تمام نمی‌شود» (خواستهٔ مالک، ۲۶ شهریور)
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// قبلاً: توکنِ کاربر ۳۰ روزه بود و بعد از آن کاربر باید دوباره شماره و کد
-// را وارد می‌کرد. مالک گفت: «وقتی ورودِ موفق داشتند، جلسه‌شان برای همیشه
-// فعال بماند» — پس عمرِ توکن به ۱۰ سال رفت که عملاً «همیشه» است (هر اپِ
-// زنده‌ای بیش از ۱۰ سال بدونِ آپدیت نمی‌ماند) و با JWT_EXPIRES_IN قابلِ
-// تنظیم است.
-//
-// ⚠️ توکنِ طولانی بدونِ «کلیدِ خاموش‌کردن» یک قرضِ امنیتی است. آن کلید
-//    ستونِ `users.session_epoch` است (migration 092) که به‌شکلِ claimِ `tv`
-//    داخلِ توکن می‌رود و در auth/authOptional/سوکت بررسی می‌شود. هر تغییرِ
-//    رمز عدد را بالا می‌برد ⇒ همهٔ توکن‌های قبلی همان لحظه بی‌اعتبار.
-//
-// توکنِ **ادمین** عمداً ۱۲ ساعته ماند: پنلِ مدیریت دسترسیِ پول و کاربران را
-// دارد و اگر گوشیِ یک ادمین گم شود، جلسهٔ همیشه‌به‌همراهش فاجعه است.
-const USER_TOKEN_TTL = process.env.JWT_EXPIRES_IN || '3650d';
-// ⚠️ هشدارِ راه‌اندازی — این یکی از تله‌های واقعیِ همین تغییر بود: کدِ پیش‌فرض
-// ۱۰ سال است، ولی `.env` سرور `JWT_EXPIRES_IN=30d` داشت و بی‌صدا خواستهٔ مالک
-// («همیشگی») را بی‌اثر می‌کرد؛ فقط چون هنگامِ تست، عمرِ توکن را از خودِ پاسخِ
-// ورود اندازه گرفتیم معلوم شد. پس اگر مقدارِ env کوتاه باشد، همین اولِ کار
-// در لاگ اعلام می‌شود تا دوباره پنهان نماند.
-(() => {
-  const ttl = String(process.env.JWT_EXPIRES_IN || '').trim();
-  if (!ttl) return; // خالی ⇒ پیش‌فرضِ خودمان ۱۰ سال است، حرفی نیست
-  const asYears = /^(\d+)\s*y$/i.exec(ttl);
-  const asDays = /^(\d+)\s*d$/i.exec(ttl);
-  const longEnough = (!!asYears && Number(asYears[1]) >= 1) || (!!asDays && Number(asDays[1]) >= 365);
-  if (!longEnough) {
-    console.warn(`[auth] هشدار: JWT_EXPIRES_IN=${ttl} → جلسهٔ کاربران کوتاه است (خواستهٔ مالک: همیشگی). مقدارِ درست: 3650d`);
-  }
-})();
-const signUser = user => jwt.sign(
-  { sub: user.id, type: 'user', tv: Number(user.session_epoch || 0) },
-  JWT_SECRET,
-  { expiresIn: USER_TOKEN_TTL },
-);
-/**
- * توکنی که همین حالا در دستِ کاربر است با نسخهٔ جلسهٔ فعلیِ حسابش می‌خواند؟
- *
- * چرا تابعِ جدا: این بررسی در چهار جا لازم است (auth، authOptional، سوکت و
- * تست). چهار کپیِ دستی یعنی روزی یکی‌شان جا می‌ماند و «خاموش‌کردنِ جلسه»
- * بی‌صدا از کار می‌افتد.
- *
- * توکنِ بدونِ `tv` (صادرشده قبل از این تغییر) عمداً ۰ حساب می‌شود تا
- * کاربرانِ واردشدهٔ فعلی یک‌باره از حسابشان پرت نشوند.
- */
-function sessionEpochMatches(payload, userRow) {
-  return Number(payload?.tv || 0) === Number(userRow?.session_epoch || 0);
-}
-const signAdmin = admin => jwt.sign({ sub: admin.id, type: 'admin', role: admin.role }, JWT_SECRET, { expiresIn: '12h' });
-/**
- * شمارهٔ موبایل / نام کاربری را به شکل متعارف در می‌آورد.
- *
- * ═══════════════════════════════════════════════════════════════════════
- * چرا این تابع فراتر از «حذف فاصله» است — باگ واقعیِ «نمی‌توانم وارد شوم»
- * ═══════════════════════════════════════════════════════════════════════
- *
- * نسخهٔ قبلی فقط این بود:
- *
- *     String(m || '').replace(/\s+/g, '').trim()
- *
- * یعنی ارقام **فارسی** دست‌نخورده می‌ماندند. صفحه‌کلید فارسی اندروید
- * (و کیبورد گوگل در حالت فارسی) به‌طور پیش‌فرض «۰۹۱۲…» تایپ می‌کند، نه
- * «0912…». آن رشته با ردیفِ دیتابیس — که با ارقام لاتین ذخیره شده —
- * برابر نمی‌شد، پس کوئری هیچ کاربری پیدا نمی‌کرد و سرور جواب می‌داد:
- *
- *     ۴۰۱ «شماره موبایل یا رمز عبور نادرست است»
- *
- * پیامی که دروغ است: رمز درست بود. کاربر رمزش را عوض می‌کرد، دوباره
- * تلاش می‌کرد، و باز همان پیام — چون مشکل هیچ ربطی به رمز نداشت.
- * روی سرور زنده ثابت شد: ثبت‌نام با ارقام لاتین ✅ ۲۰۰، ورود با همان
- * شماره به ارقام فارسی ❌ ۴۰۱.
- *
- * سه شکلِ دیگر هم که کاربر واقعی تایپ می‌کند و قبلاً رد می‌شد:
- *   • «+۹۸912…» یا «0098912…» → به «0912…»
- *   • «0912-345-6789» و «(0912) 345» → جداکننده‌ها حذف می‌شوند
- *   • «۰۹۱۲…» با ارقام عربیِ هندی (U+0660) که برخی کیبوردها می‌فرستند
- *
- * امنیت: این تابع در هر دو سمتِ ثبت‌نام و ورود صدا زده می‌شود، پس یک
- * شماره همیشه به یک ردیف می‌رسد و «حساب سایه» (دو کاربر با یک شماره در
- * دو شکلِ نگارشی) ساخته نمی‌شود.
- *
- * سازگاری با گذشته: نام‌های کاربری غیرعددی (مثل `Admin` یا حساب‌های
- * تستِ `cl…`) هیچ رقمی ندارند، پس دست‌نخورده عبور می‌کنند. هر ۳۹ ردیف
- * موجودِ دیتابیس پیش از این تغییر بررسی شد: همه لاتین‌اند، پس هیچ‌کس
- * قفل نمی‌شود.
- */
-// ── pure helpers extracted → backend/src/lib/auth-helpers.js (single source) ──
-// wrapperها برای سازگاریِ فراخوانی‌های موجود در همین فایل
-function normalizeMobile(m) { return _normalizeMobile(m); }
-function faDigits(n) { return _faDigits(n); }
-function anonymousNickname() { return _anonymousNickname(); }
-function isValidPasswordLength(pw) { return _isValidPasswordLength(pw); }
-async function auth(req, res, next) {
-  try {
-    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    const payload = jwt.verify(token, JWT_SECRET);
-    if (payload.type !== 'user') throw new Error('bad token');
-    const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [payload.sub]);
-    if (!rows[0] || rows[0].status !== 'active') return res.status(401).json({ message: 'کاربر فعال نیست' });
-    // توکنِ صادرشدهٔ قبل از آخرین تغییرِ رمز، مرده است.
-    if (!sessionEpochMatches(payload, rows[0])) return res.status(401).json({ message: 'نیاز به ورود مجدد دارید' });
-    req.user = rows[0]; next();
-  } catch { res.status(401).json({ message: 'نیاز به ورود مجدد دارید' }); }
-}
-// احرازِ اختیاری: توکنِ معتبر → req.user پر می‌شود؛ بدون توکن یا توکنِ
-// نامعتبر → خطا نمی‌دهد و req.user خالی می‌ماند (مهمان). فقط برای مسیرهای
-// عمومی‌ای استفاده می‌شود که هم کاربرِ واردشده و هم مهمان صدا می‌زنند —
-// فعلاً تنها مصرف: گزارشِ کرش، تا خطای قبل‌ازورود هم گم نشود.
-async function authOptional(req, res, next) {
-  try {
-    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    if (!token) return next();
-    const payload = jwt.verify(token, JWT_SECRET);
-    if (payload.type !== 'user') return next();
-    const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [payload.sub]);
-    if (rows[0] && rows[0].status === 'active' && sessionEpochMatches(payload, rows[0])) req.user = rows[0];
-  } catch { /* مهمان فرض می‌کنیم */ }
-  return next();
-}
-async function adminAuth(req, res, next) {
-  try {
-    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    const payload = jwt.verify(token, JWT_SECRET);
-    if (payload.type !== 'admin') throw new Error('bad token');
-    const { rows } = await pool.query('SELECT * FROM admin_users WHERE id=$1 AND is_active=true', [payload.sub]);
-    if (!rows[0]) return res.status(401).json({ message: 'ادمین معتبر نیست' });
-    req.admin = rows[0]; next();
-  } catch { res.status(401).json({ message: 'ورود ادمین لازم است' }); }
-}
-function requireRole(...roles) { return (req, res, next) => req.admin?.role === 'super_admin' || roles.includes(req.admin?.role) ? next() : res.status(403).json({ message: 'دسترسی کافی نیست' }); }
+// احرازِ هویت و توکن‌ها → lib/auth.js (همان کد، وابستگی‌های تزریقی؛ گامِ پایانیِ ماژولار شدن).
+const {
+  signUser, sessionEpochMatches, signAdmin, normalizeMobile,
+  faDigits, anonymousNickname, isValidPasswordLength, auth,
+  authOptional, adminAuth, requireRole,
+} = require('./lib/auth')({
+  JWT_SECRET, _anonymousNickname, _faDigits, _isValidPasswordLength,
+  _normalizeMobile, jwt, pool,
+});
 
-async function getChatMinLifetimePoints(client = pool) {
-  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_min_lifetime_points' LIMIT 1");
-  const raw = rows[0]?.value;
-  const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
-}
-async function getChatCooldownSeconds(client = pool) {
-  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_message_cooldown_seconds' LIMIT 1");
-  const raw = rows[0]?.value;
-  const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 5;
-}
-async function getLeagueWinnerCount(client = pool) {
-  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='league_winner_count' LIMIT 1");
-  const raw = rows[0]?.value;
-  const n = Number(typeof raw === 'object' && raw !== null ? raw.value : raw);
-  return Number.isFinite(n) && n > 0 ? Math.min(300, Math.floor(n)) : 10;
-}
-async function ensureChatCooldown(userId) {
-  const cooldown = await getChatCooldownSeconds();
-  if (!cooldown) return { cooldown, remaining: 0 };
-  const { rows } = await pool.query('SELECT sent_at FROM chat_messages WHERE user_id=$1 ORDER BY sent_at DESC LIMIT 1', [userId]);
-  if (!rows[0]) return { cooldown, remaining: 0 };
-  const diff = (Date.now() - new Date(rows[0].sent_at).getTime()) / 1000;
-  const remaining = Math.ceil(cooldown - diff);
-  return { cooldown, remaining: remaining > 0 ? remaining : 0 };
-}
-// Treats an empty-string image field as "unchanged". Without this, any admin
-// form that submits a blank picture input silently ERASES the stored image
-// (COALESCE only guards against NULL/undefined, not ''). Pass null to clear
-// an image on purpose.
-function keepImage(v) { return v === '' ? undefined : v; }
-// Parses a Toman amount coming from an admin form. Returns undefined when the
-// field was simply not submitted (so COALESCE keeps the stored value), and
-// throws on garbage rather than letting NaN reach a BIGINT column as a 500.
-function cashAmountInput(v) {
-  if (v === undefined || v === null || v === '') return undefined;
-  const n = Math.floor(Number(v));
-  if (!Number.isFinite(n) || n < 0) {
-    throw Object.assign(new Error('مبلغ نقدی باید عددی صحیح و مثبت باشد'), { status: 400 });
-  }
-  if (n > 100000000000) {
-    throw Object.assign(new Error('مبلغ نقدی خارج از محدودهٔ مجاز است'), { status: 400 });
-  }
-  return n;
-}
-function maskSecret(v) { if (!v) return ''; const s=String(v); return s.length <= 4 ? '****' : `${s.slice(0,2)}****${s.slice(-2)}`; }
-// Strips whitespace, punctuation and invisible/zero-width Unicode
-// characters before comparing against the bad-word list. Previously only
-// \u200c (ZWNJ, used legitimately in Persian text) was stripped, so a
-// message like "f\u200bu\u200bc\u200bk" (zero-width SPACE, \u200b, not
-// ZWNJ) sailed straight through the filter untouched. \u200b/\u200d/\uFEFF
-// are never meaningful in normal chat text, so it's safe to always strip
-// them for the purposes of this check (the stored/displayed message is
-// untouched — only this comparison copy is normalized).
-function normalizeChatText(text) {
-  return String(text || '')
-    .toLowerCase()
-    .replace(/[\u200b\u200c\u200d\uFEFF]/g, '')
-    .replace(/[\s_\-.]+/g, '');
-}
-// Admin-pinned chat announcement. Kept in app_settings (not chat_messages)
-// so it can't be replied to/liked/reported like a normal message.
-const PIN_ACCENTS = ['gold', 'green', 'blue', 'red'];
-async function getChatPinnedMessage(client = pool) {
-  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_pinned_message' LIMIT 1");
-  const v = rows[0]?.value;
-  if (!v || typeof v !== 'object') return { text: '', accent: 'gold', active: false };
-  return {
-    text: String(v.text || ''),
-    accent: PIN_ACCENTS.includes(v.accent) ? v.accent : 'gold',
-    active: Boolean(v.active) && String(v.text || '').trim().length > 0,
-    pinnedAt: v.pinnedAt || null,
-    pinnedBy: v.pinnedBy || null,
-  };
-}
+// تنظیمات و محتوای چت → lib/chatConfig.js (همان کد، وابستگی‌های تزریقی؛ گامِ پایانیِ ماژولار شدن).
+const {
+  getChatMinLifetimePoints, getChatCooldownSeconds, getLeagueWinnerCount, ensureChatCooldown,
+  maskSecret, PIN_ACCENTS, getChatPinnedMessage, getChatBadWords,
+  assertNoBadWords, isAllowedChatMessage, activeStickers, activeStickerById,
+  cannedMessages,
+} = require('./lib/chatConfig')({
+  UUID_RE, opsConfig, pool, shop,
+});
 
-async function getChatBadWords(client = pool) {
-  const { rows } = await client.query("SELECT value FROM app_settings WHERE key='chat_bad_words' LIMIT 1");
-  const raw = rows[0]?.value;
-  return Array.isArray(raw) ? raw.map(w => String(w).trim()).filter(Boolean) : [];
-}
-async function assertNoBadWords(text) {
-  const words = await getChatBadWords();
-  if (!words.length) return;
-  const normalized = normalizeChatText(text);
-  const hit = words.find(w => normalizeChatText(w) && normalized.includes(normalizeChatText(w)));
-  if (hit) {
-    const err = new Error('پیام شامل کلمات غیرمجاز است');
-    err.status = 400;
-    throw err;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// کلیدِ محدودکنندهٔ نرخ برای مسیرهای «بعد از ورود»
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// چرا این تابع وجود دارد و چرا اینجا (بالای همهٔ limiterها) تعریف شده:
-//
-// پیش‌فرضِ express-rate-limit کلید را از `req.ip` می‌سازد. برای مسیرهای
-// عمومی (ورود، OTP) درست است — آنجا هنوز نمی‌دانیم کاربر کیست.
-//
-// ولی برای مسیری که **پشتِ `auth` است** فاجعه است. در ایران بخش بزرگی از
-// ترافیک موبایل پشت CGNAT است: صدها مشترکِ همراه‌اول از یک IP بیرون
-// می‌آیند. یک IP یعنی یک سطل. پس:
-//
-//   • یک نفر که ۲۰ بار کارت ثبت می‌کند، سهمیهٔ صدها نفرِ دیگر را می‌سوزاند.
-//   • همان نفر اگر بخواهد سوءاستفاده کند، با عوض کردن IP (روشن/خاموش کردن
-//     دیتا) سطلِ تازه می‌گیرد — یعنی محدودیت او را نمی‌گیرد ولی
-//     بی‌گناه‌ها را می‌گیرد. دقیقاً برعکسِ هدف.
-//
-// این باگ در تستِ واقعی دیده شد: سناریوی «۴ درخواست هم‌زمان» هر بار
-// ۴۲۹ می‌گرفت و اصلاً به منطقِ برنامه نمی‌رسید، چون سطلِ IP از تست‌های
-// قبلی پر مانده بود.
-//
-// `req.user?.id || req.ip` : اگر به هر دلیلی احراز هویت انجام نشده باشد
-// (مثلاً limiter اشتباهاً قبل از `auth` سوار شود) به رفتار قبلی برمی‌گردیم
-// نه به «بدون محدودیت».
-const perUserKey = (req) => req.user?.id || req.ip;
-
-// ── محدودکننده‌های قابل تنظیم از پنل ─────────────────────────────────────
-// پنج سقفِ غیرامنیتی (چت، ضربه‌زن، دوئل، برداشت، گردونه) از ops_limits
-// خوانده می‌شوند. هر ذخیره در پنل، instance تازه می‌سازد و از همان لحظه
-// اعمال می‌شود. گاردهای امنیتی (OTP، ورودها) عمداً ثابت‌اند — بالای
-// opsLimits.js توضیح داده شده چرا.
-function opsRateLimit(name, defaults, extra = {}) {
-  // ⚠️ Store یک‌بار و ثابت برای طول عمرِ این limiter ساخته می‌شود.
-  // این limiterها «reloadِ زنده» دارند: وقتی ادمین تنظیماتِ عملیات را
-  // ذخیره می‌کند، build() دوباره اجرا می‌شود تا windowMs/limit تازه اعمال
-  // شود. اگر در هر reload یک Store تازه می‌ساختیم:
-  //   • روی Redis: نمونهٔ دومِ RateLimit با prefix مشابه، با اعتبارسنجیِ
-  //     unsharedStore express-rate-limit درمی‌افتاد و ذخیرهٔ تنظیماتِ
-  //     پنل را ۵۰۰ می‌کرد (ERR_ERL_STORE_REUSE)؛
-  //   • روی حافظه: هر reload شمارنده‌ها را صفر می‌کرد و سقف را دور می‌زد.
-  // پس Store ثابت نگه داشته می‌شود و فقط پنجره/سقفِ میدل‌ور نوسازی می‌شود.
-  const store = makeRateStore(`ops:${name}`);
-  const build = () => {
-    const rl = opsLimits.get().rateLimits[name] || defaults;
-    return rateLimit({
-      windowMs: rl.windowMs,
-      limit: rl.limit,
-      standardHeaders: true,
-      legacyHeaders: false,
-      // نمونهٔ Storeِ اختصاصی و ثابتِ همین limiter (شمارنده‌ها در Redis بینِ
-      // دو پروسه مشترک‌اند، ولی یک‌بار ساخته می‌شوند تا reload سالم بماند).
-      ...(store ? { store } : {}),
-      // ⚠️ این یک limiterِ «بازسازنده» است: هر ذخیرهٔ تنظیماتِ پنل پنجره/سقف
-      // را با build() نوسازی می‌کند و همان Storeِ ثابت را به نمونهٔ تازهٔ
-      // میدل‌ور می‌دهد. اعتبارسنجیِ unsharedStore express-rate-limit این
-      // «استفادهٔ مجددِ عمدی از همان Store برای همان limiter» را اشتباهاً با
-      // ERR_ERL_STORE_REUSE می‌گیرد و ذخیره را ۵۰۰ می‌کند. اینجا بازسازی در
-      // همین خط کنترل می‌شود (همان نمونه، همان prefix یکتا)، پس فقط همین یک
-      // قاعده را خاموش می‌کنیم؛ بقیهٔ اعتبارسنجی‌ها فعال می‌مانند.
-      validate: { unsharedStore: false },
-      ...extra,
-    });
-  };
-  const api = {
-    mw: null,
-    reload: () => { api.mw = build(); },
-  };
-  api.mw = build();
-  return api;
-}
-
-// همهٔ limiterهای زیر روی مسیرهای احراز هویت‌شده‌اند، پس همه `perUserKey`
-// می‌گیرند. (فهرست کامل در تستِ testRateLimit.js نگهبانی می‌شود.)
-const chatLimiter = opsRateLimit('chat', { windowMs: 60_000, limit: 20 }, { keyGenerator: perUserKey });
-// ── سقفِ درخواستِ کدِ پیامکی — دو لایه (خواستهٔ مالک، ۲۶ شهریور) ─────────
-//
-// مالک خواست: «سقفِ سختِ ورود/درخواستِ کد پیامکی، ولی با شمارش روی
-// **شمارهٔ خودِ کاربر**، نه آی‌پی — مثلِ ۵ کد در ۱۰ دقیقه. جلوی حدس‌زدنِ رمز
-// و اسپمِ پیامک را می‌گیرد و برای کاربرانِ اپراتوری (که یک آی‌پیِ مشترکِ
-// CGNAT دارند) مزاحم نیست.»
-//
-// چرا دو لایه و نه یکی:
-//
-//   • **شماره** (`otpMobileLimiter`): سقفِ اصلیِ مالک — ۵ کد در ۱۰ دقیقه.
-//     این همان چیزی است که «اسپمِ پیامک» و «تلاشِ پیاپی روی یک حساب» را
-//     می‌بندد، و به آی‌پی کاری ندارد؛ پس هزار کاربرِ یک اپراتور که پشتِ یک
-//     آی‌پی‌اند هم‌دیگر را قفل نمی‌کنند.
-//   • **آی‌پی** (`otpLimiter`): از ۵ به ۳۰ در ۱۰ دقیقه **شل** شد. قبلاً خودِ
-//     همین عددِ ۵ روی آی‌پی بود و کاربرانِ CGNAT را بی‌دلیل می‌بست (ششمین
-//     نفر در یک شبکهٔ بزرگ باید ۱۰ دقیقه صبر می‌کرد). حالا نقشش فقط
-//     «جلوگیری از پیمایشِ انبوهِ شماره‌ها از یک منبع» است — که ۳۰ کد در
-//     ۱۰ دقیقه برایش کافی است و برای کاربرِ واقعی هرگز دیده نمی‌شود.
-//   • **روزانه** (`otpDailyLimiter`): سقفِ ۲۰ کد در شبانه‌روز برای هر شماره —
-//     بیمهٔ صورتحسابِ پیامک. بدونِ آن، سقفِ ۱۰دقیقه‌ای اجازهٔ ۷۲۰ پیامک در
-//     روز به یک شماره می‌داد.
-const otpLimiter = rateLimit({
-  windowMs: 10 * 60_000, limit: 30, standardHeaders: true, legacyHeaders: false, ...rlStore('otp'),
-  message: { message: 'تعداد درخواست‌های کد از این اتصال زیاد بوده؛ چند دقیقه دیگر دوباره امتحان کنید' },
-});
-// کلیدِ این دو limiter **فقط شمارهٔ کاربر** است (به‌عمد بدونِ آی‌پی) — همان
-// خواستهٔ مالک. `normalizeMobile` استفاده می‌شود تا «۰۹۱۲…» و «+۹۸۹۱۲…» یک
-// کلید شوند وگرنه با تغییرِ قالبِ شماره، سقف دور زده می‌شد.
-const otpMobileKey = (req) => `m:${normalizeMobile(req.body?.mobile) || 'none'}`;
-const otpMobileLimiter = rateLimit({
-  windowMs: 10 * 60_000,
-  limit: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('otpmobile'),
-  keyGenerator: otpMobileKey,
-  message: { message: 'برای این شماره در ۱۰ دقیقهٔ گذشته چند کد درخواست شده؛ کمی بعد دوباره امتحان کنید' },
-});
-const otpDailyLimiter = rateLimit({
-  windowMs: 24 * 60 * 60_000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('otpdaily'),
-  keyGenerator: otpMobileKey,
-  message: { message: 'سقفِ پیامکِ امروزِ این شماره پر شده؛ فردا دوباره تلاش کنید' },
-});
-// Brute-force protection for the 6-digit OTP code itself. request-otp only
-// throttled how many codes could be requested — verify-otp and the password
-// reset endpoint (which also consumes an OTP) had NO limiter at all, so a
-// 6-digit code (1,000,000 possibilities) could be brute-forced with plain
-// unrestricted requests. Keyed by IP + mobile so one attacker can't lock out
-// a victim's own number for legitimate attempts from other IPs.
-const otpVerifyLimiter = rateLimit({
-  windowMs: 10 * 60_000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('otpverify'),
-  keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
-  message: { message: 'تعداد تلاش زیاد است؛ کمی بعد دوباره امتحان کنید' },
-});
-// Admin login had zero throttling; the panel has full access to user data,
-// points and card codes, so brute-forcing the password had no cost at all.
-const adminLoginLimiter = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('adminlogin'),
-  keyGenerator: (req) => `${req.ip}:${String(req.body?.username || '').toLowerCase()}`,
-  message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
-});
-// Same reasoning as adminLoginLimiter, but for regular user login.
-const userLoginLimiter = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('userlogin'),
-  keyGenerator: (req) => `${req.ip}:${normalizeMobile(req.body?.mobile)}`,
-  message: { message: 'تعداد تلاش ورود زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
-});
-// ── سقفِ «خودِ حساب» برای حدسِ رمز (خواستهٔ مالک، ۲۶ شهریور) ─────────────
-//
-// `userLoginLimiter` بالا کلیدش «آی‌پی + شماره» است؛ یعنی مهاجمی که چند
-// آی‌پی دارد می‌تواند روی **یک شماره** بی‌نهایت رمز امتحان کند. این یکی
-// فقط به شماره نگاه می‌کند و سقفِ مستقلِ خودش را دارد: حتی با هزار آی‌پی،
-// یک حساب در ۱۵ دقیقه بیش از ۱۵ تلاش نمی‌گیرد. کاربرِ واقعی که رمزش را
-// اشتباه می‌زند هرگز به این سقف نمی‌رسد.
-const userAccountLimiter = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('useraccount'),
-  keyGenerator: (req) => `m:${normalizeMobile(req.body?.mobile) || 'none'}`,
-  message: { message: 'برای این شماره تلاش‌های ورود زیاد بوده؛ کمی بعد دوباره امتحان کنید' },
-});
-const loginStreakLimiter = rateLimit({
-  windowMs: 60_000,
-  limit: 8,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('loginstreak'),
-  keyGenerator: perUserKey,
-  message: { message: 'کمی صبر کن و دوباره تلاش کن' },
+// محدودکننده‌های نرخ → lib/limiters.js (همان کد، وابستگی‌های تزریقی؛ گامِ پایانیِ ماژولار شدن).
+const {
+  opsRateLimit, chatLimiter, otpLimiter, otpMobileLimiter,
+  otpDailyLimiter, otpVerifyLimiter, adminLoginLimiter, userLoginLimiter,
+  userAccountLimiter, loginStreakLimiter, tapBatchLimiter, cardDuelLimiter,
+  changePasswordLimiter, shopLimiter, withdrawalLimiter, bankCardLimiter,
+  wheelLimiter, uploadLimiter,
+} = require('./lib/limiters')({
+  makeRateStore, normalizeMobile, opsLimits, rateLimit,
+  rlStore,
 });
 
 // ── /health ──────────────────────────────────────────────────────────────
@@ -848,107 +477,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Strips everything the client must never see. The bank card number is as
-// sensitive as the password hash: /api/profile is fetched on every app start
-// and ends up in HTTP caches, crash reports and debug logs, so the full PAN
-// is replaced by a masked form. The only endpoint that returns the real
-// number is the admin withdrawal list (behind adminAuth), because the admin
-// physically has to make the transfer.
-function safeUser(u) {
-  // ستون‌های خام بیرون نمی‌روند (چون رمزشده‌اند و به‌کارِ کلاینت نمی‌آیند)؛
-  // به‌جایشان نسخهٔ ماسک‌شدهٔ **بازشده** برگردانده می‌شود.
-  const { password_hash, bank_card_number, bank_card_sheba, ...rest } = u;
-  const cardNumber = fieldCrypto.decrypt(bank_card_number);
-  const cardSheba = fieldCrypto.decrypt(bank_card_sheba);
-  return {
-    ...rest,
-    // `bank_account` (ستون قدیمی و آزاد) هم رمز می‌شود؛ در پاسخ رمزشده
-    // نمی‌فرستیمش، متنِ ساده‌اش می‌فرستیم (صاحبِ حساب خودِ کاربر است).
-    bank_account: rest.bank_account ? fieldCrypto.decrypt(rest.bank_account) : rest.bank_account,
-    wallet_balance: Number(rest.wallet_balance || 0),
-    bank_card_masked: cardNumber ? walletService.maskCard(cardNumber) : null,
-    bank_card_sheba_masked: cardSheba ? `${cardSheba.slice(0, 6)}••••${cardSheba.slice(-4)}` : null,
-    has_bank_card: Boolean(cardNumber),
-  };
-}
+// اعتبارسنجی و سریال‌سازی → lib/validators.js (همان کد، وابستگی‌های تزریقی؛ گامِ پایانیِ ماژولار شدن).
+const {
+  safeUser, validateUuid, intInRange, boundedText,
+  safeAvatarKey, safeImageUrl,
+} = require('./lib/validators')({
+  UUID_RE, avatarKeys, fieldCrypto, walletService,
+});
 
-// ── Input validation helpers ──────────────────────────────────────────────
-
-/// Every `:id` in this API is a Postgres UUID. Passing a non-UUID straight to
-/// a query makes Postgres raise 22P02, which surfaced as a **500 Server
-/// Error** — telling the client "we broke" when the truth is "you sent
-/// nonsense". Proven live: GET /api/support/tickets/abc/messages returned 500.
-/// Worse, it burns a database round trip and a pool connection on garbage,
-/// which is a cheap denial-of-service lever.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/// Express middleware factory: rejects malformed ids before any query runs.
-const validateUuid = (...names) => (req, res, next) => {
-  for (const n of names) {
-    const v = req.params[n];
-    if (v !== undefined && !UUID_RE.test(String(v))) {
-      return res.status(400).json({ message: 'شناسه ارسالی معتبر نیست' });
-    }
-  }
-  next();
-};
-
-/// Clamp a user-supplied integer into a safe range.
-/// `?limit=99999999` used to be accepted verbatim by anything that trusted
-/// it, which is how one request can ask the database for the whole table.
-function intInRange(value, { min, max, fallback }) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, Math.trunc(n)));
-}
-
-/// Trim and hard-cap a free-text field. Postgres raises 22001 on overflow,
-/// which reached the user as a 500 instead of a clear "too long" message.
-function boundedText(value, max) {
-  if (value === undefined || value === null) return null;
-  const t = String(value).trim();
-  if (!t) return null;
-  return t.slice(0, max);
-}
-
-/// Whitelist of bundled avatar keys. The API previously stored ANY string,
-/// so `profileAvatarKey: "../../etc/passwd"` was accepted with a 200 and then
-/// interpolated straight into an asset path by the clients
-/// (mobile/lib/core/assets.dart: 'assets/avatars/$key'). That is a path
-/// traversal waiting for a client that resolves it.
-// The list itself moved to `src/lib/avatarKeys.js` (فاز ۲) so the *count* can
-// be served to the clients — `GET /api/avatars` and `avatars` in /api/config —
-// instead of being frozen inside the APK text («۱۰ مدل اختصاصی»). The Set
-// stays bound here because `safeAvatarKey` runs on every profile write.
-const AVATAR_KEYS = avatarKeys.AVATAR_KEYS;
-/// A club crest may also be a profile picture, stored as `club:<slug>`. The
-/// slug is bounded to the same characters the shop generates, so this stays a
-/// whitelist — it can never resolve to a path segment.
-const CLUB_AVATAR_RE = /^club:[a-z0-9_]{1,40}$/;
-
-const safeAvatarKey = (v) => {
-  if (!v) return null;
-  const s = String(v);
-  if (AVATAR_KEYS.has(s)) return s;
-  // NOTE: this only validates the SHAPE. Whether the user is actually a
-  // member of that club is enforced in shopService.useClubAvatar and swept
-  // by clubService.clearOrphanedCosmetics; the generic profile endpoint must
-  // not become a way to wear a crest you never joined.
-  return CLUB_AVATAR_RE.test(s) ? s : null;
-};
-
-/// Only accept an image URL we ourselves produced, or a plain https URL.
-/// Blocks `javascript:` and `data:` payloads from reaching a webview.
-function safeImageUrl(v) {
-  if (v === undefined || v === null) return null;
-  const t = String(v).trim();
-  if (!t) return null;
-  if (t.startsWith('/uploads/') || t.startsWith('/public/')) return t.slice(0, 400);
-  if (/^https:\/\//i.test(t)) return t.slice(0, 400);
-  return null;
-}
-
-// Authentication and account registration.
 app.use('/api', require('./routes/auth')({
   pool, asyncHandler, otpLimiter, otpVerifyLimiter, userLoginLimiter,
   otpMobileLimiter, otpDailyLimiter, userAccountLimiter,
@@ -969,70 +505,16 @@ app.use('/api', require('./routes/auth')({
 // comment there for the full threat model.
 const tapGame = require('./services/tapGameService');
 
-// Rate limit sized against the client's 8s flush cadence: ~7 legitimate
-// batches per minute, so 20 leaves room for level-up flushes and a retry
-// after a dropped connection while still stopping a request flood.
-const tapBatchLimiter = opsRateLimit('tapBatch',
-  { windowMs: 60_000, limit: 20 },
-  {
-    // Key on the user, not the IP: a whole school behind one NAT must not
-    // share a bucket, and a single cheater must not escape by changing IP.
-    keyGenerator: (req) => req.user?.id || req.ip,
-    message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کن' },
-  });
 
-// ── دوئل پنج‌کارتی زنده ──────────────────────────────────────────────────
-// The REST surface prepares a user's authoritative deck and supports old
-// clients' free bot practice. New bot/online/lobby matches all run through the
-// shared Socket.IO engine and escrow used by the other competitive games.
-const cardDuelLimiter = opsRateLimit('cardDuel',
-  { windowMs: 60_000, limit: 24 },
-  { keyGenerator: perUserKey, message: { message: 'تعداد دوئل زیاد است؛ کمی صبر کن' } });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // `/api/coins/quota` حذف شد (چرخهٔ ۲۴): هیچ کلاینتی صدایش نمی‌زد —
 // سهمیهٔ سکه در bootstrap هست و بعد از هر بازی هم کلاینت‌ها `/api/level`
 // را می‌خوانند. یک کوئریِ بی‌مصرف فقط سطحِ حمله را زیاد می‌کرد.
 
-// Self-service password change while logged in. Added alongside the
-// register-password account-takeover fix: since real "forgot password" via
-// SMS OTP isn't available yet, a logged-in user still needs *some* safe way
-// to change their password — this requires proof of the current password,
-// unlike the old register-password bug.
-// ── چرا این مسیر limiterِ خودش را دارد ──
-//
-// قبلاً `userLoginLimiter` را قرض می‌گرفت. آن limiter کلیدش
-// `${req.ip}:${normalizeMobile(req.body?.mobile)}` است — منطقی برای
-// مسیرِ ورود، چون آنجا `mobile` در بدنه هست.
-//
-// ولی بدنهٔ «تغییر رمز» اصلاً فیلدِ `mobile` ندارد. پس
-// `normalizeMobile(undefined)` رشتهٔ خالی می‌داد و کلید عملاً می‌شد
-// «فقط IP». نتیجه: با CGNAT اپراتورهای موبایل، **همهٔ** کاربرانِ پشتِ
-// یک IP در یک سطلِ ۲۰تایی به ازای ۱۵ دقیقه شریک می‌شدند. بیست نفر که
-// رمزشان را عوض می‌کردند، نفرِ بیست‌ویکم پیامِ «تعداد تلاش ورود زیاد
-// است» می‌گرفت — پیامی که هیچ ربطی به کاری که کرده نداشت.
-//
-// اینجا کاربر قطعاً وارد شده و شناسه داریم، پس کلید روی خودش می‌رود.
-// سقف پایین‌تر (۱۰) چون تغییر رمزِ مکرر رفتار عادی نیست و این مسیر
-// `bcrypt.compare` دارد که عمداً کند است (~۱۰۰ms CPU).
-const changePasswordLimiter = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('changepw'),
-  keyGenerator: perUserKey,
-  message: { message: 'تعداد تلاش‌ها زیاد است؛ چند دقیقه دیگر دوباره امتحان کنید' },
-});
 // Reward groups: the user-facing catalogue with per-group progress.
 const rewardGroups = require('./services/rewardGroupService');
 
-// Buying spends from the wallet, so it is rate-limited like other money paths.
-const shopLimiter = rateLimit({
-  windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.ip,
-  message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی صبر کن' },
-});
 
 // ── خرید: مرحلهٔ ۱ (ساخت سفارش) ───────────────────────────────────────
 //
@@ -1058,25 +540,6 @@ const shopLimiter = rateLimit({
 //  کیف پول تومانی — مسیرهای کاربر
 // ===========================================================================
 
-// Withdrawal is the one place where a bug costs real money, so it gets its
-// own throttle on top of the global one: a script hammering this endpoint
-// would otherwise be able to probe balance/state transitions rapidly.
-//
-// CGNAT: `perUserKey` بالای فایل (کنار بقیهٔ limiterها) تعریف شده و حالا
-// **همهٔ** مسیرهای احراز هویت‌شده از آن استفاده می‌کنند، نه فقط این دو.
-// تعریفِ دومی که قبلاً اینجا بود حذف شد.
-const withdrawalLimiter = opsRateLimit('withdrawal',
-  { windowMs: 60_000, limit: 10 },
-  { keyGenerator: perUserKey, message: { message: 'تعداد درخواست‌ها زیاد است؛ کمی بعد دوباره تلاش کنید' } });
-const bankCardLimiter = rateLimit({
-  windowMs: 10 * 60_000,
-  limit: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('bankcard'),
-  keyGenerator: perUserKey,
-  message: { message: 'تعداد تلاش برای ثبت کارت زیاد است؛ کمی بعد دوباره تلاش کنید' },
-});
 
 // نقطهٔ اتصال گردونهٔ شانس (طراحی UI بعداً انجام می‌شود).
 //
@@ -1116,12 +579,6 @@ module.exports.creditWheelPrize = creditWheelPrize;
 // هیچ مبلغی از بدنهٔ درخواست خوانده نمی‌شود. کلاینت فقط می‌گوید «چرخاندم»؛
 // جایزه را wheelService از روی جدول وزن‌دار سرور انتخاب می‌کند.
 
-// محدودکنندهٔ نرخ: سهمیهٔ روزانه و قید یکتای دیتابیس کار اصلی را می‌کنند،
-// ولی این جلوی کوبیدن endpoint را می‌گیرد — هر تلاش یک تراکنش با قفل ردیف
-// باز می‌کند و بدون این، یک اسکریپت می‌تواند ردیف کاربر را قفل نگه دارد.
-const wheelLimiter = opsRateLimit('wheel',
-  { windowMs: 60_000, limit: 20 },
-  { keyGenerator: perUserKey, message: { message: 'تعداد درخواست‌ها زیاد است، کمی صبر کن' } });
 
 // اعمالِ بی‌درنگِ تغییرِ سقف‌ها از پنل: با هر ذخیره، instanceهای تازه
 // ساخته می‌شوند (سطل‌های قدیمی صفر می‌شوند — برای تغییرِ نادرِ ادمین
@@ -1137,196 +594,21 @@ opsLimits.onChange(() => {
 // GET /api/wheel (که spinsLeft دارد) می‌سازند؛ شمارندهٔ جدا فقط یک مسیرِ
 // تکراریِ احراز‌شده بود.
 
-async function isAllowedChatMessage(text, userId) {
-  if (!text || !String(text).trim()) return false;
-  const clean = String(text).trim();
-  if (cannedMessages().includes(clean)) return true;
-  // Allow single emoji or emoji sequences (up to 16 emoji chars)
-  const emojiRegex = /^[\p{Extended_Pictographic}\p{Emoji}\p{Emoji_Component}\p{Emoji_Modifier}\p{Emoji_Modifier_Base}\p{Emoji_Presentation}\u2600-\u27BF\u2B50\u2764\uFE0F\u200D\s]+$/u;
-  if (emojiRegex.test(clean) && clean.length <= 20) return true;
-  // Paid packs remain controlled: only exact server-seeded phrases owned by
-  // this user are accepted. Purchasing never enables arbitrary free text.
-  return Boolean(userId && await shop.isEmoteAllowed(userId, clean));
-}
 
-const DEFAULT_CANNED_MESSAGES = Object.freeze([
-  "سلام بچه‌ها!",
-  "من اومدم!",
-  "بازی خیلی باحال بود!",
-  "خوشبختم دوستان!",
-  "کی پایه بازیه؟",
-  "عالی بود!",
-  "خیلی خفن بود!",
-  "موفق باشی!",
-  "چه خبر بچه‌ها؟",
-  "خداحافظ تا بعد!",
-  "مواظب خودتون باشید!",
-  "کسی کد جدید داره؟",
-  "وای چقدر خنده‌دار بود!",
-  "تبریک میگم!",
-  "میشه کمکم کنید؟",
-  "ممنون از شما!",
-  "شما تو کدوم لیگ هستید؟",
-  "چقدر امتیازم بالا رفت!",
-  "کارت جدید پیدا کردم!",
-  "امروز روز منه!",
-  "ایول به همگی!",
-  "دوباره امتحان می‌کنم!",
-  "شگفت‌انگیز بود!",
-  "کجا زندگی می‌کنید؟",
-  "امروز چیکار کردید؟",
-  "من عاشق این بازی‌ام!",
-  "بریم برای برد!",
-  "منم می‌خوام بازی کنم!",
-  "بزن بریم بازی!",
-  "آماده‌ای برای مسابقه؟",
-  "این دست من می‌برم!",
-  "بازی عالی بود!",
-  "دوباره بازی کنیم؟",
-  "کارت خفن گرفتم!",
-  "حریف قوی می‌خوام!",
-  "پنالتی رو دریبل کردم!",
-]);
 
-// پیام‌های آمادهٔ چت از پنل ادمین قابل ویرایش‌اند (chat_canned_messages)؛
-// آرایهٔ بالا فقط پیش‌فرض است تا رفتار بدونِ تنظیم مثل قبل بماند.
-// ── استیکرهای چت ─────────────────────────────────────────────────────────
-// فهرست و اعتبارسنجی از جدولِ chat_stickers. image_url نسبی است:
-// وب همان دامنه را می‌گیرد و اندروید baseUrl خودش را پیشوند می‌کند —
-// پس افزودن/حذفِ استیکر فقط یک ردیفِ دیتابیس می‌خواهد و هیچ کلاینتی
-// آپدیت نمی‌شود.
-async function activeStickers() {
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, title, image_url, sticker_type
-         FROM chat_stickers WHERE is_active = TRUE
-        ORDER BY created_at, title`);
-    return rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      url: r.image_url,
-      type: r.sticker_type,
-    }));
-  } catch {
-    // استیکر هرگز نباید چت را بشکند؛ در بدترین حالت فهرست خالی است.
-    return [];
-  }
-}
 
-async function activeStickerById(id) {
-  if (!id || !UUID_RE.test(String(id))) return null;
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, title, image_url, sticker_type
-         FROM chat_stickers WHERE id=$1 AND is_active = TRUE`, [id]);
-    return rows[0] || null;
-  } catch {
-    return null;
-  }
-}
 
-function cannedMessages() {
-  const v = opsConfig.syncGet('chat_canned_messages');
-  if (!Array.isArray(v) || v.length === 0) return DEFAULT_CANNED_MESSAGES;
-  return v
-    .map((x) => String(x).trim())
-    .filter((x) => x.length > 0 && x.length <= 80)
-    .slice(0, 60);
-}
 
-// ── Support tickets ───────────────────────────────────────────────────────
-// Rules:
-//   * one OPEN ticket at a time, and at most one NEW ticket per calendar day
-//   * while a ticket is open the user replies inside that thread instead
-//   * only an admin can close it, which frees the user to open a new one
-//   * every message may carry 1..5 image attachments
-// سقفِ ضمیمهٔ هر تیکت و سهمیهٔ تیکتِ روزانه حالا **زنده**اند
-// (live_rules.maxTicketAttachments / ticketsPerDay). تابع برمی‌گردانیم نه
-// ثابت، تا اگر ادمین از پنل سقف را عوض کند، همان درخواستِ بعدی سقفِ
-// تازه را ببیند.
-const ticketMaxAttachments = () => liveContent.rules().maxTicketAttachments;
-const ticketsPerDay = () => liveContent.rules().ticketsPerDay;
-
-// Accepts an array of upload URLs previously returned by the upload route.
-// Anything that isn't one of our own /uploads/ paths is rejected so a caller
-// can't smuggle in an arbitrary external URL.
-function sanitizeAttachments(input) {
-  if (!Array.isArray(input)) return [];
-  const out = [];
-  for (const raw of input) {
-    const v = String(raw || '').trim();
-    if (!v) continue;
-    // SECURITY (ممیزی دورِ ۲۳): پسوندِ فایل هم باید تصویری باشد. قبلاً هر
-    // مسیری زیر /uploads/images/ با هر پسوندی پذیرفته می‌شد — از جمله
-    // .html/.svg که (قبل از سخت‌گیریِ فیلترِ آپلود) می‌شد فایلِ حمله را
-    // به‌عنوان پیوستِ تیکت به کاربر/ادمین نشان داد. حالا فقط همان
-    // پسوندهایی که فیلترِ multer می‌پذیرد.
-    if (!/^\/uploads\/images\/[A-Za-z0-9._-]+\.(png|jpe?g|webp|gif)$/i.test(v)) {
-      const err = new Error('یکی از پیوست‌ها معتبر نیست');
-      err.status = 400;
-      throw err;
-    }
-    out.push(v);
-    const maxAtt = ticketMaxAttachments();
-    if (out.length > maxAtt) {
-      const err = new Error(`حداکثر ${maxAtt} عکس می‌توانید ارسال کنید`);
-      err.status = 400;
-      throw err;
-    }
-  }
-  return out;
-}
-
-// Users upload ticket images through their own route (the admin upload
-// endpoint requires an admin token). Rate-limited because this is the only
-// endpoint where an ordinary user can write files to the VPS disk — without
-// a cap one account could fill the volume and take the whole service down.
-const uploadLimiter = rateLimit({
-  windowMs: 10 * 60_000,
-  limit: 40,
-  standardHeaders: true,
-  legacyHeaders: false,
-  ...rlStore('upload'),
-  keyGenerator: perUserKey, // CGNAT — توضیح کامل کنار تعریفِ perUserKey
-  message: { message: 'تعداد آپلود زیاد است؛ کمی بعد دوباره تلاش کنید' },
+// پیکربندیِ پشتیبانی → lib/supportConfig.js (همان کد، وابستگی‌های تزریقی؛ گامِ پایانیِ ماژولار شدن).
+const {
+  ticketMaxAttachments, sanitizeAttachments, ticketQuota,
+} = require('./lib/supportConfig')({
+  liveContent, pool,
 });
 
-// Tells the client whether the "new ticket" form should be enabled, and why
-// not — so the app can explain the rule instead of just failing on submit.
-async function ticketQuota(userId) {
-  const open = await pool.query(
-    "SELECT id, subject, status FROM support_tickets WHERE user_id=$1 AND status <> 'closed' ORDER BY created_at DESC LIMIT 1",
-    [userId]
-  );
-  if (open.rows[0]) {
-    return {
-      canCreate: false,
-      reason: 'open_ticket',
-      message: 'یک تیکت باز دارید؛ تا بسته شدن آن، پاسخ خود را در همان تیکت بفرستید.',
-      openTicket: open.rows[0],
-    };
-  }
-  const today = await pool.query(
-    "SELECT count(*)::int AS c FROM support_tickets WHERE user_id=$1 AND created_at >= date_trunc('day', NOW())",
-    [userId]
-  );
-  // سهمیهٔ روزانه از اعدادِ زنده — متنِ راهنما هم از همان قالبِ زنده
-  // (live_copy.support.ticketRule) می‌آید تا عددِ متن با عددِ منطقِ
-  // سرور هرگز در دو رقم نباشد.
-  const limit = ticketsPerDay();
-  if (today.rows[0].c >= limit) {
-    return {
-      canCreate: false,
-      reason: 'daily_limit',
-      message: liveContent.fillTemplate(
-        liveContent.copy().support.ticketRule,
-        { ticketsPerDay: limit },
-      ),
-      openTicket: null,
-    };
-  }
-  return { canCreate: true, reason: null, message: null, openTicket: null };
-}
+
+
+
 
 // ── مسیرهای کاربری — ماژول‌های routes/ (بیرون آمده از این فایل؛ بندِ ۱ نقشهٔ
 // راه، مهر ۱۴۰۵). mount عمداً این‌جاست: بعدِ همهٔ کمک‌تابع‌ها و محدودکننده‌ها

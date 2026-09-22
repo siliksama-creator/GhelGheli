@@ -272,7 +272,8 @@ behaviorPromise.then(() => {
 
     const serverSrc = stripComments(read('src', 'server.js'))
       + stripComments(read('src', 'routes', 'profile.js'))
-      + stripComments(read('src', 'routes', 'wallet.js'));
+      + stripComments(read('src', 'routes', 'wallet.js'))
+      + stripComments(read('src', 'lib', 'validators.js'));
     ok(serverSrc.includes("fieldCrypto.encrypt(boundedText(b.bankAccount, 40))"),
       'ذخیرهٔ حسابِ قدیمی رمز می‌شود');
     ok(serverSrc.includes('bank_account: rest.bank_account ? fieldCrypto.decrypt'),
@@ -306,6 +307,7 @@ behaviorPromise.then(() => {
       'src/services/walletService.js', 'src/services/withdrawalService.js',
       'src/routes/adminUsers.js', 'src/routes/adminLeague.js', 'src/server.js',
       'src/routes/profile.js', 'src/routes/wallet.js',
+      'src/lib/validators.js',
     ];
     let leaked = 0;
     for (const f of candidates) {

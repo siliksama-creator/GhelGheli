@@ -38,7 +38,8 @@ const ok = (cond, name) => {
 
 // ── استخراج تابع واقعی از server.js ────────────────────────────────────────
 const src = fs.readFileSync(
-  path.join(__dirname, '..', 'src', 'server.js'), 'utf8');
+  path.join(__dirname, '..', 'src', 'server.js'), 'utf8')
+    + fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'auth.js'), 'utf8');
 const start = src.indexOf('function normalizeMobile(');
 if (start === -1) {
   console.error('normalizeMobile در server.js پیدا نشد — تست نمی‌تواند اجرا شود');

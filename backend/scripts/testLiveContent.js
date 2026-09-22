@@ -185,7 +185,8 @@ ok('جفت‌یاب تعداد جفت را از liveContent می‌خواند',
   /liveContent\.rules\(\)\.memoryPairs/.test(memorySrc));
 ok('جفت‌یاب ثابتِ SIZE=16 حذف شده', !/const SIZE = 16/.test(memorySrc));
 
-const serverSrc = read('src/server.js');
+// تعریف‌ها به lib/ منتقل شدند (گامِ پایانیِ ماژولار شدن، مهر ۱۴۰۵) — هر دو خوانده می‌شوند.
+const serverSrc = read('src/server.js') + read('src/lib/supportConfig.js');
 ok('سرور کلیدهای زنده را در بوت پیش‌بارگیری می‌کند',
   /'live_copy', 'live_rules', 'config_version',/.test(serverSrc));
 ok('سرور liveContent را به clientConfig می‌دهد',

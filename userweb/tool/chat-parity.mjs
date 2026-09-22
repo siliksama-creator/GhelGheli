@@ -42,7 +42,8 @@ const web = read('userweb/src/screens/Chat.jsx');
 const android = read('mobile/lib/screens/user/chat_page.dart');
 // ماژولار شدنِ server.js (مهر ۱۴۰۵): مسیرهای چت به routes/chat.js رفتند؛
 // هر دو پرونده خوانده می‌شوند تا پین‌ها نسبت به جابه‌جاییِ ماژول‌ها کور نمانند.
-const server = read('backend/src/server.js') + read('backend/src/routes/chat.js');
+const server = read('backend/src/server.js') + read('backend/src/routes/chat.js')
+  + read('backend/src/lib/chatConfig.js');
 
 let checks = 0;
 function ok(label, cond) {
