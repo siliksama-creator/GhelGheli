@@ -44,11 +44,9 @@ check(/notifications\/status/.test(webNotifications) && /fcmConfigured/.test(web
 check(/send-segmented/.test(webNotifications),
   'web uses the segmented-notification endpoint');
 
-const rewardRoutes = read('backend/src/routes/adminRewards.js');
-check(/AS required_cards/.test(rewardRoutes) && /cardTypeId/.test(rewardRoutes),
-  'reward admin API returns persisted card requirements');
-check(/LEFT JOIN reward_tiers/.test(rewardRoutes) && /COALESCE\(c\.reward_name/.test(rewardRoutes),
-  'deleted reward tiers do not hide historical claims');
+// دو بررسیِ routeهای مدیرِ جوایز اینجا بود؛ بخشِ جوایز به دستورِ مالک
+// کامل حذف شد (تسک ۱۳) و routeهای مرده‌اش هم پاک شدند (ممیزیِ ۸ مهر)،
+// پس چیزی برای سنجیدن با پنل باقی نمانده است.
 
 const dialog = read('admin/src/components/dialog.jsx');
 check(/state\.description \|\| state\.message/.test(dialog),

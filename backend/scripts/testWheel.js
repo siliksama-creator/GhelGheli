@@ -642,9 +642,10 @@ test('عدد نمایشی متناهی است، نه Infinity', () => {
 test('endpoint فقط برای سوپرادمین است', () => {
   // این پرچم عملاً جایزهٔ نامحدود می‌دهد؛ نقش پشتیبانی نباید بتواند
   // روشنش کند.
+  // مسیر از server.js به routes/adminDashboard.js منتقل شد (بندِ ۱ ممیزی ۸ مهر)
   const src = require('fs').readFileSync(
-    require('path').join(__dirname, '../src/server.js'), 'utf8');
-  const i = src.indexOf("'/api/admin/users/:id/unlimited-spins'");
+    require('path').join(__dirname, '../src/routes/adminDashboard.js'), 'utf8');
+  const i = src.indexOf("'/admin/users/:id/unlimited-spins'");
   assert.ok(i > 0, 'endpoint وجود ندارد');
   const route = src.slice(i, i + 700);
   assert.ok(/requireRole\(\)/.test(route),

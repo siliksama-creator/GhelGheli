@@ -88,7 +88,7 @@ export function CloudflarePage({ request }) {
   });
 
   const disable = () => run('disable', async () => {
-    const out = await request('/api/admin/cloudflare/disable', 'POST', {}\);
+    const out = await request('/api/admin/cloudflare/disable', 'POST', {});
     setSt((prev) => ({ ...prev, ...out }));
     notify('سپر خاموش شد — ترافیک مستقیم به سرور برگشت.', 'success');
   });

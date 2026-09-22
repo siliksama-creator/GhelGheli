@@ -35,7 +35,7 @@
   {
    "method": "POST",
    "path": "/api/admin/auth/login",
-   "source": "server.js"
+   "source": "routes/adminAuth.js"
   },
   {
    "method": "GET",
@@ -60,7 +60,7 @@
   {
    "method": "GET",
    "path": "/api/admin/card-duel/balance",
-   "source": "server.js"
+   "source": "routes/adminDashboard.js"
   },
   {
    "method": "GET",
@@ -90,12 +90,12 @@
   {
    "method": "GET",
    "path": "/api/admin/chat/pinned",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "PATCH",
    "path": "/api/admin/chat/pinned",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "PATCH",
@@ -155,12 +155,12 @@
   {
    "method": "GET",
    "path": "/api/admin/dashboard",
-   "source": "server.js"
+   "source": "routes/adminDashboard.js"
   },
   {
    "method": "GET",
    "path": "/api/admin/games/results",
-   "source": "server.js"
+   "source": "routes/adminDashboard.js"
   },
   {
    "method": "GET",
@@ -235,7 +235,7 @@
   {
    "method": "GET",
    "path": "/api/admin/metrics",
-   "source": "server.js"
+   "source": "routes/adminDashboard.js"
   },
   {
    "method": "GET",
@@ -430,17 +430,17 @@
   {
    "method": "GET",
    "path": "/api/admin/referrals/purchase-commissions",
-   "source": "server.js"
+   "source": "routes/adminDashboard.js"
   },
   {
    "method": "GET",
    "path": "/api/admin/settings/chat",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "PATCH",
    "path": "/api/admin/settings/chat",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "GET",
@@ -470,12 +470,12 @@
   {
    "method": "GET",
    "path": "/api/admin/settings/games",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "PATCH",
    "path": "/api/admin/settings/games",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "PATCH",
@@ -520,12 +520,12 @@
   {
    "method": "GET",
    "path": "/api/admin/settings/nickname-filter",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "PATCH",
    "path": "/api/admin/settings/nickname-filter",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "GET",
@@ -545,12 +545,12 @@
   {
    "method": "GET",
    "path": "/api/admin/settings/sms",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "PATCH",
    "path": "/api/admin/settings/sms",
-   "source": "server.js"
+   "source": "routes/adminSettings.js"
   },
   {
    "method": "PATCH",
@@ -640,7 +640,7 @@
   {
    "method": "POST",
    "path": "/api/admin/uploads/image",
-   "source": "server.js"
+   "source": "routes/adminDashboard.js"
   },
   {
    "method": "GET",
@@ -685,7 +685,7 @@
   {
    "method": "POST",
    "path": "/api/admin/users/:id/unlimited-spins",
-   "source": "server.js"
+   "source": "routes/adminDashboard.js"
   },
   {
    "method": "GET",
@@ -735,7 +735,7 @@
   {
    "method": "GET",
    "path": "/api/admin/wheel/stats",
-   "source": "server.js"
+   "source": "routes/adminDashboard.js"
   },
   {
    "method": "POST",

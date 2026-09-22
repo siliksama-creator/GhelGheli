@@ -111,7 +111,10 @@ assert(referrals.includes('wallet.getWalletSettings()'));
 
 // API and compact category UI parity.
 assert(server.includes("req.body?.billingCycle"));
-assert(server.includes("/api/admin/referrals/purchase-commissions"));
+// مسیر از server.js به routes/adminDashboard.js منتقل شد (بندِ ۱ ممیزی ۸ مهر)
+assert((server + read('backend/src/routes/adminDashboard.js'))
+  .includes("/api/admin/referrals/purchase-commissions") ||
+  read('backend/src/routes/adminDashboard.js').includes("/admin/referrals/purchase-commissions"));
 assert(server.includes('shop.emotePacksFor(req.user.id)'));
 assert(server.includes('await isAllowedChatMessage(clean, req.user.id)'));
 assert(webShop.includes('shopNav') && webShop.includes('shopCarousel'));
