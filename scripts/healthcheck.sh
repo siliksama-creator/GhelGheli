@@ -96,12 +96,62 @@ else
   fi
 fi
 
-# ── ۳) وب کاربر از بیرون (از دید کاربر واقعی) ─────────────────────────
-WEB_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 https://user.ghelghelishop.ir/ 2>/dev/null || echo 000)"
-case "$WEB_CODE" in 2??|3??) : ;; *) FAILURES+=("web: وب کاربر کد $WEB_CODE برگرداند") ;; esac
+# ── ۳) سرویس‌ها از بیرون، روی دامنه‌های کانونیکالِ «همان‌جا» ─────────
+# user/api/admin.ghelghelishop.com مقصدِ نهاییِ کاربرِ واقعی‌اند؛ دامنه‌های
+# .ir فقط ریدایرکت‌اند و «کد ۳xx = سالم» یعنی عملاً ریدایرکت تست می‌شد نه
+# سرویس. حالا: (الف) فقط کد ۲xx سالم است، (ب) بدنه باید مارکرِ محتوایِ
+# خودِ برنامه را داشته باشد — اگر روزی DNS جایِ دیگری را نشانه برود،
+# یک وردپرسِ بی‌ربط هم کد ۲۰۰ می‌دهد ولی مارکرِ فارسیِ ما را ندارد.
+probe_url() { # $1=url → PROBE_CODE, PROBE_BODY
+  local raw
+  raw="$(curl -sSL --max-time 20 -w '\n@@CODE@@%{http_code}' "$1" 2>/dev/null || printf '\n@@CODE@@000')"
+  PROBE_CODE="${raw##*@@CODE@@}"
+  PROBE_BODY="${raw%@@CODE@@*}"
+}
 
-API_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 https://api.ghelghelishop.ir/health 2>/dev/null || echo 000)"
+probe_url "https://user.ghelghelishop.com/"
+WEB_CODE="$PROBE_CODE"
+case "$WEB_CODE" in 2??) : ;; *) FAILURES+=("web: وب کاربر کد $WEB_CODE برگرداند") ;; esac
+echo "$PROBE_BODY" | grep -q 'lang="fa"' \
+  || FAILURES+=("web-content: صفحهٔ وب کاربر مارکرِ «lang=fa» ندارد — احتمالاً سرویسِ اشتباهی جای وب نشسته است")
+
+probe_url "https://admin.ghelghelishop.com/"
+ADMIN_CODE="$PROBE_CODE"
+case "$ADMIN_CODE" in 2??) : ;; *) FAILURES+=("admin-web: پنل ادمین کد $ADMIN_CODE برگرداند") ;; esac
+echo "$PROBE_BODY" | grep -q 'lang="fa"' \
+  || FAILURES+=("admin-content: پنل ادمین مارکرِ «lang=fa» ندارد — احتمالاً سرویسِ اشتباهی جای پنل نشسته است")
+
+probe_url "https://api.ghelghelishop.com/health"
+API_CODE="$PROBE_CODE"
 case "$API_CODE" in 2??) : ;; *) FAILURES+=("api-public: دامنه api کد $API_CODE برگرداند") ;; esac
+echo "$PROBE_BODY" | grep -q '"ok":true' \
+  || FAILURES+=("api-content: پاسخ /health مارکرِ «ok:true» ندارد")
+
+# ── ۳ب) یکپارچگیِ DNS: دامنه‌های کانونیکال باید به همین سرور برسند ──
+# حادثهٔ واقعی: رکوردهای A یک دامنه بی‌خبر عوض شدند و تمامِ ترافیک به
+# سرورِ دیگری رفت، در حالی که هر دو مانیتور (کرون و systemd) فقط
+# localhost و دامنه‌های ریدایرکتی را نگاه می‌کردند. این چک همان حفره را
+# می‌بندد. آی‌پیِ عمومی یک‌بار بیرون کشیده و کش می‌شود تا اگر
+# اینترنتِ خروجی قطع بود، چکِ DNS «سکوت» کند نه «هشدارِ کاذب».
+PUBLIC_IP_FILE="$STATE_DIR/public-ip"
+FRESH_IP="$(curl -sS --max-time 10 https://api.ipify.org 2>/dev/null || true)"
+if [ -n "$FRESH_IP" ]; then
+  echo "$FRESH_IP" > "$PUBLIC_IP_FILE" 2>/dev/null || true
+fi
+PUBLIC_IP="$(cat "$PUBLIC_IP_FILE" 2>/dev/null || true)"
+if [ -n "$PUBLIC_IP" ]; then
+  for d in user.ghelghelishop.com api.ghelghelishop.com admin.ghelghelishop.com; do
+    R="$(dig +short "$d" @8.8.8.8 2>/dev/null | tail -1 || true)"
+    if [ -z "$R" ]; then
+      R="$(getent hosts "$d" 2>/dev/null | awk '{print $1}' | tail -1 || true)"
+    fi
+    if [ -n "$R" ] && [ "$R" != "$PUBLIC_IP" ]; then
+      FAILURES+=("dns: دامنهٔ $d به $R رسیده است، نه به آی‌پیِ این سرور ($PUBLIC_IP) — رکوردهای DNS را چک کنید")
+    fi
+  done
+else
+  log "dns-check skipped: آی‌پیِ عمومیِ سرور تشخیص داده نشد"
+fi
 
 # ── ۴) دیتابیس: اتصال + خواندنِ یک ردیف ──────────────────────────────
 if ! PGPASSWORD="$(cat /root/.ghelgheli_db_pass 2>/dev/null)" \
@@ -153,7 +203,7 @@ if [ "${#FAILURES[@]}" -eq 0 ]; then
       case "$k" in ALARM_*) set_alarm "${k#ALARM_}" 0 "" ;; esac
     done < "$STATE_FILE"
   fi
-  log "healthy (disk=${DISK_PCT}% mem=${MEM_PCT}% web=${WEB_CODE} api=${API_CODE})"
+  log "healthy (disk=${DISK_PCT}% mem=${MEM_PCT}% web=${WEB_CODE} admin=${ADMIN_CODE} api=${API_CODE})"
 else
   MSG="$(printf '• %s\n' "${FAILURES[@]}")"
   set_alarm "health" 1 "$MSG"
