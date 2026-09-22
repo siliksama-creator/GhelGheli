@@ -1001,8 +1001,8 @@ String formatWheelChance(double p) {
   if (p <= 0) return '${faNum(0)}٪';
   if (p >= 1) return '${faNum((p * 10).round() / 10)}٪';
   if (p >= 0.01) return '${faNum((p * 100).round() / 100)}٪';
-  final n = (100 / p).round();
-  return '۱ در ${faNum(n < 1 ? 1 : n)}';
+  // خواستهٔ مالک (۲۰۲۶-۰۹-۲۲): همیشه درصد، هم‌راستا با وب — «۱ در N» ممنوع.
+  return '${faNum((p * 10000).round() / 10000)}٪';
 }
 
 

@@ -1062,6 +1062,18 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
         </Suspense>
         </UserErrorBoundary>
       )}
+
+      {/* اعلانِ وب: وقتی توکن هست یعنی کاربر لاگین است — همان «اولین
+          ورود» که مالک خواست پرسشِ اجازه نمایش داده شود. مهمان هرگز
+          پرسش نمی‌بیند (بدونِ توکن، رندر نمی‌شود). mounts در ریشهٔ اپ
+          (نه داخلِ یک صفحه) تا در هر تبی از اولین ورود دیده شود —
+          درسِ بازبینیِ ۲۲ سپتامبر: قبلاً داخلِ صفحهٔ چت‌وبازی بود و
+          فقط آن‌جا دیده می‌شد. */}
+      {token ? (
+        <Suspense fallback={null}>
+          <WebPushPrompt token={token} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
@@ -1135,14 +1147,6 @@ function Club({ token, openProfile, meId, openGames = false, launchGame = null, 
         setExternalLaunch({ socket, start, nonce: Date.now() });
         setSub('games');
       }} />}
-      {/* اعلانِ وب: وقتی توکن هست یعنی کاربر لاگین است — همان «اولین
-          ورود» که مالک خواست پرسشِ اجازه نمایش داده شود. مهمان هرگز
-          پرسش نمی‌بیند (بدونِ توکن، رندر نمی‌شود). */}
-      {token ? (
-        <Suspense fallback={null}>
-          <WebPushPrompt token={token} />
-        </Suspense>
-      ) : null}
     </div>
   );
 }

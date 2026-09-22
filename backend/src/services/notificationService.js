@@ -66,10 +66,21 @@ async function createNotification(userId, type, title, body, opts = {}) {
   if (!cleanTitle || !cleanBody) {
     throw Object.assign(new Error('عنوان و متن اعلان لازم است'), { status: 400 });
   }
-  const { rows } = await pool.query(
-    'INSERT INTO notifications(user_id,type,title,body) VALUES ($1,$2,$3,$4) RETURNING *',
-    [userId || null, type, cleanTitle, cleanBody]
-  );
+  let rows;
+  try {
+    ({ rows } = await pool.query(
+      'INSERT INTO notifications(user_id,type,title,body) VALUES ($1,$2,$3,$4) RETURNING *',
+      [userId || null, type, cleanTitle, cleanBody]
+    ));
+  } catch (e) {
+    // کاربرِ مقصد حذف شده (FK 23503): اعلان ارزشِ شکستنِ اقدامِ اصلی
+    // (بنِ چت، پاسخِ تیکت، نتیجهٔ بازی…) را ندارد و ردیفِ یتیم هم نمی‌سازیم.
+    if (e.code === '23503') {
+      console.warn('[notify] مقصد وجود ندارد — اعلان رد شد:', type);
+      return null;
+    }
+    throw e;
+  }
   if (opts.push === false) return rows[0];
   // لایهٔ موبایل (FCM) و لایهٔ وب (Web Push) موازی فرستاده می‌شوند؛
   // هیچ‌کدام نباید دیگری را بلوک یا خراب کند (allSettled — خطای هر کدام

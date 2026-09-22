@@ -21,14 +21,15 @@ import { rewardMoment } from '../lib/rewardMoment.js';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
-/** شانس را خوانا نشان بده. زیر ۰.۰۱٪ به‌جای اعشارِ بی‌معنی، «۱ در N». */
+/** شانس را خوانا نشان بده. خواستهٔ مالک (۲۰۲۶-۰۹-۲۲): همیشه درصد —
+ * «۱ در N» ممنوع؛ برای احتمالاتِ ریز تا چهار رقمِ اعشار کافی است. */
+const fa4 = n => new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 4 }).format(Number(n || 0));
 function formatChance(percent) {
   const p = Number(percent) || 0;
   if (p <= 0) return `${fa(0)}٪`;
   if (p >= 1) return `${fa(Math.round(p * 10) / 10)}٪`;
   if (p >= 0.01) return `${fa(Math.round(p * 100) / 100)}٪`;
-  const n = Math.max(1, Math.round(100 / p));
-  return `۱ در ${fa(n)}`;
+  return `${fa4(Math.round(p * 10000) / 10000)}٪`;
 }
 
 /** شمارش معکوس فارسی. رو به بالا گرد می‌شود — «۱ ساعت» وقتی ۹۰ دقیقه مانده
@@ -87,10 +88,14 @@ function LiveWheelDisc({ prizes }) {
           >
             <span style={{
               position: 'absolute',
-              left: 0, top: 0,
-              transform: `translate(-50%, 0) rotate(${flip}deg)`,
+              // رویِ نوارِ شعاعی: ۶۲٪ یعنی میانِ شخصیتِ مرکز و لبه —
+              // قبلاً top:0 بود یعنی همهٔ برچسب‌ها زیرِ شخصیتِ مرکز گم می‌شدند.
+              left: 0, top: '62%',
+              // متن در جهتِ شعاع خوانده می‌شود؛ نیمهٔ چپ قرینه (flip) تا
+              // وارونه دیده نشود. برچسب از سرور می‌آید (p.label) — بدون هاردکد.
+              transform: `translate(-50%, -50%) rotate(${90 + flip}deg)`,
               color: '#fff',
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 900,
               whiteSpace: 'nowrap',
               textShadow: '0 1px 2px #000, 0 0 6px #000',

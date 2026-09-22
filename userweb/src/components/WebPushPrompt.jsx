@@ -104,7 +104,7 @@ export default function WebPushPrompt({ token }) {
   if (!visible) return null;
   return (
     <div role="dialog" aria-label="فعال‌سازی اعلان‌ها" style={{
-      position: 'fixed', insetInline: 0, bottom: 16, zIndex: 4000,
+      position: 'fixed', insetInline: 0, top: 16, zIndex: 4000,
       display: 'flex', justifyContent: 'center', pointerEvents: 'none',
     }}>
       <div style={{
