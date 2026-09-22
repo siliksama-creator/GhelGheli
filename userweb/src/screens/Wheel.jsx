@@ -107,6 +107,21 @@ function LiveWheelDisc({ prizes }) {
   );
 }
 
+/** برش‌های هم‌برچسب یک جایزه‌اند: شانس‌ها جمع می‌شود نه تکرار.
+ * خروجی بیشترین→کمترین (خواستهٔ مالک ۲۰۲۶-۰۹-۲۳). همهٔ اعداد از
+ * p.percent سرور می‌آید — هیچ چیزی هاردکد نیست. */
+function groupedOdds(prizes) {
+  const map = new Map();
+  for (const p of (prizes || [])) {
+    const key = String(p.label || '?');
+    const cur = map.get(key) || { label: key, color: p.color, percent: 0 };
+    cur.percent += Number(p.percent) || 0;
+    map.set(key, cur);
+  }
+  return [...map.values()].filter((g) => g.percent > 0)
+    .sort((a, b) => b.percent - a.percent);
+}
+
 export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
   // جملهٔ «سهمیه هر شب ساعت ۱۲…» و عددِ چرخشِ آستانه از پنل زنده‌اند
   // (فاز ۲). مشترک‌شدن روی همان کشِ config است — fetchِ تازه‌ای لازم نیست.
@@ -302,18 +317,25 @@ export default function Wheel({ token, setMsg, reloadProfile, onSpinsChange }) {
       {(state.prizes || []).some((p) => Number(p.percent) > 0) && (
         <div className="wheelOdds" style={{ marginTop: 16 }}>
           <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>شانس هر جایزه</h3>
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 12.5 }}>
-            {state.prizes.map((p) => (
-              <li key={p.id || p.sliceOrder} style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                marginBottom: 5,
+          <ul style={{
+            // خواستهٔ مالک: جمع‌وجور — شبکهٔ دوستونی به‌جای فهرستِ بلند،
+            // تا صفحهٔ چرخونه کمتر اسکرول بخواهد.
+            margin: 0, padding: 0, listStyle: 'none', fontSize: 11.5,
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 14px',
+          }}>
+            {groupedOdds(state.prizes).map((g) => (
+              <li key={g.label} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
               }}>
                 <span style={{
-                  width: 10, height: 10, borderRadius: 3,
-                  background: p.color || '#84CC16', flexShrink: 0,
+                  width: 9, height: 9, borderRadius: 3,
+                  background: g.color || '#84CC16', flexShrink: 0,
                 }} />
-                <span style={{ flex: 1 }}>{p.label}</span>
-                <b>{formatChance(p.percent)}</b>
+                <span style={{
+                  flex: 1, overflow: 'hidden',
+                  textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{g.label}</span>
+                <b>{formatChance(g.percent)}</b>
               </li>
             ))}
           </ul>

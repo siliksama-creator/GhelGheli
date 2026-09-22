@@ -1012,6 +1012,74 @@ String formatWheelChance(double p) {
 /// پاریتی «اندروید شانس هر جایزه را از سرور نشان می‌دهد» فقط به‌خاطرِ
 /// متنِ همان کلاسِ مرده سبز بود. حالا واقعاً در صفحه نمایش داده می‌شود
 /// وقتی سرور درصد بفرستد — هم‌تراز با جدولِ وب.
+/// یک جایزهٔ ادغام‌شده: برچسب + رنگ + مجموعِ درصدِ برش‌هایش.
+class _OddsGroup {
+  const _OddsGroup(this.label, this.color, this.percent);
+  final String label;
+  final Color color;
+  final double percent;
+}
+
+/// برش‌های هم‌برچسب یک جایزه‌اند؛ درصدشان جمع می‌شود و خروجی
+/// بیشترین→کمترین مرتب می‌شود (هم‌راستا با وب).
+List<_OddsGroup> _groupedOdds(List<WheelPrize> prizes) {
+  final map = <String, _OddsGroup>{};
+  for (final p in prizes) {
+    final key = p.label.isEmpty ? '?' : p.label;
+    final cur = map[key];
+    map[key] = cur == null
+        ? _OddsGroup(key, p.color, p.percent)
+        : _OddsGroup(key, cur.color, cur.percent + p.percent);
+  }
+  final list = map.values.where((g) => g.percent > 0).toList();
+  list.sort((a, b) => b.percent.compareTo(a.percent));
+  return list;
+}
+
+/// ردیف‌های دوستونیِ جمع‌وجور برای کارتِ شانس‌ها.
+List<Widget> _oddsRows(List<_OddsGroup> list, ThemeData theme) {
+  final rows = <Widget>[];
+  for (var i = 0; i < list.length; i += 2) {
+    final second = i + 1 < list.length ? list[i + 1] : null;
+    rows.add(Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(child: _oddsCell(list[i], theme)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: second == null ? const SizedBox.shrink() : _oddsCell(second, theme),
+          ),
+        ],
+      ),
+    ));
+  }
+  return rows;
+}
+
+Widget _oddsCell(_OddsGroup g, ThemeData theme) => Row(
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: g.color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(g.label,
+              style: theme.textTheme.bodySmall,
+              overflow: TextOverflow.ellipsis),
+        ),
+        Text(
+          formatWheelChance(g.percent),
+          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w900),
+        ),
+      ],
+    );
+
 class _OddsCard extends StatelessWidget {
   const _OddsCard({required this.prizes});
   final List<WheelPrize> prizes;
@@ -1034,31 +1102,10 @@ class _OddsCard extends StatelessWidget {
                 color: const Color(0xFFA3E635),
               )),
           Gaps.vXs,
-          for (final p in prizes)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 5),
-              child: Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: p.color,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(p.label, style: theme.textTheme.bodySmall),
-                  ),
-                  Text(
-                    formatWheelChance(p.percent),
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(fontWeight: FontWeight.w900),
-                  ),
-                ],
-              ),
-            ),
+          // خواستهٔ مالک (۲۰۲۶-۰۹-۲۳): بیشترین→کمترین و جمع‌وجورِ
+          // دوستونی؛ برش‌های هم‌برچسب ادغام و درصدها جمع می‌شوند.
+          // ورودی همان p.percent سرور است — هیچ چیزی هاردکد نیست.
+          ..._oddsRows(_groupedOdds(prizes), theme),
           Text(
             'این عددها از پنل می‌آیند. برش‌ها از نظر اندازه مساوی‌اند؛ '
             'جایزه را سرور با همین شانس‌ها انتخاب می‌کند.',
