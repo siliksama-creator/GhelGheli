@@ -59,17 +59,40 @@ class PendingRoomJoin {
   final String? gameId;
 }
 
+/// نتیجهٔ کال‌بکِ زرین‌پال که از دامنهٔ عمومیِ کاربر به اپ برگشته است.
+class PendingPaymentReturn {
+  const PendingPaymentReturn({required this.orderId, required this.status});
+  final String orderId;
+  final String status;
+}
+
 class DeepLinks {
   DeepLinks._();
   static final DeepLinks instance = DeepLinks._();
 
   PendingRoomJoin? _initial;
+  PendingPaymentReturn? _initialPayment;
   final StreamController<PendingRoomJoin> _controller =
       StreamController<PendingRoomJoin>.broadcast();
+  final StreamController<PendingPaymentReturn> _paymentController =
+      StreamController<PendingPaymentReturn>.broadcast();
   bool _started = false;
 
   /// لینک‌هایی که وقتی اپ از قبل باز است می‌رسند.
   Stream<PendingRoomJoin> get joins => _controller.stream;
+
+  /// بازگشتِ زرین‌پال، هم برای صفحهٔ فروشگاه و هم صندوقِ دوئل.
+  Stream<PendingPaymentReturn> get payments => _paymentController.stream;
+
+  PendingPaymentReturn? _parsePayment(Uri? uri) {
+    if (uri == null || uri.queryParameters['pay'] != 'result') return null;
+    final id = uri.queryParameters['order'];
+    if (id == null || id.trim().isEmpty) return null;
+    return PendingPaymentReturn(
+      orderId: id.trim(),
+      status: (uri.queryParameters['status'] ?? 'failed').trim().toLowerCase(),
+    );
+  }
 
   PendingRoomJoin? _parse(Uri? uri) {
     if (uri == null) return null;
@@ -97,8 +120,14 @@ class DeepLinks {
     try {
       final links = AppLinks();
       final initialUri = await links.getInitialLink();
+      _initialPayment = _parsePayment(initialUri);
       _initial = _parse(initialUri);
       links.uriLinkStream.listen((uri) {
+        final payment = _parsePayment(uri);
+        if (payment != null) {
+          _paymentController.add(payment);
+          return;
+        }
         final join = _parse(uri);
         if (join != null) _controller.add(join);
       }, onError: (_) {/* لینک نامعتبر — بی‌خیال */});
@@ -111,6 +140,13 @@ class DeepLinks {
   Future<PendingRoomJoin?> consumeInitialJoin() async {
     final value = _initial;
     _initial = null;
+    return value;
+  }
+
+  /// نتیجهٔ پرداختی که اپ با آن از حالت سرد باز شده است (یک‌بار مصرف).
+  Future<PendingPaymentReturn?> consumeInitialPayment() async {
+    final value = _initialPayment;
+    _initialPayment = null;
     return value;
   }
 }

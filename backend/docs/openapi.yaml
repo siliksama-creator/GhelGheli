@@ -3953,6 +3953,190 @@ paths:
               additionalProperties: true
       security:
         - bearerAuth: []
+  /api/admin/payments/zarinpal:
+    get:
+      tags:
+        - Admin
+      summary: دریافت /api/admin/payments/zarinpal
+      operationId: get_api_admin_payments_zarinpal
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
+    put:
+      tags:
+        - Admin
+      summary: جایگزینی /api/admin/payments/zarinpal
+      operationId: put_api_admin_payments_zarinpal
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
+  /api/admin/payments/zarinpal/test:
+    post:
+      tags:
+        - Admin
+      summary: ایجاد/ارسال /api/admin/payments/zarinpal/test
+      operationId: post_api_admin_payments_zarinpal_test
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
   /api/admin/photo-cards/card-types/{id}:
     delete:
       tags:
@@ -13663,6 +13847,190 @@ paths:
             schema:
               type: object
               additionalProperties: true
+      security:
+        - bearerAuth: []
+  /api/payments/zarinpal/callback:
+    get:
+      tags:
+        - API
+      summary: دریافت /api/payments/zarinpal/callback
+      operationId: get_api_payments_zarinpal_callback
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      security:
+        - bearerAuth: []
+  /api/payments/zarinpal/order:
+    post:
+      tags:
+        - API
+      summary: ایجاد/ارسال /api/payments/zarinpal/order
+      operationId: post_api_payments_zarinpal_order
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      security:
+        - bearerAuth: []
+  /api/payments/zarinpal/order/{id}:
+    get:
+      tags:
+        - API
+      summary: دریافت /api/payments/zarinpal/order/{id}
+      operationId: get_api_payments_zarinpal_order_id
+      responses:
+        "200":
+          description: موفق
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "400":
+          description: درخواست نامعتبر
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "401":
+          description: نیازمند ورود
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "403":
+          description: دسترسی غیرمجاز
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "404":
+          description: یافت نشد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "409":
+          description: تعارض وضعیت
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "429":
+          description: تعداد درخواست بیش از حد
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+        "500":
+          description: خطای داخلی سرور
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JsonResponse"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
       security:
         - bearerAuth: []
   /api/photo-cards/check-code:

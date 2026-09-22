@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { req, fa } from '../lib/api.js';
 // برچسب‌های «۳۰ روز» و «حدود ۳۰٪» از live_copy + اعدادِ پلن می‌آیند
 // (فاز ۲). `days`/`savingPercent` را خودِ /api/shop در هر پلن می‌فرستد.
-import { text, useLive } from '../lib/liveConfig.js';
+import { liveConfig, text, useLive } from '../lib/liveConfig.js';
 import { AnimatedName, CosmeticAvatarFrame, DisplayName, profileBackgroundClass, profileBackgroundStyle } from '../components/Cosmetics.jsx';
 import { SvgIcon } from '../components/IconAsset.jsx';
 import CardBox from '../components/CardBox.jsx';
@@ -138,6 +138,11 @@ export default function Shop({ token, reloadProfile }) {
   // است که همان اول خرج شود، نه اینکه دوباره از جیبش بدهد. خاموش‌کردنش
   // یک کلیک است.
   const [useWallet, setUseWallet] = useState(true);
+  // درگاه از /api/config می‌آید؛ پنل ادمین بدون انتشار نسخه آن را روشن/خاموش
+  // می‌کند. وقتی روشن است، وب مستقیم به زرین‌پال می‌رود و دیگر به پلِ قدیمی
+  // کافه‌بازار (که فقط داخل اپ اندروید وجود دارد) وابسته نیست.
+  useLive();
+  const zarinpalEnabled = liveConfig()?.payments?.zarinpalEnabled === true;
 
   const load = useCallback(async () => {
     try {
@@ -184,7 +189,21 @@ export default function Shop({ token, reloadProfile }) {
     finally { setBusy(''); }
   };
 
-  // ── خرید: کیف پول + باقی‌مانده از کافه‌بازار (هیبرید) ───────────────
+  // ── خرید: زرین‌پالِ زنده / سازگاری با بازارِ قدیمی ───────────────────
+  // وقتی ادمین زرین‌پال را روشن کرده، سرور مبلغ و نوع کالا را از دیتابیس
+  // می‌سازد، authority می‌گیرد و کاربر را به درگاه می‌فرستد. کال‌بک همان
+  // سفارش را verify و تحویل می‌کند؛ مرورگر فقط URL پرداخت را باز می‌کند.
+  const startZarinpal = async ({ kind, slug, billingCycle, useWallet: wallet = false }) => {
+    const order = await req('/api/payments/zarinpal/order', 'POST', {
+      kind, slug, billingCycle, useWallet: wallet,
+    }, token);
+    if (order?.settled === true) return order;
+    if (!order?.startPayUrl) throw new Error('آدرس درگاه زرین‌پال دریافت نشد');
+    window.location.assign(order.startPayUrl);
+    return order;
+  };
+
+  // ── خرید: کیف پول + باقی‌مانده از بازار (هیبرید) ───────────────
   //
   // ⚠️ این رفتار در دورِ ۲۲ به خواستهٔ صریحِ مالک برگشت. پیش‌تر خرید
   // ۱۰۰٪ از بازار بود و کیف پول فقط برداشت نقدی داشت.
@@ -222,6 +241,9 @@ export default function Shop({ token, reloadProfile }) {
   };
 
   const buyPlan = (billingCycle) => act(`plus-${billingCycle}`, async () => {
+    if (zarinpalEnabled) {
+      return startZarinpal({ kind: 'plus', billingCycle });
+    }
     const order = await req('/api/shop/plus', 'POST', { billingCycle }, token);
     return purchase(order);
   }, billingCycle === 'annual' ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد',
@@ -230,6 +252,9 @@ export default function Shop({ token, reloadProfile }) {
   { note: (data?.plans || []).find((pl) => pl.billingCycle === billingCycle)?.label || '' });
 
   const buyItem = (item) => act(`buy-${item.id}`, async () => {
+    if (zarinpalEnabled) {
+      return startZarinpal({ kind: 'shop', slug: item.id, useWallet });
+    }
     const order = await req(`/api/shop/items/${item.id}/buy`, 'POST',
       { useWallet }, token);
     // سرور کالا را از کیف پول تسویه کرده — باز کردنِ پنجرهٔ بازار یعنی
@@ -297,13 +322,13 @@ export default function Shop({ token, reloadProfile }) {
             اول از کیف پول کم شود
             <small>
               موجودی: <b>{money(data.walletBalance)}</b> · اگر کمتر از قیمت باشد،
-              باقی‌مانده از کافه‌بازار گرفته می‌شود
+              باقی‌مانده از {zarinpalEnabled ? 'زرین‌پال' : 'کافه‌بازار'} گرفته می‌شود
             </small>
           </span>
         </label>
       ) : (
         <p className="shopPayNote">
-          پرداخت از کافه‌بازار یا با جایزهٔ نقدیِ کیف پول (لیگ و گردونه). کیف پول با خرید شارژ نمی‌شود.
+          پرداخت از {zarinpalEnabled ? 'زرین‌پال' : 'کافه‌بازار'} یا با جایزهٔ نقدیِ کیف پول (لیگ و گردونه). کیف پول با خرید شارژ نمی‌شود.
         </p>
       )}
       {showPlans && <div className="shopPlans">{(data.plans || []).map((plan) => {
@@ -335,7 +360,8 @@ export default function Shop({ token, reloadProfile }) {
         <h3>درِ ورود به دوئل</h3>
         <span>کارت فیزیکی نداری؟ از اینجا شروع کن</span>
       </div>
-      <CardBox token={token} onGranted={() => { load(); reloadProfile?.(); }} />
+      <CardBox token={token} zarinpalEnabled={zarinpalEnabled}
+        onGranted={() => { load(); reloadProfile?.(); }} />
     </section>
 
     <nav className="shopNav" aria-label="دسته‌های فروشگاه">{availableKinds.map(([key, label]) => <button key={key}

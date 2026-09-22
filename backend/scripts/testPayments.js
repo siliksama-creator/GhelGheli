@@ -152,7 +152,8 @@ ok('کمیسیون در تحویلِ پلاس پرداخت می‌شود',
 ok('کمیسیون روی قیمت کاملِ پرداختی حساب می‌شود',
   /purchaseAmount: Number\(amount\)/.test(shopSvc));
 ok('درگاه در سند کمیسیون ثبت می‌شود',
-  /gatewayProvider: 'cafebazaar'/.test(shopSvc)
+  /gatewayProvider/.test(shopSvc)
+  && /gatewayProvider = 'cafebazaar'/.test(shopSvc)
   && /gateway_provider/.test(referral));
 ok('نرخ پیش‌فرض کمیسیون ۵٪ است و از getter می‌آید',
   /purchaseCommissionPercent\(\)/.test(referral)

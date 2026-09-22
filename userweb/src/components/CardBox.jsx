@@ -37,7 +37,7 @@ const REVEAL_SFX = {
  *
  * دو جا رندر می‌شود: قفسهٔ فروشگاه، و درست همان‌جا که دوئل بن‌بست می‌شود.
  */
-export default function CardBox({ token, compact = false, onGranted }) {
+export default function CardBox({ token, compact = false, onGranted, zarinpalEnabled = false }) {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -112,8 +112,17 @@ export default function CardBox({ token, compact = false, onGranted }) {
     startShakeSound();
     const t0 = Date.now();
     try {
-      // همان سه‌گامِ فروشگاه: سفارش از سرور، پرداخت در بازار، تحویل بعد
-      // از راستی‌آزماییِ سرور. کلاینت هیچ‌وقت خودش «تحویل شد» نمی‌گوید.
+      if (zarinpalEnabled) {
+        // وب‌مرورگر بازارِ درون‌برنامه‌ای ندارد؛ زرین‌پال همان خرید را
+        // در مرورگر انجام می‌دهد و کال‌بکِ سرور صندوق را تحویل می‌دهد.
+        const order = await req('/api/payments/zarinpal/order', 'POST',
+          { kind: 'card_box' }, token);
+        if (!order?.startPayUrl) throw new Error('آدرس درگاه زرین‌پال دریافت نشد');
+        window.location.assign(order.startPayUrl);
+        return;
+      }
+      // سازگاری با نسخهٔ قدیمی: اگر زرین‌پال از پنل خاموش است، مسیر بازار
+      // فقط داخل اپ اندروید و از طریق پلِ موجود ادامه پیدا می‌کند.
       const order = await req('/api/card-box/buy', 'POST', {}, token);
       if (!window.__ghBazaarPurchase) {
         throw new Error('برای خرید صندوق، اپ اندروید را از کافه‌بازار نصب کنید');
@@ -447,7 +456,7 @@ export default function CardBox({ token, compact = false, onGranted }) {
           ) : (
             <div className="cardBoxBuyRow" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <button type="button" className="cardBoxBtn" onClick={buy} disabled={busy}>
-                {busy ? 'در حال باز کردن…' : 'باز کردن صندوق'}
+                {busy ? 'در حال باز کردن…' : (zarinpalEnabled ? 'پرداخت با زرین‌پال' : 'باز کردن صندوق')}
               </button>
               {typeof data.walletBalance === 'number' && (
                 <button type="button" className="cardBoxBtn cardBoxBtnWallet"

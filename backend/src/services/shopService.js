@@ -339,7 +339,7 @@ async function catalogue(userId, shape) {
  * توزیعِ جایزهٔ نقدی همچنان بر اساسِ **سکه** است (`ORDER BY coins DESC`) و
  * سکه فقط از بازی‌کردن می‌آید؛ پس خریدِ صندوق مستقیماً پول برنمی‌گرداند.
  */
-async function deliverCardBox(client, { userId, amount, orderId }) {
+async function deliverCardBox(client, { userId, amount, orderId, gatewayProvider = 'cafebazaar' }) {
   const box = await cardBox.grantBox(client, {
     userId,
     pricePaid: Number(amount) || 0,
@@ -366,7 +366,7 @@ async function deliverCardBox(client, { userId, amount, orderId }) {
     purchaseType: 'card_box',
     purchaseReferenceId: box.boxId,
     purchaseAmount: Number(amount) || 0,
-    gatewayProvider: 'cafebazaar',
+    gatewayProvider,
   });
 
   return {
@@ -381,7 +381,7 @@ async function deliverCardBox(client, { userId, amount, orderId }) {
   };
 }
 
-async function deliverItem(client, { userId, itemId, amount, walletPaid = 0 }) {
+async function deliverItem(client, { userId, itemId, amount, walletPaid = 0, gatewayProvider = 'cafebazaar' }) {
   const itemRes = await client.query(
     `SELECT * FROM shop_items WHERE id=$1 AND is_active=true FOR UPDATE`,
     [itemId],
@@ -481,7 +481,7 @@ async function deliverItem(client, { userId, itemId, amount, walletPaid = 0 }) {
       purchaseType: 'shop_item',
       purchaseReferenceId: purchaseId,
       purchaseAmount: commissionable,
-      gatewayProvider: 'cafebazaar',
+      gatewayProvider,
     })
     : null;
 
@@ -512,7 +512,7 @@ function normalizeBillingCycle(value) {
  * می‌خرد، ۵۰ روز می‌گیرد — نه ۳۰ روز با ۲۰ روز سوخته. این همان رفتاری
  * است که قبل از تغییرِ درگاه هم داشتیم و عمداً حفظ شده.
  */
-async function deliverPlus(client, { userId, billingCycle, amount }) {
+async function deliverPlus(client, { userId, billingCycle, amount, gatewayProvider = 'cafebazaar' }) {
   const cycle = normalizeBillingCycle(billingCycle);
   const chosen = plusPlansConfig()[cycle] || plusPlansConfig().monthly;
   {
@@ -574,7 +574,7 @@ async function deliverPlus(client, { userId, billingCycle, amount }) {
       purchaseType: cycle === 'annual' ? 'plus_annual' : 'plus_monthly',
       purchaseReferenceId: subscriptionId,
       purchaseAmount: Number(amount) || chosen.price,
-      gatewayProvider: 'cafebazaar',
+      gatewayProvider,
     });
 
     // `plusStatus` روی همین client خوانده می‌شود نه pool: اگر از pool
@@ -621,8 +621,8 @@ async function deliverPlus(client, { userId, billingCycle, amount }) {
  *   پیش‌فرضِ خاموش عمدی است: کاربر نباید ناخواسته موجودیِ نقدی‌اش را
  *   خرج کند چون دکمهٔ «خرید» را زده.
  */
-async function buyShopItem(userId, slug, { useWallet = false } = {}) {
-  if (!useWallet) return payments.createShopOrder(userId, slug);
+async function buyShopItem(userId, slug, { useWallet = false, provider = 'cafebazaar' } = {}) {
+  if (!useWallet) return payments.createShopOrder(userId, slug, { provider });
 
   const item = await resolveShopItem(slug);
   const price = Number(item.price);
@@ -690,12 +690,16 @@ async function buyShopItem(userId, slug, { useWallet = false } = {}) {
     // ببندد و هرگز نپردازد، پولش تا ابد بلوکه می‌ماند و به سازوکارِ انقضا/
     // بازپرداختِ جداگانه‌ای نیاز می‌شود. کسر در لحظهٔ تحویل یعنی پول فقط
     // وقتی کم می‌شود که کالا واقعاً داده شده است.)
-    const split = payments.bestWalletSplit(price, balance);
+    const split = provider === 'zarinpal'
+      // زرین‌پال مبلغ آزاد می‌گیرد؛ بیشترین سهمِ امنِ کیف پول را استفاده کن
+      // و باقی‌مانده را خودِ زرین‌پال می‌گیرد (محدودیتِ نقاطِ بازار اینجا نیست).
+      ? { walletAmount: Math.min(balance, price), payable: price - Math.min(balance, price) }
+      : payments.bestWalletSplit(price, balance);
     await client.query('COMMIT');
     if (!split || split.walletAmount <= 0) {
       // هیچ شکستِ ممکنی با کیف پول ممکن نیست — سفارشِ تماماً-بازاری.
       return {
-        ...await payments.createShopOrder(userId, slug),
+        ...await payments.createShopOrder(userId, slug, { provider }),
         settled: false,
         paidFromWallet: 0,
         remainingToPay: price,
@@ -703,6 +707,7 @@ async function buyShopItem(userId, slug, { useWallet = false } = {}) {
     }
     const order = await payments.createShopOrder(userId, slug, {
       walletAmount: split.walletAmount,
+      provider,
     });
     return {
       ...order,
@@ -860,38 +865,44 @@ async function buyCardBoxWithWallet(userId) {
  * `orderId` و `purchaseToken` می‌دهد؛ اینکه آن سفارش برای چه بوده و
  * چقدر بوده، فقط از دیتابیس خوانده می‌شود.
  */
+async function deliverForOrder(client, userId, order, amount) {
+  if (order.purchase_kind === 'shop_item') {
+    if (!order.shop_item_id) throw fail('سفارش ناقص است', 409);
+    // `amount` مبلغی است که واقعاً به بازار رفته. در خریدِ ترکیبی، سهمِ
+    // کیف پول (wallet_amount سفارش) به‌عنوان walletPaid به تحویل پاس
+    // داده می‌شود تا (۱) همان‌جا در همین تراکنش از موجودی کسر شود و
+    // (۲) کمیسیونِ معرف روی آن حساب نشود. تا کامیتِ ممیزیِ دورِ ۲۳
+    // این کسر در هیچ‌جا انجام نمی‌شد — کامنتِ اینجا به آن اشاره دارد.
+    const walletPaid = Number(order.wallet_amount || 0);
+    return deliverItem(client, {
+      userId,
+      itemId: order.shop_item_id,
+      amount: Number(amount) + walletPaid,
+      walletPaid,
+      gatewayProvider: order.provider,
+    });
+  }
+  if (order.purchase_kind === 'card_box') {
+    return deliverCardBox(client, {
+      userId, amount, orderId: order.id, gatewayProvider: order.provider,
+    });
+  }
+  if (order.purchase_kind === 'plus_monthly'
+   || order.purchase_kind === 'plus_annual') {
+    return deliverPlus(client, {
+      userId,
+      billingCycle: order.plus_cycle
+        || (order.purchase_kind === 'plus_annual' ? 'annual' : 'monthly'),
+      amount,
+      gatewayProvider: order.provider,
+    });
+  }
+  throw fail('نوع این سفارش پشتیبانی نمی‌شود', 409);
+}
+
 async function verifyPurchase(userId, orderId, purchaseToken) {
   return payments.verifyAndDeliver(userId, orderId, purchaseToken,
-    async (client, { order, amount }) => {
-      if (order.purchase_kind === 'shop_item') {
-        if (!order.shop_item_id) throw fail('سفارش ناقص است', 409);
-        // `amount` مبلغی است که واقعاً به بازار رفته. در خریدِ ترکیبی، سهمِ
-        // کیف پول (wallet_amount سفارش) به‌عنوان walletPaid به تحویل پاس
-        // داده می‌شود تا (۱) همان‌جا در همین تراکنش از موجودی کسر شود و
-        // (۲) کمیسیونِ معرف روی آن حساب نشود. تا کامیتِ ممیزیِ دورِ ۲۳
-        // این کسر در هیچ‌جا انجام نمی‌شد — کامنتِ اینجا به آن اشاره دارد.
-        const walletPaid = Number(order.wallet_amount || 0);
-        return deliverItem(client, {
-          userId,
-          itemId: order.shop_item_id,
-          amount: Number(amount) + walletPaid,
-          walletPaid,
-        });
-      }
-      if (order.purchase_kind === 'card_box') {
-        return deliverCardBox(client, { userId, amount, orderId: order.id });
-      }
-      if (order.purchase_kind === 'plus_monthly'
-       || order.purchase_kind === 'plus_annual') {
-        return deliverPlus(client, {
-          userId,
-          billingCycle: order.plus_cycle
-            || (order.purchase_kind === 'plus_annual' ? 'annual' : 'monthly'),
-          amount,
-        });
-      }
-      throw fail('نوع این سفارش پشتیبانی نمی‌شود', 409);
-    });
+    (client, ctx) => deliverForOrder(client, ctx.userId, ctx.order, ctx.amount));
 }
 
 async function assertUsable(client, userId, item) {
@@ -1134,6 +1145,7 @@ module.exports = {
   deliverItem,
   deliverPlus,
   verifyPurchase,
+  deliverForOrder,
   equip,
   plusStatus,
   purchaseHistory,

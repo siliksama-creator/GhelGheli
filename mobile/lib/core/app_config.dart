@@ -92,6 +92,10 @@ class AppConfig extends ChangeNotifier {
     return v is num ? v.toInt() : null;
   }
 
+  /// درگاهِ پرداختِ زندهٔ پنل — وب و اندروید دقیقاً از همین پرچم می‌خوانند.
+  /// نبودنِ کلید یعنی خاموش (سازگاری با سرورهای قدیمی).
+  bool get zarinpalEnabled => _at('payments.zarinpalEnabled') == true;
+
   /// اتصالِ ApiClientِ خودِ اپ (نه یک کلاینتِ تازه).
   ///
   /// چرا: یک کلاینتِ تازه یعنی یک کشِ ETag جدا و یک درخواستِ اضافه در هر

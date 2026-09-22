@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  Activity, BarChart3, Bell, BookText, CircleDot, Coins, Gamepad2, Layers, LifeBuoy, Megaphone, MessageCircle, Package, ScanLine, Settings, Shield, ShieldCheck, Sigma, SlidersHorizontal, Smartphone, Store, Swords, Target, Timer, Trophy, Users, Wallet,
+  Activity, BarChart3, Bell, BookText, CircleDot, Coins, CreditCard, Gamepad2, Layers, LifeBuoy, Megaphone, MessageCircle, Package, ScanLine, Settings, Shield, ShieldCheck, Sigma, SlidersHorizontal, Smartphone, Store, Swords, Target, Timer, Trophy, Users, Wallet,
 } from 'lucide-react';
 
 import './theme.css';
@@ -46,6 +46,7 @@ const GameEconomyPage = lazy(() => import('./pages/game-economy.jsx').then(m => 
 const WheelPage = lazy(() => import('./pages/wheel.jsx').then(m => ({ default: m.WheelAdminPage })));
 const CardBoxPage = lazy(() => import('./pages/card-box.jsx').then(m => ({ default: m.CardBoxAdminPage })));
 const SettingsPage = lazy(() => import('./pages/settings.jsx').then(m => ({ default: m.SettingsPage })));
+const ZarinPalPage = lazy(() => import('./pages/zarinpal.jsx').then(m => ({ default: m.ZarinPalPage })));
 const LiveCopyPage = lazy(() => import('./pages/live-copy.jsx').then(m => ({ default: m.LiveCopyPage })));
 const AdminsPage = lazy(() => import('./pages/admins.jsx').then(m => ({ default: m.AdminsPage })));
 const MetricsPage = lazy(() => import('./pages/metrics.jsx').then(m => ({ default: m.MetricsPage })));
@@ -145,6 +146,9 @@ const NAV = [
     'cards'],
   ['shop', 'فروشگاه', Store, ShopAdminPage,
     'آیتم‌های فروشگاه و صندوق کارت؛ هر تغییری همان لحظه در فروشگاهِ کاربران می‌نشیند — بدون آپدیت اپ.',
+    'cards'],
+  ['zarinpal', 'درگاه زرین‌پال', CreditCard, ZarinPalPage,
+    'فعال‌سازی و تست درگاه پرداختِ مشترک وب و اندروید؛ تنظیمات از اینجا زنده روی هر دو کلاینت می‌نشیند.',
     'cards'],
   ['card-box', 'صندوق کارت', Package, CardBoxPage,
     'شانسِ هر کلاس، قیمت و روشن/خاموش‌کردن فروش صندوق + تاریخچهٔ خریدها.',

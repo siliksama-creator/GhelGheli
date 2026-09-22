@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 254,
+ "count": 260,
  "endpoints": [
   {
    "method": "GET",
@@ -316,6 +316,21 @@
    "method": "PATCH",
    "path": "/api/admin/pass/tiers/:id",
    "source": "routes/adminPass.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/payments/zarinpal",
+   "source": "routes/zarinpal.js"
+  },
+  {
+   "method": "PUT",
+   "path": "/api/admin/payments/zarinpal",
+   "source": "routes/zarinpal.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/payments/zarinpal/test",
+   "source": "routes/zarinpal.js"
   },
   {
    "method": "DELETE",
@@ -1031,6 +1046,21 @@
    "method": "POST",
    "path": "/api/pass/claim/:tierId?",
    "source": "routes/progression.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/payments/zarinpal/callback",
+   "source": "routes/zarinpal.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/payments/zarinpal/order",
+   "source": "routes/zarinpal.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/payments/zarinpal/order/:id",
+   "source": "routes/zarinpal.js"
   },
   {
    "method": "GET",

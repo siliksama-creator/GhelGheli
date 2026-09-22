@@ -1,11 +1,14 @@
 // Compact category-based Shop. Web parity: monthly/annual Plus and every
 // deterministic cosmetic use the same server catalogue and wallet ledger.
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../api_client.dart';
 import '../../core/app_config.dart';
+import '../../core/deep_links.dart';
 import '../../core/cosmetics.dart';
 import '../../core/money.dart';
 import '../../utils/fa_date.dart';
@@ -28,6 +31,10 @@ class _ShopPageState extends State<ShopPage> {
   late Future<dynamic> _future = widget.api.get('/api/shop?shape=items');
   String? _busy;
   String _kind = 'card_frame';
+  StreamSubscription<PendingPaymentReturn>? _paymentSub;
+
+  bool get _zarinpalEnabled => AppConfig.instance.zarinpalEnabled;
+  String get _gatewayName => _zarinpalEnabled ? 'زرین‌پال' : 'کافه‌بازار';
   bool _showPlans = true;
 
   /// سوابق خرید — مثل وب، با تپ باز/بسته می‌شود و تنبلانه از
@@ -50,6 +57,67 @@ class _ShopPageState extends State<ShopPage> {
   /// چون دیالوگ بیرونِ `FutureBuilder` باز می‌شود، عدد را اینجا نگه
   /// می‌داریم. عددِ نهایی همیشه سمتِ سرور دوباره حساب می‌شود.
   int _walletBalance = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    AppConfig.instance.addListener(_onLiveConfig);
+    _paymentSub = DeepLinks.instance.payments.listen(_handlePaymentReturn);
+    unawaited(_consumeInitialPayment());
+  }
+
+  @override
+  void dispose() {
+    AppConfig.instance.removeListener(_onLiveConfig);
+    _paymentSub?.cancel();
+    super.dispose();
+  }
+
+  void _onLiveConfig() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _consumeInitialPayment() async {
+    final result = await DeepLinks.instance.consumeInitialPayment();
+    if (result != null) await _handlePaymentReturn(result);
+  }
+
+  Future<void> _handlePaymentReturn(PendingPaymentReturn result) async {
+    try {
+      final response = await widget.api.get('/api/payments/zarinpal/order/${Uri.encodeComponent(result.orderId)}', fresh: true);
+      final order = response is Map ? response['order'] : null;
+      if (!mounted) return;
+      if (order is Map && order['status'] == 'paid' && result.status == 'ok') {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پرداخت با موفقیت انجام شد و خرید تحویل شد.')));
+        await _reload();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پرداخت انجام نشد یا لغو شد.')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.status == 'ok' ? 'نتیجهٔ پرداخت در حال بررسی است.' : 'پرداخت لغو شد.')));
+    }
+  }
+
+  Future<dynamic> _startZarinpal({
+    required String kind,
+    String? slug,
+    String? billingCycle,
+    bool useWallet = false,
+  }) async {
+    final response = Map<String, dynamic>.from(await widget.api.post('/api/payments/zarinpal/order', {
+      'kind': kind,
+      if (slug != null) 'slug': slug,
+      if (billingCycle != null) 'billingCycle': billingCycle,
+      'useWallet': useWallet,
+    }) as Map);
+    if (response['settled'] == true) return response;
+    final url = Uri.tryParse('${response['startPayUrl'] ?? ''}');
+    if (url == null || !url.hasScheme) throw const BillingUnavailable('آدرس زرین‌پال معتبر نیست');
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!opened) throw const BillingUnavailable('باز کردن درگاه زرین‌پال ممکن نشد');
+    return response;
+  }
 
   static const _categories = <(String, String, IconData)>[
     ('club_badge', 'باشگاه‌ها', Icons.shield_rounded),
@@ -191,7 +259,7 @@ class _ShopPageState extends State<ShopPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${Money.withUnit(price)} از طریق کافه‌بازار پرداخت می‌شود.'),
+            Text('${Money.withUnit(price)} از طریق $_gatewayName پرداخت می‌شود.'),
             Gaps.vXs,
             Text(annual
                 ? 'قاب، عنوان پروفایل و قالب نتیجهٔ سالانه دائمی هستند؛ یک فرصت تغییر باشگاه هم می‌گیری.'
@@ -222,9 +290,11 @@ class _ShopPageState extends State<ShopPage> {
     );
     if (ok != true) return;
     await _run(
-      () async => _purchase(await widget.api.post('/api/shop/plus', {
-        'billingCycle': plan['billingCycle'],
-      })),
+      () async => _zarinpalEnabled
+          ? _startZarinpal(kind: 'plus', billingCycle: '${plan['billingCycle']}')
+          : _purchase(await widget.api.post('/api/shop/plus', {
+              'billingCycle': plan['billingCycle'],
+            })),
       'plus-${plan['billingCycle']}',
       annual ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد',
       // نامِ پلن از خودِ سرور می‌آید (همان چیزی که روی کارتِ پلن نوشته شده)،
@@ -279,12 +349,12 @@ class _ShopPageState extends State<ShopPage> {
                 ],
                 if (wallet > 0 && rest > 0)
                   Text('${Money.withUnit(wallet)} از کیف پول و '
-                      '${Money.withUnit(rest)} از کافه‌بازار پرداخت می‌شود.')
+                      '${Money.withUnit(rest)} از $_gatewayName پرداخت می‌شود.')
                 else if (wallet > 0)
                   Text('${Money.withUnit(wallet)} کاملاً از کیف پول پرداخت '
-                      'می‌شود — نیازی به کافه‌بازار نیست.')
+                      'می‌شود — نیازی به $_gatewayName نیست.')
                 else
-                  Text('${Money.withUnit(price)} از طریق کافه‌بازار پرداخت '
+                  Text('${Money.withUnit(price)} از طریق $_gatewayName پرداخت '
                       'می‌شود.'),
                 Gaps.vXs,
                 const Text(
@@ -314,11 +384,13 @@ class _ShopPageState extends State<ShopPage> {
     // (پیامِ موفقیتِ خرید این‌جا بود؛ حذف شد — کارتِ لحظه نامِ آیتم را
     //  نشان می‌دهد و دو پیامِ موازی برای یک رویداد همان تکرارِ شکایت‌شده بود.)
     await _run(
-      () async => _purchase(
-        await widget.api.post('/api/shop/items/${item['id']}/buy', {
-          'useWallet': wantWallet,
-        }),
-      ),
+      () async => _zarinpalEnabled
+          ? _startZarinpal(kind: 'shop', slug: '${item['id']}', useWallet: wantWallet)
+          : _purchase(
+              await widget.api.post('/api/shop/items/${item['id']}/buy', {
+                'useWallet': wantWallet,
+              }),
+            ),
       'buy-${item['id']}',
       // بدونِ پیامِ گوشه‌ای: نامِ آیتم روی کارتِ لحظه می‌آید.
       null,
@@ -381,6 +453,7 @@ class _ShopPageState extends State<ShopPage> {
               _ShopHero(
                 balance: balance,
                 plus: plus,
+                gatewayName: _gatewayName,
                 expanded: _showPlans,
                 onToggle: () => setState(() => _showPlans = !_showPlans),
               ),
@@ -454,7 +527,8 @@ class _ShopPageState extends State<ShopPage> {
                         ],
                       ),
                     ),
-                    CardBox(api: widget.api, onGranted: _reload),
+                    CardBox(api: widget.api, zarinpalEnabled: _zarinpalEnabled,
+                      listenPaymentReturns: false, onGranted: _reload),
                   ],
                 ),
               ),
@@ -582,11 +656,13 @@ class _ShopHero extends StatelessWidget {
   const _ShopHero({
     required this.balance,
     required this.plus,
+    required this.gatewayName,
     required this.expanded,
     required this.onToggle,
   });
   final int balance;
   final Map<String, dynamic> plus;
+  final String gatewayName;
   final bool expanded;
   final VoidCallback onToggle;
 
@@ -650,9 +726,9 @@ class _ShopHero extends StatelessWidget {
                 // آینهٔ `shopPayNote` در وب. کاربر باید بداند این موجودی
                 // خرج خرید نمی‌شود — فقط برداشت نقدی.
                 Gaps.vXxs,
-                const Text(
-                  'پرداخت از کافه‌بازار یا با جایزهٔ نقدیِ کیف پول. کیف پول با خرید شارژ نمی‌شود.',
-                  style: TextStyle(fontSize: 9.5, color: Colors.white54),
+                Text(
+                  'پرداخت از $gatewayName یا با جایزهٔ نقدیِ کیف پول. کیف پول با خرید شارژ نمی‌شود.',
+                  style: const TextStyle(fontSize: 9.5, color: Colors.white54),
                 ),
               ],
             ),

@@ -268,8 +268,8 @@ async function verifyWithBazaar(productId, purchaseToken) {
  *   کیف پول کم شده است. اینجا صرفاً ثبت می‌شود تا هنگامِ تحویل بدانیم
  *   کمیسیون روی چه مبلغی حساب شود.
  */
-async function createShopOrder(userId, slug, { walletAmount = 0 } = {}) {
-  if (!configured() && !cfg().sandbox) {
+async function createShopOrder(userId, slug, { walletAmount = 0, provider = 'cafebazaar' } = {}) {
+  if (provider !== 'zarinpal' && !configured() && !cfg().sandbox) {
     throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
   }
   // کلاینت ممکن است slug بفرستد یا UUID. روت قدیمیِ
@@ -301,8 +301,11 @@ async function createShopOrder(userId, slug, { walletAmount = 0 } = {}) {
   const fromWallet = Math.max(0, Math.min(Number(walletAmount) || 0, Number(item.price)));
   const payable = Number(item.price) - fromWallet;
 
-  const productId = productForPrice(payable);
-  if (!productId) {
+  // زرین‌پال مبلغ آزاد می‌گیرد و به شناسهٔ محصولِ بازار نیاز ندارد؛
+  // product_id برای سابقهٔ مشترک null می‌ماند. مسیر بازار همچنان همان
+  // فهرستِ PRICE_PRODUCTS را به‌عنوان گارد نگه می‌دارد.
+  const productId = provider === 'zarinpal' ? null : productForPrice(payable);
+  if (!productId && provider !== 'zarinpal') {
     throw fail('این کالا فعلاً قابل خرید نیست', 503, 'NO_PRODUCT');
   }
 
@@ -310,9 +313,9 @@ async function createShopOrder(userId, slug, { walletAmount = 0 } = {}) {
     `INSERT INTO payment_orders
        (user_id, amount, provider, product_id, status,
         purchase_kind, shop_item_id, wallet_amount)
-     VALUES ($1, $2, 'cafebazaar', $3, 'pending', 'shop_item', $4, $5)
+     VALUES ($1, $2, $6, $3, 'pending', 'shop_item', $4, $5)
      RETURNING id, amount, created_at`,
-    [userId, payable, productId, item.id, fromWallet]);
+    [userId, payable, productId, item.id, fromWallet, provider]);
 
   return {
     orderId: order.rows[0].id,
@@ -341,8 +344,8 @@ async function createShopOrder(userId, slug, { walletAmount = 0 } = {}) {
  *    ردیفِ shop_item ندارد (روی `user_shop_items` یکتاست و صندوقِ تکراری
  *    را رد می‌کرد).
  */
-async function createCardBoxOrder(userId) {
-  if (!configured() && !cfg().sandbox) {
+async function createCardBoxOrder(userId, { provider = 'cafebazaar' } = {}) {
+  if (provider !== 'zarinpal' && !configured() && !cfg().sandbox) {
     throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
   }
 
@@ -351,15 +354,15 @@ async function createCardBoxOrder(userId) {
   const raw = Number(rows[0]?.value);
   const price = Number.isFinite(raw) && raw > 0 ? Math.trunc(raw) : 100000;
 
-  const productId = productForPrice(price);
-  if (!productId) throw fail('صندوق فعلاً قابل خرید نیست', 503, 'NO_PRODUCT');
+  const productId = provider === 'zarinpal' ? null : productForPrice(price);
+  if (!productId && provider !== 'zarinpal') throw fail('صندوق فعلاً قابل خرید نیست', 503, 'NO_PRODUCT');
 
   const order = await pool.query(
     `INSERT INTO payment_orders
        (user_id, amount, provider, product_id, status, purchase_kind, wallet_amount)
-     VALUES ($1, $2, 'cafebazaar', $3, 'pending', 'card_box', 0)
+     VALUES ($1, $2, $4, $3, 'pending', 'card_box', 0)
      RETURNING id, amount, created_at`,
-    [userId, price, productId]);
+    [userId, price, productId, provider]);
 
   return {
     orderId: order.rows[0].id,
@@ -372,8 +375,8 @@ async function createCardBoxOrder(userId) {
 }
 
 /** سفارش خرید اشتراک پلاس. */
-async function createPlusOrder(userId, billingCycle) {
-  if (!configured() && !cfg().sandbox) {
+async function createPlusOrder(userId, billingCycle, { provider = 'cafebazaar' } = {}) {
+  if (provider !== 'zarinpal' && !configured() && !cfg().sandbox) {
     throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
   }
   const clean = String(billingCycle || 'monthly').toLowerCase();
@@ -382,18 +385,21 @@ async function createPlusOrder(userId, billingCycle) {
   if (!cycle) throw fail('دوره اشتراک باید ماهانه یا سالانه باشد');
 
   const plan = PLUS_PRODUCTS[cycle];
+  // پلاس هم در زرین‌پال محصولِ بازار نمی‌خواهد؛ product_id فقط برای
+  // سازگاری با verify بازار نگه داشته می‌شود.
+  const productId = provider === 'zarinpal' ? null : plan.productId;
   const order = await pool.query(
     `INSERT INTO payment_orders
        (user_id, amount, provider, product_id, status,
         purchase_kind, plus_cycle)
-     VALUES ($1, $2, 'cafebazaar', $3, 'pending', $4, $5)
+     VALUES ($1, $2, $6, $3, 'pending', $4, $5)
      RETURNING id, amount, created_at`,
-    [userId, plan.price, plan.productId,
-      cycle === 'annual' ? 'plus_annual' : 'plus_monthly', cycle]);
+    [userId, plan.price, productId,
+      cycle === 'annual' ? 'plus_annual' : 'plus_monthly', cycle, provider]);
 
   return {
     orderId: order.rows[0].id,
-    productId: plan.productId,
+    productId,
     amount: Number(order.rows[0].amount),
     kind: cycle === 'annual' ? 'plus_annual' : 'plus_monthly',
     cycle,

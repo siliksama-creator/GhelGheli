@@ -11,6 +11,7 @@
 const express = require('express');
 const featureFlags = require('../services/featureFlags');
 const notificationService = require('../services/notificationService');
+const zarinpalGateway = require('../services/zarinpalService');
 
 // شناسه‌های مجازِ تب‌ها — یک قراردادِ مشترک بین وب و اندروید. هر کلاینت
 // تب‌های خودش را با همین idها نگاشت می‌کند و ترتیبِ ارسالیِ سرور را
@@ -283,6 +284,11 @@ module.exports = function createClientConfigRoutes(deps) {
       // فعال‌سازی را نشان نمی‌دهد (rollout بی‌خطر).
       webPush: { vapidPublicKey: notificationService.webPushPublicKey() },
       ...cfg,
+      // درگاه پرداخت زنده: پنل ادمین روشن/خاموش می‌کند؛ کلاینت‌ها
+      // دکمه‌های خرید مستقیم را با همین یک پرچم نشان می‌دهند/پنهان.
+      // عمداً بعد از ...cfg است تا هیچ محتوای قدیمی/ناخواسته‌ای این پرچم را
+      // override نکند.
+      payments: { zarinpalEnabled: await zarinpalGateway.configured() },
       app,
       wallet: { enabled: wallet.enabled !== false },
       // اقتصادِ بازی‌ها: سکهٔ هر نتیجه، سهمیهٔ روزانه، درصدِ انتقالِ

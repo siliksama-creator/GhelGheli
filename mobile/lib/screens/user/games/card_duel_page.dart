@@ -899,6 +899,7 @@ class _CardDuelPageState extends State<CardDuelPage> {
               ),
               CardBox(
                 api: widget.api,
+                zarinpalEnabled: AppConfig.instance.zarinpalEnabled,
                 compact: true,
                 onGranted: () => unawaited(_load()),
               ),

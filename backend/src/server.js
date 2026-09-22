@@ -638,6 +638,11 @@ app.use('/api', require('./routes/commerce')({
   auth, asyncHandler, validateUuid, shop,
   shopLimiter, cardBox, grants, clubs,
 }));
+// درگاه زرین‌پال (خواستهٔ مالک ۲۰۶-۰-۲۳): خرید مستقیم وب/اندروید با
+// تنظیمِ زنده از پنل ادمین؛ کال‌بک و تحویلِ تراکنشی داخل همان ماژول.
+app.use('/api', require('./routes/zarinpal')({
+  pool, auth, adminAuth, requireRole, asyncHandler, audit, validateUuid,
+}));
 app.use('/api', require('./routes/wallet')({
   auth, asyncHandler, validateUuid, walletService,
   bankCardLimiter, withdrawalService, withdrawalLimiter,

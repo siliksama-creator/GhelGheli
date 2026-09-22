@@ -788,7 +788,31 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('pay') !== 'result') return;
+    const orderId = q.get('order');
+    const status = q.get('status') || 'failed';
+    // اگر مرورگر نشست را از دست داده، query را فعلاً نگه می‌داریم تا بعد
+    // از ورود بتوانیم نتیجهٔ واقعیِ همان سفارش را بخوانیم.
+    if (!token) return;
+    // کال‌بک زرین‌پال خودش verify/تحویل را انجام داده؛ این درخواست فقط
+    // برای نمایشِ نتیجهٔ واقعیِ سفارش است، نه اعتماد به query string.
+    (async () => {
+      try {
+        const d = orderId
+          ? await req(`/api/payments/zarinpal/order/${encodeURIComponent(orderId)}`, 'GET', null, token)
+          : null;
+        const paid = d?.order?.status === 'paid' && status === 'ok';
+        setMsg(paid ? 'پرداخت با موفقیت انجام شد و خریدت تحویل شد.' : 'پرداخت انجام نشد یا لغو شد.');
+      } catch {
+        setMsg(status === 'ok' ? 'نتیجهٔ پرداخت در حال بررسی است؛ صفحه را تازه کن.' : 'پرداخت انجام نشد یا لغو شد.');
+      } finally {
+        const clean = window.location.pathname + (q.get('room') ? `?room=${encodeURIComponent(q.get('room'))}` : '');
+        window.history.replaceState(null, '', clean);
+      }
+    })();
+  }, [token]);
 
   // کاوشِ بخشِ «برنامه‌های پیشنهادی» — مستقل از ورود کاربر (مسیر عمومی است).
   useEffect(() => { probeApps(true); // eslint-disable-next-line react-hooks/exhaustive-deps

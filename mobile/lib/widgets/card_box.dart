@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api_client.dart';
+import '../core/app_config.dart';
+import '../core/deep_links.dart';
 import '../screens/user/games/game_audio.dart';
 import '../core/money.dart';
 import '../utils/fa_date.dart';
@@ -34,11 +37,18 @@ class CardBox extends StatefulWidget {
     super.key,
     required this.api,
     this.onGranted,
+    this.zarinpalEnabled = false,
+    this.listenPaymentReturns = true,
     this.compact = false,
   });
 
   final ApiClient api;
   final VoidCallback? onGranted;
+  /// وقتی پنل زرین‌پال را روشن کرده، خرید از مرورگر و کال‌بکِ سرور انجام می‌شود.
+  final bool zarinpalEnabled;
+  /// فروشگاهِ والد خودش نتیجهٔ همهٔ خریدها را می‌گیرد؛ در آنجا false است
+  /// تا یک کال‌بک دو SnackBar نسازد. در صفحهٔ دوئل پیش‌فرض true می‌ماند.
+  final bool listenPaymentReturns;
 
   /// حالتِ فشرده — جایی که صندوق داخلِ بن‌بستِ دوئل می‌نشیند و نباید کلِ
   /// صفحه را بگیرد: تصویرِ کوچک‌تر و متنِ کمکی پنهان.
@@ -65,6 +75,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
   bool _showHistory = false;
   bool _historyLoading = false;
   _Phase _phase = _Phase.idle;
+  StreamSubscription<PendingPaymentReturn>? _paymentSub;
 
   // شروعِ لرزش (برای سقفِ حداقل ۳ ثانیه). صدا با GameAudio.playShake.
   DateTime _shakeStart = DateTime.now();
@@ -87,11 +98,45 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    if (widget.listenPaymentReturns) {
+      _paymentSub = DeepLinks.instance.payments.listen(_handlePaymentReturn);
+      unawaited(_consumeInitialPayment());
+    }
     _load();
+  }
+
+  Future<void> _consumeInitialPayment() async {
+    final result = await DeepLinks.instance.consumeInitialPayment();
+    if (result != null) await _handlePaymentReturn(result);
+  }
+
+  Future<void> _handlePaymentReturn(PendingPaymentReturn result) async {
+    try {
+      final response = await widget.api.get(
+        '/api/payments/zarinpal/order/${Uri.encodeComponent(result.orderId)}',
+        fresh: true,
+      );
+      final order = response is Map ? response['order'] : null;
+      if (!mounted) return;
+      if (order is Map && order['status'] == 'paid' && result.status == 'ok') {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('پرداخت صندوق با موفقیت انجام شد و کارت‌ها تحویل شدند.')));
+        await _load();
+        widget.onGranted?.call();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('پرداخت صندوق انجام نشد یا لغو شد.')));
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('نتیجهٔ پرداخت صندوق در حال بررسی است.')));
+    }
   }
 
   @override
   void dispose() {
+    _paymentSub?.cancel();
     unawaited(GameAudio.instance.stopShake());
     _idleCtrl.dispose();
     _shakeCtrl.dispose();
@@ -221,8 +266,27 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
     _shakeStart = DateTime.now();
     GameAudio.instance.playShake();
     try {
-      // همان سه‌گامِ فروشگاه: سفارش از سرور، پرداخت در بازار، تحویل بعد
-      // از راستی‌آزماییِ سرور. کلاینت هیچ‌وقت خودش «تحویل شد» نمی‌گوید.
+      if (widget.zarinpalEnabled) {
+        // وب‌مرورگر و اندروید هر دو یک جریان واحد دارند: سفارش سمتِ سرور،
+        // رفتن به زرین‌پال، verify و تحویل داخلِ کال‌بک.
+        unawaited(GameAudio.instance.stopShake());
+        _shakeCtrl.stop();
+        if (mounted) setState(() => _phase = _Phase.idle);
+        final order = Map<String, dynamic>.from(
+            await widget.api.post('/api/payments/zarinpal/order', {
+          'kind': 'card_box',
+        }) as Map);
+        final url = Uri.tryParse('${order['startPayUrl'] ?? ''}');
+        if (url == null || !url.hasScheme) {
+          throw const BillingUnavailable('آدرس زرین‌پال معتبر نیست');
+        }
+        final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+        if (!opened) throw const BillingUnavailable('باز کردن زرین‌پال ممکن نشد');
+        return;
+      }
+      // همان سه‌گامِ سازگاری با بازار: سفارش از سرور، پرداخت در بازار،
+      // تحویل بعد از راستی‌آزماییِ سرور. کلاینت هیچ‌وقت خودش «تحویل شد»
+      // نمی‌گوید.
       final order = Map<String, dynamic>.from(
           await widget.api.post('/api/card-box/buy', const {}) as Map);
       final orderId = '${order['orderId']}';
@@ -570,7 +634,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
                               fontWeight: FontWeight.w900, fontSize: 13.5),
                         ),
                         child: Text(
-                            _busy ? 'در حال باز کردن…' : 'باز کردن صندوق'),
+                            _busy ? 'در حال باز کردن…' : (widget.zarinpalEnabled ? 'پرداخت با زرین‌پال' : 'باز کردن صندوق')),
                       ),
                     ),
                     if (((data['walletBalance'] as num?)?.toInt() ?? 0) >=
