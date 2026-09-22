@@ -16,6 +16,7 @@
     "test:live-copy-parity": "node tool/live-copy-parity.mjs",
     "test:live-copy-coverage": "node tool/live-copy-coverage.mjs",
     "test:admin-copy-parity": "node tool/admin-copy-parity.mjs",
+    "test:admin-request": "node tool/admin-request-convention.mjs",
     "test:chat-parity": "node tool/chat-parity.mjs",
     "test:league-live": "node tool/league-live-parity.mjs",
     "test:desktop-layout": "node tool/desktop-layout.mjs",

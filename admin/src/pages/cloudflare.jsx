@@ -46,7 +46,7 @@ export function CloudflarePage({ request }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await request('/cloudflare');
+      const r = await request('/api/admin/cloudflare');
       setSt(r);
       setDomainsText((r.domains || []).join('\n'));
       setUnderAttack(!!r.underAttack);
@@ -66,14 +66,14 @@ export function CloudflarePage({ request }) {
     const domains = domainsText.split('\n').map((x) => x.trim()).filter(Boolean);
     const body = { domains };
     if (token.trim()) body.apiToken = token.trim();
-    const out = await request('/cloudflare', 'PUT', body);
+    const out = await request('/api/admin/cloudflare', 'PUT', body);
     setSt((prev) => ({ ...prev, ...out }));
     setToken('');
     notify('ذخیره شد. حالا دکمهٔ «بررسی و تأیید دامنه‌ها» را بزن.', 'success');
   });
 
   const verify = () => run('verify', async () => {
-    const out = await request('/cloudflare/verify', 'POST', {});
+    const out = await request('/api/admin/cloudflare/verify', 'POST', {});
     setReport(out);
     setSt((prev) => ({ ...prev, ...out }));
     if (out.missing?.length) notify(`تأیید شد، ولی ${out.missing.length} دامنه رکورد ندارد.`, 'warning');
@@ -81,14 +81,14 @@ export function CloudflarePage({ request }) {
   });
 
   const enable = () => run('enable', async () => {
-    const out = await request('/cloudflare/enable', 'POST', { confirm: confirmText, underAttack });
+    const out = await request('/api/admin/cloudflare/enable', 'POST', { confirm: confirmText, underAttack });
     setSt((prev) => ({ ...prev, ...out }));
     setConfirmText('');
     notify(out.serverNote || 'سپر روشن شد.', 'success');
   });
 
   const disable = () => run('disable', async () => {
-    const out = await request('/cloudflare/disable', 'POST', {});
+    const out = await request('/api/admin/cloudflare/disable', 'POST', {}\);
     setSt((prev) => ({ ...prev, ...out }));
     notify('سپر خاموش شد — ترافیک مستقیم به سرور برگشت.', 'success');
   });

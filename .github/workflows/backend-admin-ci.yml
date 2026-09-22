@@ -238,6 +238,8 @@ jobs:
       - run: npm run test:feedback-parity
       - run: npm run test:coin-parity
       - run: npm run test:chat-parity
+      # قراردادِ یگانهٔ فراخوانیِ پنل: آرگومانِ request همیشه /api کامل
+      - run: npm run test:admin-request
       # جدول لیگ باید در هر دو کلاینت رویدادمحور (سوکت/اتاق) بماند و pollِ
       # ثابت برنگردد؛ این گارد subscribe/unsubscribe و پخشِ اتاقی را قفل می‌کند.
       - run: npm run test:league-live
