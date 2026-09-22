@@ -25,7 +25,11 @@
  * اجرا:  node tool/cache-headers.mjs [origin]
  */
 
-const ORIGIN = process.argv[2] || 'https://user.ghelghelishop.ir';
+// دامنهٔ پیش‌فرض از .ir به .com آمد: از مهاجرتِ دامنه (تسک ۱۱) نشانیِ .ir
+// با ۳۰۱ به .com می‌رود و این ابزار بی‌صدا «شکست» می‌خورد در حالی که
+// هدرهای زندهٔ .com درست بودند (خروجیِ ممیزیِ ۸ مهر: html=no-cache،
+// assets=immutable). این ابزار در CI نیست و برای همین کسی ندید.
+const ORIGIN = process.argv[2] || 'https://user.ghelghelishop.com';
 
 // نامِ ثابت ⇒ نباید کشِ ماندگار داشته باشد.
 const MUST_REVALIDATE = ['/', '/index.html', '/image-cache-sw.js'];
