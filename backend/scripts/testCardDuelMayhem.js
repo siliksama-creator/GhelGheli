@@ -97,8 +97,14 @@ async function main() {
       const xb = st.remaining.X.length, ob = st.remaining.O.length;
       rules.applyMove(st, { cardId: st.remaining.X[0] }, 'X');
       rules.applyMove(st, { cardId: st.remaining.O[0] }, 'O');
-      assert.ok(xb - st.remaining.X.length === 1 && ob - st.remaining.O.length === 1,
-        'هر راند دقیقاً یک کارت از هر طرف مصرف می‌شود');
+      const lr = st.history[st.history.length - 1];
+      // خواستهٔ مالک (۸ مهر ۱۴۰۵): وقتِ اضافه کارت مصرف نمی‌کند — همان
+      // قولی که آموزش و «جزئیات راندها» می‌دهند. پس راندِ معمولی دقیقاً
+      // یک کارت از هر طرف مصرف می‌کند و راندِ وقت‌اضافه‌ای صفر؛ حالتِ
+      // سومی مجاز نیست (نه مصرفِ دوتایی، نه مصرف در وقت اضافه).
+      const consumed = lr && lr.overtime ? 0 : 1;
+      assert.ok(xb - st.remaining.X.length === consumed && ob - st.remaining.O.length === consumed,
+        `هر راند به‌اندازهٔ درست کارت مصرف می‌کند (این راند: ${consumed})`);
     }
     totalGames++;
     assert.strictEqual(st.history.length, 5, 'وقت اضافه راند ششم نمی‌سازد');
