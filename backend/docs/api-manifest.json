@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 260,
+ "count": 261,
  "endpoints": [
   {
    "method": "GET",
@@ -135,6 +135,11 @@
   {
    "method": "PATCH",
    "path": "/api/admin/crashes/groups/:hash",
+   "source": "routes/growth.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/crashes/resolve-open",
    "source": "routes/growth.js"
   },
   {

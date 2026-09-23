@@ -7,6 +7,8 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/json_map.dart';
+
 class ApiClient {
   static const String defaultBaseUrl = String.fromEnvironment('API_BASE_URL',
       defaultValue: 'https://api.ghelghelishop.com');
@@ -932,12 +934,6 @@ bool isTransient(Object e) {
 int? apiStatusCode(Object e) {
   try {
     return (e as dynamic).response?.statusCode as int?;
-  } catch (_) {
-    return null;
-  }
-}
-
-return (e as dynamic).response?.statusCode as int?;
   } catch (_) {
     return null;
   }
