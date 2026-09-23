@@ -63,7 +63,7 @@ if 'abiFilters' not in src:
         raise SystemExit(1)
     if flavour == 'kts':
         inner = ('\n        ndk {\n'
-                 '            abiFilters listOf("arm64-v8a", "armeabi-v7a")\n'
+                 '            abiFilters += listOf("arm64-v8a", "armeabi-v7a")\n'
                  '        }\n')
     else:
         inner = ("\n        ndk {\n"
