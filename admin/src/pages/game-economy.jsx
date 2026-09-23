@@ -42,7 +42,7 @@ export function GameEconomyPage({ request, onNavigate }) {
       })
       .catch(() => {});
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   const setEcon = (path, value) => setCfg(prev => {
     const next = JSON.parse(JSON.stringify(prev));

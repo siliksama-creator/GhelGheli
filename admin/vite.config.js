@@ -7,6 +7,13 @@ import react from '@vitejs/plugin-react';
 // files in the new modular admin structure.
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // Hidden sourcemaps: فایلِ .map ساخته می‌شود ولی هیچ ارجاعی در باندل نیست،
+    // پس مرورگر دنبالش نمی‌گردد. deploy.sh آن‌ها را به
+    // /root/ghelgheli-sourcemaps/<sha>/ منتقل می‌کند (خصوصی، هرگز سرو نمی‌شود)
+    // تا کرش‌های مینیفایدِ صندوق خطا قابل ریشه‌یابی باشند.
+    sourcemap: 'hidden',
+  },
   server: {
     host: '0.0.0.0',
   },

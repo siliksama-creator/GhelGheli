@@ -42,7 +42,7 @@ export function MissionsPage({ request }) {
       })
       .catch((e) => notify(e.message || 'خواندن ماموریت‌ها ناموفق بود', 'error'));
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   const builtin = useMemo(() => data?.builtin || [], [data]);
 

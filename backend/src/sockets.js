@@ -24,7 +24,7 @@ io.use(async (socket, next) => {
     // کاربرِ سوکت بارگذاری می‌شود و یک ستونِ اضافه هزینه‌ای ندارد؛
     // یک کوئریِ دوم در مسیرِ اتصال، تأخیرِ شروعِ بازی را زیاد می‌کرد.
     const { rows } = await pool.query(`SELECT id,nickname,first_name,last_name,
-      profile_image_url,profile_avatar_key,chat_banned_until,status,
+      profile_image_url,profile_avatar_key,status,
       lifetime_points,current_points,game_xp,coins, equipped_club,equipped_frame,
       equipped_color,equipped_profile_background,equipped_emote_pack,profile_title,
       session_epoch
@@ -92,7 +92,6 @@ io.on('connection', socket => {
       if (Number(socket.user.lifetime_points || 0) < minLifetimePoints) throw new Error(`برای ارسال پیام باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید`);
       const cd = await ensureChatCooldown(socket.user.id);
       if (cd.remaining > 0) throw new Error(`برای جلوگیری از اسپم، ${cd.remaining} ثانیه دیگر پیام بدهید`);
-      if (socket.user.chat_banned_until && new Date(socket.user.chat_banned_until) > new Date()) throw new Error('شما موقتاً از چت محروم هستید');
       const body = typeof payload === 'object' && payload ? payload : { text: payload };
       const stickerId = body.stickerId || null;
       const sticker = stickerId ? await activeStickerById(stickerId) : null;

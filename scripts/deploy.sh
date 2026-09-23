@@ -85,12 +85,27 @@ npm run thumbs:prewarm
 log "Building admin panel"
 cd "$APP_DIR/admin"
 npm ci --no-audit --no-fund
-npm run build
+# VITE_APP_RELEASE مثل userweb: کرش‌ریپورت‌های پنل باید به SHAی ریلیز بچسبند تا با
+# سورس‌مپِ بایگانی‌شدهٔ همان ریلیز نگاشت شوند (قبلاً همیشه admin-web بود).
+VITE_APP_RELEASE="$NEW_SHA" npm run build
 
 log "Building user web app"
 cd "$APP_DIR/userweb"
 npm ci --no-audit --no-fund
 VITE_APP_RELEASE="$NEW_SHA" npm run build
+
+log "Archiving hidden sourcemaps (private - never served)"
+# باندل‌ها hidden sourcemap دارند (.map بدون ارجاع در کد). آن‌ها را با شناسهٔ
+# ریلیز بایگانیِ خصوصی می‌کنیم و از dist پاک می‌کنیم تا nginx هرگز سرویشان
+# نکند؛ کرش‌ریپورت‌ها فیلد release دارند و با همین SHA نگاشت می‌شوند.
+MAP_DIR="/root/ghelgheli-sourcemaps/$NEW_SHA"
+mkdir -p "$MAP_DIR/admin" "$MAP_DIR/userweb"
+chmod 700 /root/ghelgheli-sourcemaps "$MAP_DIR" "$MAP_DIR/admin" "$MAP_DIR/userweb"
+for _app in admin userweb; do
+  find "$APP_DIR/$_app/dist" -name '*.map' -exec mv {} "$MAP_DIR/$_app/" \; 
+done
+# نگه‌داشت: فقط ۱۰ ریلیزِ آخر (هر سری .map چند مگ است).
+ls -1t /root/ghelgheli-sourcemaps | tail -n +11 | while read -r _old; do rm -rf "/root/ghelgheli-sourcemaps/$_old"; done || true
 
 log "Reloading API as unprivileged user $SERVICE_USER"
 cd "$APP_DIR/backend"

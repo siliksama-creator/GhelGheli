@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Ban, Flag, MessageCircle, Pin, PinOff, Trash2 } from 'lucide-react';
+import { Flag, MessageCircle, Pin, PinOff, Trash2 } from 'lucide-react';
 import { Badge, Button, Card, DataRow, EmptyState, Field, IconButton, Textarea } from '../components/ui.jsx';
 import { useToast } from '../lib/toast.jsx';
 
@@ -158,18 +158,10 @@ export function ChatModerationPage({ request }) {
     load();
   }
 
-  async function ban(uid) {
-    const raw = window.prompt('مدت محرومیت به دقیقه (۶۰ = یک ساعت، ۱۴۴۰ = یک روز، ۱۰۰۸۰ = یک هفته)', '1440');
-    if (raw == null) return;
-    const minutes = Math.max(1, Math.min(10080, Number(raw) || 1440));
-    await request(`/api/admin/chat/users/${uid}/ban`, { method: 'PATCH', body: { minutes, reason: 'اسپم/تخلف' } });
-    notify(`کاربر ${minutes} دقیقه از چت محروم شد`);
-  }
-
   return (
     <div style={{ display: 'grid', gap: 20 }}>
     <PinnedMessageCard request={request} />
-    <Card title="پیام‌های اخیر چت روم" subtitle="حذف پیام و محرومیت ۲۴ ساعته کاربر از چت">
+    <Card title="پیام‌های اخیر چت روم" subtitle="حذف پیام نامناسب">
       {rows.length === 0 ? (
         <EmptyState icon={MessageCircle} title="پیامی وجود ندارد" />
       ) : (
@@ -182,7 +174,6 @@ export function ChatModerationPage({ request }) {
             actions={
               <>
                 <IconButton icon={Trash2} variant="ghost" title="حذف پیام" onClick={() => del(m.id)} />
-                <IconButton icon={Ban} variant="danger" title="بن چت" onClick={() => ban(m.user_id)} />
               </>
             }
           />

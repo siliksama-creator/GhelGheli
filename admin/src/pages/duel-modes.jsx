@@ -71,7 +71,7 @@ export function DuelModesPage({ request }) {
       .catch(() => { /* تاریخچه اختیاری است؛ نباید صفحه را سفید کند */ });
   }, [request]);
 
-  useEffect(loadHistory, [loadHistory]);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
   const revertLast = async () => {
     if (!confirm('آخرین تغییرِ عددهای زنده برگردانده شود؟ (فقط یک مرحله به عقب)')) return;

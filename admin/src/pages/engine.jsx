@@ -22,7 +22,7 @@ export function EnginePage({ request }) {
       })
       .catch((e) => notify(e.message || 'خواندن تنظیمات ناموفق بود', 'error'));
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   async function save(path, body) {
     try {
@@ -137,7 +137,7 @@ function OpsLimitsCard({ request, notify }) {
   const load = () => request('/api/admin/settings/ops-limits')
     .then(setL)
     .catch(() => {});
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   const setNum = (path, value) => setL((prev) => {
     const next = JSON.parse(JSON.stringify(prev));
@@ -272,7 +272,7 @@ function BazaarProductsCard({ request }) {
     request('/api/admin/bazaar-products').then(setCat).catch(() => {});
     request('/api/admin/card-box').then((d) => setBoxPrice(Number(d.price || 0))).catch(() => {});
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   if (!cat) return <Card title="نقاط قیمتی کافه‌بازار"><p className="topbar-sub">در حال بارگذاری…</p></Card>;
 

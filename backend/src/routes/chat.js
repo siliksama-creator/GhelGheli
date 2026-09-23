@@ -128,14 +128,13 @@ router.get('/chat/messages', auth, asyncHandler(async (req, res) => {
 router.post('/chat/messages', auth, chatLimiter.mw, asyncHandler(async (req, res) => {
   const minLifetimePoints = await getChatMinLifetimePoints();
   if (Number(req.user.lifetime_points || 0) < minLifetimePoints) return res.status(403).json({ message: `برای ارسال پیام باید حداقل ${minLifetimePoints} امتیاز تاریخی داشته باشید` });
-  if (req.user.chat_banned_until && new Date(req.user.chat_banned_until) > new Date()) return res.status(403).json({ message: 'شما موقتاً از چت محروم هستید' });
   const cd = await ensureChatCooldown(req.user.id);
   if (cd.remaining > 0) return res.status(429).json({ message: `برای جلوگیری از اسپم، ${cd.remaining} ثانیه دیگر پیام بدهید`, cooldownSeconds: cd.cooldown, remainingSeconds: cd.remaining });
   const stickerId = req.body.stickerId || req.body.sticker_id || null;
   const replyTo = req.body.replyTo || req.body.reply_to_message_id || null;
   const clean = String(req.body.message || req.body.text || '').trim();
   // استیکر متنِ آزاد ندارد؛ اعتبارش فقط عضویت در فهرستِ فعالِ
-  // chat_stickers است. کولدون و بن و سقف امتیاز همچنان یکسان اعمال می‌شوند.
+  // chat_stickers است. کولدون و سقف امتیاز همچنان یکسان اعمال می‌شوند.
   const sticker = stickerId ? await activeStickerById(stickerId) : null;
   if (stickerId && !sticker) {
     return res.status(400).json({ message: 'استیکر معتبر نیست' });

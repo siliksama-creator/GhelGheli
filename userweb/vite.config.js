@@ -10,6 +10,9 @@ const previewHosts = [".e2b.app", "localhost", "127.0.0.1"];
 
 export default defineConfig({
   plugins: [react()],
+  // Hidden sourcemaps (مثل پنل ادمین): .map ساخته ولی در باندل ارجاع نمی‌شود؛
+  // deploy.sh آن‌ها را خصوصی بایگانی و از dist پاک می‌کند — هرگز سرو نمی‌شوند.
+  build: { sourcemap: 'hidden' },
   server: { host: "0.0.0.0", allowedHosts: previewHosts },
   preview: { host: "0.0.0.0", allowedHosts: previewHosts },
 });

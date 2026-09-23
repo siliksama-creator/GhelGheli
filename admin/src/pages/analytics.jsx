@@ -36,7 +36,7 @@ export function AnalyticsPage({ request }) {
     }).catch(e => notify(e.message || 'دریافت تحلیل ناموفق بود', 'error'))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   const resolve = async (hash, platform) => {
     try {

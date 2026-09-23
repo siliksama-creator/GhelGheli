@@ -21,7 +21,7 @@ export function GameRewardsPage({ request }) {
     request('/api/admin/settings/games').then(setCfg).catch(() => {});
     request('/api/admin/games/results').then(setResults).catch(() => {});
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   async function save() {
     setSaving(true);

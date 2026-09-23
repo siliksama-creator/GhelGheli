@@ -60,7 +60,7 @@ export function WheelAdminPage({ request }) {
       })
       .catch((e) => notify(e.message || 'خواندن گردونه ناموفق بود', 'error'));
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   const activeWeight = useMemo(
     () => prizes.filter((p) => p.isActive).reduce((s, p) => s + Number(p.weight || 0), 0),

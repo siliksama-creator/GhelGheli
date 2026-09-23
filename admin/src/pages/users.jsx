@@ -35,7 +35,7 @@ export function UsersPage({ request, isSuperAdmin = true }) {
       .then(setRows)
       .finally(() => setLoading(false));
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
     async function grantPlus(id) {
     const days = await promptText({

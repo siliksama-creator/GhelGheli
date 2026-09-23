@@ -36,7 +36,7 @@ export function BattlePassPage({ request }) {
       })
       .catch((e) => notify(e.message || 'خواندن گذر نبرد ناموفق بود', 'error'));
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   // بعد از load، فصل فعال را باز کن تا نوار مقیاس بالا دیده شود
   useEffect(() => {

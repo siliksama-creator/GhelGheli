@@ -32,7 +32,7 @@ export function AdminsPage({ request }) {
     request('/api/admin/admins').then(setAdmins);
     loadLogs();
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   async function openLog(id) {
     try {

@@ -127,6 +127,9 @@ module.exports = function growthRoutes({
   // ورودی‌ها را پاک‌سازی و سقف‌دار می‌کند.
   router.post('/telemetry/crash', authOptional, crashLimiter, asyncHandler(async (req, res) => {
     const b = readCrashBody(req.body);
+    // گزارشِ بدونِ متن = نویز (پروبِ بات‌ها به مسیرِ مهمان‌پذیر): صندوق را شلوغ می‌کند و
+    // هیچ ردی برای دیباگ ندارد. هر سه کلاینتِ واقعی (وب/پنل/اندروید) همیشه message می‌فرستند.
+    if (!String(b.message || '').trim()) return res.status(400).json({ message: 'متن خطا لازم است' });
     const result = await analytics.reportCrash({
       userId: req.user?.id || null,
       platform: b.platform,

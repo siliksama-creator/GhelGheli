@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 261,
+ "count": 260,
  "endpoints": [
   {
    "method": "GET",
@@ -96,11 +96,6 @@
    "method": "PATCH",
    "path": "/api/admin/chat/pinned",
    "source": "routes/adminSettings.js"
-  },
-  {
-   "method": "PATCH",
-   "path": "/api/admin/chat/users/:id/ban",
-   "source": "routes/adminCommunications.js"
   },
   {
    "method": "GET",

@@ -115,7 +115,7 @@ export function CustomMissionPage({ request }) {
       .finally(() => setLoading(false));
   }, [request, notify, applyMissions]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const activeCount = items.filter(m => m.enabled && m.title.trim()).length;
   // کارتی که کاربر **نمی‌بیند** ولی ادمین فکر می‌کند ساخته: عنوان دارد ولی

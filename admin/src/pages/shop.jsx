@@ -41,7 +41,7 @@ export function ShopAdminPage({ request }) {
       .catch((e) => notify(e.message || 'خواندن فروشگاه ناموفق بود', 'error'));
     request('/api/admin/shop/plus').then(setPlans).catch(() => {});
   };
-  useEffect(load, [request]);
+  useEffect(() => { load(); }, [request]);
 
   const activeCount = useMemo(() => items.filter((i) => i.isActive).length, [items]);
 

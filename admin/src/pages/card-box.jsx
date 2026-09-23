@@ -56,8 +56,8 @@ export function CardBoxAdminPage({ request }) {
       })
       .catch((e) => notify(e.message || 'خواندن شانس صندوق ناموفق بود', 'error'));
   };
-  useEffect(load, [request]);
-  useEffect(loadPurchases, [request]);
+  useEffect(() => { load(); }, [request]);
+  useEffect(() => { loadPurchases(); }, [request]);
 
   const sum = useMemo(
     () => odds.reduce((s, o) => s + Number(o.permille || 0), 0),
