@@ -281,6 +281,20 @@ cp /etc/nginx/nginx.conf "$STAGE/server/nginx.conf" 2>/dev/null || true
 cp -a /etc/nginx/conf.d "$STAGE/server/nginx-conf.d" 2>/dev/null || true
 cp -a /etc/cron.d "$STAGE/server/cron.d" 2>/dev/null || true
 cp /etc/sysctl.d/99-ghelgheli.conf "$STAGE/server/" 2>/dev/null || true
+# ── قطعات DR که قبلاً جا می‌افتادند ────────────────────────────────────
+# بدون snippets، nginx بعد از restore «include» را پیدا نمی‌کند و بالا نمی‌آید.
+# بدون unitهای systemd، نگهبان سلامت/ظرفیت/حمله خاموش می‌ماند.
+# بدون /usr/local/bin/ghelgheli-* کرون بکاپ فردا چیزی برای اجرا ندارد.
+# شاپ وردپرس هدف نیست: فقط فایل‌هایی که نام ghelgheli دارند کپی می‌شوند.
+mkdir -p "$STAGE/server/nginx-snippets" "$STAGE/server/systemd" "$STAGE/server/usr-local-bin"
+if [ -d /etc/nginx/snippets ]; then
+  find /etc/nginx/snippets -maxdepth 1 -type f -iname 'ghelgheli*' \
+    -exec cp -a {} "$STAGE/server/nginx-snippets/" \; 2>/dev/null || true
+fi
+find /etc/systemd/system -maxdepth 1 \( -name 'ghelgheli-*.service' -o -name 'ghelgheli-*.timer' \) \
+  -exec cp -a {} "$STAGE/server/systemd/" \; 2>/dev/null || true
+find /usr/local/bin -maxdepth 1 -type f -name 'ghelgheli-*' \
+  -exec cp -a {} "$STAGE/server/usr-local-bin/" \; 2>/dev/null || true
 crontab -l > "$STAGE/server/root.crontab" 2>/dev/null || true
 pm2 save >/dev/null 2>&1 || true
 cp /root/.pm2/dump.pm2 "$STAGE/server/pm2-dump.json" 2>/dev/null || true
@@ -318,6 +332,9 @@ CONTENTS
   config/backend.env       API secrets: DB password, JWT_SECRET, Firebase
   config/db_password       PostgreSQL password for the ghelgheli role
   server/nginx-*           vhost + tuning
+  server/nginx-snippets/   includeهای nginx قل‌قلی (upstream، سقف درخواست، ضد اسکنر)
+  server/systemd/          unitهای ghelgheli-*.service/.timer
+  server/usr-local-bin/    ابزارهای /usr/local/bin/ghelgheli-*
   server/letsencrypt.tar.gz SSL certificates
   server/pm2-dump.json     PM2 process list
   server/root.crontab      scheduled jobs
@@ -334,8 +351,9 @@ $(cat "$STAGE/db/TABLE_COUNTS.txt" 2>/dev/null | sed 's/^/  /')
 
 NOT INCLUDED (regenerated, not lost)
   node_modules/  -> npm ci rebuilds it exactly from package-lock.json
-  dist/ build/   -> rebuilt by scripts/deploy.sh
+  userweb/dist admin/dist  -> حدود ۱۴۰ مگ؛ سقف تلگرام ۵۰ مگ است. deploy.sh از منبع می‌سازد
   logs           -> not needed to run the system
+  ghelghelishop (wordpress) -> عمداً بیرون است؛ این بکاپ فقط قل‌قلی است
 
 HOW TO RESTORE ON A BRAND-NEW SERVER
   1. Fresh Ubuntu 24.04, log in as root

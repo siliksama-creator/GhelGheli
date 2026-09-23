@@ -274,6 +274,25 @@ if [ -d "$HERE/server/nginx-sites" ]; then
 fi
 [ -d "$HERE/server/nginx-conf.d" ] && cp -a "$HERE/server/nginx-conf.d/." /etc/nginx/conf.d/
 [ -f "$HERE/server/nginx.conf" ]   && cp "$HERE/server/nginx.conf" /etc/nginx/nginx.conf
+# snippets/systemd/باینری‌هایی که بدون‌شان nginx یا کرون بعد از DR ناقص می‌ماند.
+if [ -d "$HERE/server/nginx-snippets" ]; then
+  mkdir -p /etc/nginx/snippets
+  cp -a "$HERE/server/nginx-snippets/." /etc/nginx/snippets/
+  ok "اسنیپت‌های nginx قل‌قلی بازگردانده شد"
+fi
+if [ -d "$HERE/server/systemd" ]; then
+  cp -a "$HERE/server/systemd/." /etc/systemd/system/
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  for u in /etc/systemd/system/ghelgheli-*.timer; do
+    [ -f "$u" ] || continue
+    systemctl enable --now "$(basename "$u")" >/dev/null 2>&1 || true
+  done
+  ok "unitهای systemd قل‌قلی بازگردانده شد"
+fi
+if [ -d "$HERE/server/usr-local-bin" ]; then
+  find "$HERE/server/usr-local-bin" -maxdepth 1 -type f -exec install -m 700 {} /usr/local/bin/ \;
+  ok "ابزارهای /usr/local/bin/ghelgheli-* بازگردانده شد"
+fi
 [ -f "$HERE/server/99-ghelgheli.conf" ] && {
   cp "$HERE/server/99-ghelgheli.conf" /etc/sysctl.d/ && sysctl -p /etc/sysctl.d/99-ghelgheli.conf >/dev/null 2>&1
   ok "تنظیمات شبکه اعمال شد"

@@ -847,10 +847,8 @@ String apiError(Object e) {
   // ۱. پیامِ صریحِ سرور همیشه اولویت دارد — فارسی و دقیق است.
   try {
     final data = (e as dynamic).response?.data;
-    if (data is Map && data['message'] != null) {
-      final m = data['message'].toString().trim();
-      if (m.isNotEmpty) return m;
-    }
+    final m = jsonStr(data, 'message').trim();
+    if (m.isNotEmpty) return m;
   } catch (_) {/* شکلِ پاسخ غیرمنتظره بود */}
 
   if (e is DioException) {
@@ -934,6 +932,12 @@ bool isTransient(Object e) {
 int? apiStatusCode(Object e) {
   try {
     return (e as dynamic).response?.statusCode as int?;
+  } catch (_) {
+    return null;
+  }
+}
+
+return (e as dynamic).response?.statusCode as int?;
   } catch (_) {
     return null;
   }

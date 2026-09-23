@@ -51,6 +51,21 @@ export function AnalyticsPage({ request }) {
     }
   };
 
+  const resolveAllOpen = async (status) => {
+    const label = status === 'ignored' ? 'نادیده گرفته' : 'حل‌شده';
+    if (!window.confirm(`همهٔ خطاهای باز صندوق ${label} شوند؟ این کار گروهی است.`)) return;
+    try {
+      const r = await request('/api/admin/crashes/resolve-open', {
+        method: 'POST',
+        body: { status },
+      });
+      notify(`${fmtNumber(r.updated || 0)} گزارش ${label} شد`);
+      load();
+    } catch (e) {
+      notify(e.message || 'بستن گروهی ناموفق بود', 'error');
+    }
+  };
+
   const f = data?.funnel || {};
   const e = data?.events || {};
   return <div className="stack">
@@ -71,8 +86,14 @@ export function AnalyticsPage({ request }) {
         </div>)}
       </div>
     </Card>
-    <Card title={`صندوق خطاهای باز (${fmtNumber(data?.openCrashCount||0)})`} subtitle="بستن گروه، همهٔ رخدادهای همان hash را حل‌شده می‌کند — نه فقط یکی." action={<AlertTriangle size={20} color="#ff5070"/>}>
+    <Card title={`صندوق خطاهای باز (${fmtNumber(data?.openCrashCount||0)})`} subtitle="لیست همهٔ بازهاست، نه فقط ۳۰ روز. بستن گروه کل hash را می‌بندد؛ بستن همه با تأیید است." action={<AlertTriangle size={20} color="#ff5070"/>}>
       <div style={{ display:'grid',gap:8 }}>
+        {!!data?.openCrashCount && (
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            <Button size="sm" variant="secondary" onClick={() => resolveAllOpen('resolved')}>همه را حل‌شده کن</Button>
+            <Button size="sm" variant="secondary" onClick={() => resolveAllOpen('ignored')}>همه را نادیده بگیر</Button>
+          </div>
+        )}
         {(data?.crashes||[]).map(crash=><div key={`${crash.error_hash}-${crash.platform}`} style={{ display:'grid',gridTemplateColumns:'100px 1fr auto',gap:10,alignItems:'center',padding:12,border:'1px solid rgba(255,80,112,.18)',borderRadius:12 }}>
           <Badge tone="danger">{crash.platform}</Badge>
           <div><b>{crash.message}</b><small className="topbar-sub" style={{ display:'block' }}>{fmtNumber(crash.occurrences)} بار · {fmtNumber(crash.affected_users)} کاربر · آخرین {new Date(crash.last_seen).toLocaleString('fa-IR')}</small></div>

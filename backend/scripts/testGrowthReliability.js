@@ -86,6 +86,26 @@ ok(read('userweb/src/screens/Home.jsx').includes('دعوت و کسب درآمد'
   'dashboard invitation shortcut communicates earning on both clients');
 ok(read('admin/src/pages/analytics.jsx').includes('/api/admin/analytics'),
   'analytics/crash dashboard ships on the web admin panel');
+ok(read('backend/src/services/analyticsService.js').includes('async function resolveOpenCrashes')
+  && growthRoutes.includes("router.post('/admin/crashes/resolve-open'")
+  && read('admin/src/pages/analytics.jsx').includes('/api/admin/crashes/resolve-open'),
+  'crash inbox can close every open report in one confirmed action');
+ok(!read('backend/src/services/analyticsService.js').includes('DESC LIMIT 30'),
+  'open crash list is not capped to 30 groups of the last 30 days');
+ok(read('backend/src/server.js').includes("process.env.BIND_HOST || '127.0.0.1'")
+  && read('backend/src/server.js').includes('server.listen(port, bindHost'),
+  'API binds to loopback by default so nginx is the only public face');
+ok(read('backend/src/routes/adminSecurity.js').includes('isValidPasswordLength(password)')
+  && !read('backend/src/routes/adminSecurity.js').includes('bcrypt.hash(req.body.password,12)'),
+  'creating an admin rejects empty passwords instead of hashing undefined');
+ok(read('scripts/backup_telegram.sh').includes('nginx-snippets')
+  && read('scripts/backup_telegram.sh').includes('ghelgheli-*.service')
+  && read('scripts/backup_telegram.sh').includes('usr-local-bin')
+  && read('scripts/restore_from_backup.sh').includes('nginx-snippets'),
+  'daily telegram backup and restore carry nginx snippets, systemd units and local bin');
+ok(read('userweb/src/main.jsx').includes('vite:preloadError')
+  && read('userweb/src/main.jsx').includes('gg-chunk-reload'),
+  'user web reloads once when a stale Vite chunk fails to load');
 
 // ── بند ۶الف/۶بِ ممیزیِ مستقلِ دوم: ایندکسِ جدول‌های پرترافیک و
 //    هرسِ analytics_events. مایگریشن ۰۸۱ باید هر دو ایندکسِ جدید را

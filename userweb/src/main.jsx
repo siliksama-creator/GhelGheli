@@ -43,25 +43,54 @@ import ScrollHint from './components/ScrollHint.jsx';
 // کاربرند و تا کلیک‌نشدن هیچ‌کس به آن‌ها نیاز ندارد.
 //
 // هیچ امکانی حذف نشده — فقط زمانِ رسیدنش عوض شده.
-const Profile = lazy(() => import('./screens/Profile.jsx'));
-const Ledger = lazy(() => import('./screens/Ledger.jsx'));
-const League = lazy(() => import('./screens/League.jsx'));
-const Chat = lazy(() => import('./screens/Chat.jsx'));
-const PublicProfile = lazy(() => import('./screens/PublicProfile.jsx'));
-const CardReg = lazy(() => import('./screens/CardReg.jsx'));
-const Shop = lazy(() => import('./screens/Shop.jsx'));
-const Wheel = lazy(() => import('./screens/Wheel.jsx'));
-const Referral = lazy(() => import('./screens/Referral.jsx'));
-const Pass = lazy(() => import('./screens/Pass.jsx'));
-const GamesHub = lazy(() => import('./games.jsx'));
-const GrowthHub = lazy(() => import('./GrowthHub.jsx'));
+// بعد از دیپلوی، مرورگر چانکِ هشِ قدیمی را از کش می‌خواهد و
+// «Failed to fetch dynamically imported module» می‌دهد. یک رفرش کافی است؛
+// بدون این، کاربر روی صفحهٔ سفید/خطا می‌ماند تا دستی رفرش کند.
+function lazyRetry(importer) {
+  return lazy(() => importer().catch((err) => {
+    const msg = String(err?.message || err || '');
+    if (/Failed to fetch dynamically imported module|Loading chunk|Importing a module script failed/i.test(msg)) {
+      try {
+        if (!sessionStorage.getItem('gg-chunk-reload')) {
+          sessionStorage.setItem('gg-chunk-reload', '1');
+          window.location.reload();
+          return new Promise(() => {});
+        }
+      } catch { /* private mode */ }
+    }
+    throw err;
+  }));
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    try { event.preventDefault(); } catch { /* ignore */ }
+    try {
+      if (sessionStorage.getItem('gg-chunk-reload')) return;
+      sessionStorage.setItem('gg-chunk-reload', '1');
+    } catch { return; }
+    window.location.reload();
+  });
+}
+
+const Profile = lazyRetry(() => import('./screens/Profile.jsx'));
+const Ledger = lazyRetry(() => import('./screens/Ledger.jsx'));
+const League = lazyRetry(() => import('./screens/League.jsx'));
+const Chat = lazyRetry(() => import('./screens/Chat.jsx'));
+const PublicProfile = lazyRetry(() => import('./screens/PublicProfile.jsx'));
+const CardReg = lazyRetry(() => import('./screens/CardReg.jsx'));
+const Shop = lazyRetry(() => import('./screens/Shop.jsx'));
+const Wheel = lazyRetry(() => import('./screens/Wheel.jsx'));
+const Referral = lazyRetry(() => import('./screens/Referral.jsx'));
+const Pass = lazyRetry(() => import('./screens/Pass.jsx'));
+const GamesHub = lazyRetry(() => import('./games.jsx'));
+const GrowthHub = lazyRetry(() => import('./GrowthHub.jsx'));
 // پرسشِ اعلانِ وب — فقط برای کاربرِ لاگین‌کرده، یک‌بار (کدِ تنبل تا
 // به باندلِ اصلیِ ورود اضافه نشود؛ خودش هم بی‌صدا شرط‌ها را چک می‌کند).
-const WebPushPrompt = lazy(() => import('./components/WebPushPrompt.jsx'));
-const Support = lazy(() => import('./support.jsx'));
-const Wallet = lazy(() => import('./wallet.jsx'));
+const WebPushPrompt = lazyRetry(() => import('./components/WebPushPrompt.jsx'));
+const Support = lazyRetry(() => import('./support.jsx'));
+const Wallet = lazyRetry(() => import('./wallet.jsx'));
 // برنامه‌های پیشنهادی — صفحهٔ مستقل، از «بیشتر» باز می‌شود (خواستهٔ مالک).
-const RecommendedApps = lazy(() => import('./screens/RecommendedApps.jsx'));
+const RecommendedApps = lazyRetry(() => import('./screens/RecommendedApps.jsx'));
 
 // وقتی کاربر روی تبی می‌زند، چانکش تازه دانلود می‌شود. برای اینکه آن
 // لحظه صفر حس شود، به‌محضِ بی‌کار شدنِ مرورگر چانک‌های پرتردد را از
@@ -69,11 +98,11 @@ const RecommendedApps = lazy(() => import('./screens/RecommendedApps.jsx'));
 // رندرِ اول را نگرفته‌اند.
 function prefetchTabs() {
   const warm = () => {
-    import('./games.jsx');
-    import('./screens/League.jsx');
-    import('./screens/CardReg.jsx');
-    import('./screens/Shop.jsx');
-    import('./screens/Chat.jsx');
+    import('./games.jsx').catch(() => {});
+    import('./screens/League.jsx').catch(() => {});
+    import('./screens/CardReg.jsx').catch(() => {});
+    import('./screens/Shop.jsx').catch(() => {});
+    import('./screens/Chat.jsx').catch(() => {});
   };
   if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 4000 });
   else setTimeout(warm, 2500);
@@ -88,7 +117,8 @@ class UserErrorBoundary extends Component {
   }
   handleRetry = () => {
     this.setState({ hasError: false, error: null });
-    if (String(this.state.error?.message || '').includes('Chunk') || String(this.state.error?.message || '').includes('Loading')) {
+    const m = String(this.state.error?.message || '');
+    if (/Chunk|Loading|dynamically imported module/i.test(m)) {
       window.location.reload();
     } else {
       this.props.onReset?.();

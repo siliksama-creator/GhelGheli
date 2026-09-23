@@ -1,5 +1,7 @@
 /** Administrator account lifecycle and audit-log routes. */
 const express = require('express');
+const { isValidPasswordLength } = require('../lib/auth-helpers');
+const ADMIN_ROLES = new Set(['super_admin', 'support', 'observer']);
 
 module.exports = function createAdminSecurityRoutes(deps) {
   const {
@@ -8,7 +10,25 @@ module.exports = function createAdminSecurityRoutes(deps) {
   const router = express.Router();
 
 router.get('/admin/admins', adminAuth, requireRole(), asyncHandler(async (req, res) => res.json((await pool.query('SELECT id,username,role,is_active,created_at FROM admin_users ORDER BY created_at DESC')).rows)));
-router.post('/admin/admins', adminAuth, requireRole(), asyncHandler(async (req, res) => { const hash=await bcrypt.hash(req.body.password,12); const r=await pool.query('INSERT INTO admin_users(username,password_hash,role) VALUES($1,$2,$3) RETURNING id,username,role,is_active,created_at',[req.body.username,hash,req.body.role]); await audit(req.admin.id,'create_admin','admin_users',r.rows[0].id,null,{username:req.body.username,role:req.body.role}); res.json(r.rows[0]); }));
+router.post('/admin/admins', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  // bcrypt.hash(undefined) یک هش برای رشتهٔ «undefined» می‌سازد و حساب
+  // با رمز ناشناخته بالا می‌آید. فیلد خالی را باید قبل از هش رد کرد.
+  const username = String(req.body.username || '').trim().slice(0, 80);
+  const password = String(req.body.password || '');
+  const role = String(req.body.role || 'support');
+  if (!username) return res.status(400).json({ message: 'نام کاربری لازم است' });
+  if (!isValidPasswordLength(password)) {
+    return res.status(400).json({ message: 'رمز باید بین ۶ تا ۷۲ نویسه باشد' });
+  }
+  if (!ADMIN_ROLES.has(role)) return res.status(400).json({ message: 'نقش معتبر نیست' });
+  const hash = await bcrypt.hash(password, 12);
+  const r = await pool.query(
+    'INSERT INTO admin_users(username,password_hash,role) VALUES($1,$2,$3) RETURNING id,username,role,is_active,created_at',
+    [username, hash, role],
+  );
+  await audit(req.admin.id, 'create_admin', 'admin_users', r.rows[0].id, null, { username, role });
+  res.json(r.rows[0]);
+}));
 // There was previously no way to revoke an admin/support account once
 // created — only DB access could set is_active=false. A departing
 // support/support-with-a-compromised-password account could keep a fully

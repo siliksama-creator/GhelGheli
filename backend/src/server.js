@@ -1075,6 +1075,12 @@ process.on('uncaughtException', (err) => {
 });
 
 const port = process.env.PORT || 4000;
+// nginx فقط به 127.0.0.1 وصل می‌شود (snippets/ghelgheli-upstream.conf).
+// گوش‌دادن روی همهٔ اینترفیس‌ها سطح حمله را زیاد می‌کند بدون اینکه
+// فایده‌ای برای کاربر داشته باشد — فایروال پورت را می‌بندد، ولی BIND
+// پیش‌فرض باید همان لوکال باشد. استیجینگ روی ۴۹۹۹ هم لوکال است.
+// BIND_HOST=0.0.0.0 فقط برای تست روی شبکهٔ دیگر.
+const bindHost = process.env.BIND_HOST || '127.0.0.1';
 // ── آمادگی خوشه‌ای ────────────────────────────────────────────────────
 //
 // اگر REDIS_URL تنظیم باشد، آداپتور ردیس وصل می‌شود تا رویدادهای
@@ -1086,7 +1092,7 @@ const port = process.env.PORT || 4000;
 //    docs/scaling-fa.md — بخش «چه چیزی هنوز مانع است».
 const { attachRedisAdapter } = require('./lib/socketCluster');
 
-server.listen(port, async () => {
+server.listen(port, bindHost, async () => {
   await attachRedisAdapter(io).catch(e => {
     logger.error('[cluster] اتصال آداپتور ناموفق بود، تک‌پروسه ادامه می‌دهیم:', e.message);
   });
@@ -1119,7 +1125,7 @@ server.listen(port, async () => {
   await leagueCountdown.refresh().catch((e) =>
     logger.error('[league] گرم‌کردنِ کشِ شماره معکوس ناموفق بود:', e.message));
   await ensureActiveSeason();
-  logger.info(`GhelGheli API on :${port}`);
+  logger.info(`GhelGheli API on ${bindHost}:${port}`);
   // خطِ «ظرفیت» در بوت: تنها جایی که بعد از ارتقای سرور (بدون گشتن در
   // کانفیگ‌ها) می‌شود فهمید پروسه سخت‌افزار را درست دیده یا نه.
   logger.info(`${capacity.summary()} | نقش=${process.env.PROCESS_ROLE || 'game'}`);

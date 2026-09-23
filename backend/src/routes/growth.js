@@ -148,6 +148,9 @@ module.exports = function growthRoutes({
     res.json(await analytics.resolveCrashGroup(
       req.params.hash, req.body?.status || 'resolved', req.body?.platform));
   }));
+  router.post('/admin/crashes/resolve-open', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+    res.json(await analytics.resolveOpenCrashes(req.body?.status || 'resolved'));
+  }));
   router.patch('/admin/crashes/:reportId', adminAuth, requireRole(), asyncHandler(async (req, res) => {
     if (!/^\d+$/.test(req.params.reportId)) return res.status(400).json({ message: 'شناسه نامعتبر است' });
     res.json(await analytics.resolveCrash(req.params.reportId, req.body?.status));

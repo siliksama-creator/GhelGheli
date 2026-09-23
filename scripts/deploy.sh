@@ -224,5 +224,20 @@ else
   echo "monitor: ⚠️ نگهبانِ سلامتِ ۳۰ثانیه‌ای فعال نیست — monitor/health.sh و ghelgheli-health.timer را ببینید" >&2
 fi
 
+# کرون بکاپ تلگرام از /usr/local/bin می‌خواند، نه از مخزن. اگر این کپی
+# نباشد، اصلاح اسکریپت با دپلوی به سرور نمی‌رسد و آرشیو دیشب همان شکاف
+# قدیمی را تکرار می‌کند.
+log "Installing backup tooling"
+for pair in \
+  "backup_telegram.sh:ghelgheli-backup-telegram.sh" \
+  "restore_from_backup.sh:ghelgheli-restore.sh" \
+  "verify_backup.sh:ghelgheli-verify-backup.sh"
+do
+  src="$APP_DIR/scripts/${pair%%:*}"; dst="/usr/local/bin/${pair##*:}"
+  if [ -f "$src" ]; then
+    install -m 700 "$src" "$dst"
+  fi
+done
+
 log "Deploy OK — $NEW_SHA is live"
 curl -fsS -m 5 "$API_URL"; echo

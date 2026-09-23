@@ -73,14 +73,16 @@ async function summary(days = 30) {
          FROM analytics_events
         WHERE created_at >= NOW() - ($1::text || ' days')::interval
         GROUP BY created_at::date,event_name ORDER BY day`, [period]),
+    // صندوق باید همهٔ بازها را نشان دهد، نه فقط ۳۰ روز اخیر با سقف ۳۰ گروه.
+    // شمارندهٔ openCrashCount سراسری است؛ اگر لیست فیلتر شود مدیر صندوق را
+    // «خالی» می‌بیند در حالی که ده‌ها ردیف باز مانده — دقیقاً همان شکاف زنده.
     pool.query(
       `SELECT error_hash, platform, MIN(message) AS message,
               COUNT(*)::int AS occurrences, MAX(created_at) AS last_seen,
               COUNT(DISTINCT user_id)::int AS affected_users
          FROM app_crash_reports
-        WHERE created_at >= NOW() - ($1::text || ' days')::interval
-          AND status='open'
-        GROUP BY error_hash,platform ORDER BY COUNT(*) DESC,MAX(created_at) DESC LIMIT 30`, [period]),
+        WHERE status='open'
+        GROUP BY error_hash,platform ORDER BY COUNT(*) DESC,MAX(created_at) DESC LIMIT 200`),
     pool.query("SELECT COUNT(*)::int AS n FROM app_crash_reports WHERE status='open'"),
   ]);
   const byName = Object.fromEntries(totals.rows.map(r => [r.event_name, {
@@ -143,6 +145,22 @@ async function resolveCrashGroup(hash, status, platform) {
     [h, status, p]);
   if (!rowCount) throw Object.assign(new Error('گروه خطا پیدا نشد'), { status: 404 });
   return { hash: h, status, updated: rowCount };
+}
+
+/**
+ * بستن همهٔ گزارش‌های باز — تا صندوق واقعاً خالی‌شدنی باشد.
+ * بدون این، مدیر باید گروه به گروه کلیک کند و گروه‌های بیرون از سقف لیست
+ * تا ابد باز می‌مانند.
+ */
+async function resolveOpenCrashes(status) {
+  if (!['resolved', 'ignored'].includes(status)) {
+    throw Object.assign(new Error('وضعیت گزارش خطا معتبر نیست'), { status: 400 });
+  }
+  const { rowCount } = await pool.query(
+    `UPDATE app_crash_reports SET status=$1::text, resolved_at=NOW()
+      WHERE status='open'`,
+    [status]);
+  return { status, updated: rowCount };
 }
 
 /**
@@ -215,4 +233,4 @@ async function pruneCrashes(keepDays = 180) {
   return removed;
 }
 
-module.exports = { EVENTS, record, reportCrash, summary, resolveCrash, resolveCrashGroup, safeObject, pruneOld, pruneCrashes };
+module.exports = { EVENTS, record, reportCrash, summary, resolveCrash, resolveCrashGroup, resolveOpenCrashes, safeObject, pruneOld, pruneCrashes };
