@@ -608,8 +608,11 @@ String _gatewayFa(Object? g) {
       return 'زرین‌پال · ';
     case 'wallet':
       return 'کیف پول · ';
+    // تاریخچهٔ خریدهای قدیمی می‌تواند provider='cafebazaar' داشته باشد
+    // (پیش‌فرضِ مسیرِ قدیمیِ createShopOrder). کافه‌بازار از پروژه حذف شده،
+    // پس برچسبِ بی‌طرف نشان داده می‌شود، نه نامِ فروشگاهی که وجود ندارد.
     case 'cafebazaar':
-      return 'کافه‌بازار · ';
+      return 'درگاه پرداخت · ';
     default:
       return '';
   }
