@@ -92,8 +92,14 @@ function sha256File(file) {
  *   • امضای ZIP («PK») — APK یک zip است.
  *   • وجودِ `AndroidManifest.xml` در فهرستِ مرکزی (نام‌ها بدونِ فشرده‌سازی
  *     ذخیره می‌شوند، پس در چند صد کیلوبایتِ آخرِ فایل دیده می‌شوند).
- *   • وجودِ امضای دیجیتال در `META-INF` — APKِ منتشرنشدهٔ بدونِ امضا روی
- *     گوشیِ کاربر نصب نمی‌شود و اگر ما نبینیمش، کاربر می‌بیند.
+ *   • امضای دیجیتال — APKِ بدونِ امضا روی گوشیِ کاربر نصب نمی‌شود
+ *     (اندروید نصبش را رد می‌کند). دو طرحِ رایج:
+ *       – v1 (JAR): فایل‌های `META-INF/*.RSA|.DSA|.EC` + `.SF`
+ *       – v2/v3: بلوکی بین داده‌ها و فهرستِ مرکزیِ ZIP که با رشتهٔ جادوییِ
+ *         `APK Sig Block 42` تمام می‌شود
+ *     ⚠️ بیلدهای امروزی (minSdk 24) فقط v2/v3 دارند و **هیچ** فایلِ امضایی
+ *     در `META-INF` نمی‌گذارند. نسخهٔ اولِ همین تابع فقط v1 را می‌شناخت و
+ *     در اولین انتشارِ واقعی، APKِ سالمِ خودمان را «بی‌امضا» خواند.
  */
 async function inspectApk(filePath) {
   const fd = await fsp.open(filePath, 'r');
@@ -106,12 +112,37 @@ async function inspectApk(filePath) {
     const tail = Buffer.alloc(tailLen);
     await fd.read(tail, 0, tailLen, size - tailLen);
     const text = tail.toString('latin1');
+    const hasV1 = /META-INF\/[^/]*\.(RSA|DSA|EC)/i.test(text)
+      || /META-INF\/[^/]*\.SF/i.test(text);
+
+    // ── امضای v2/v3 ──────────────────────────────────────────────────────
+    // بلاکِ امضا دقیقاً پیش از فهرستِ مرکزی می‌نشیند: [داده‌ها][بلاکِ
+    // امضا][فهرستِ مرکزی][EOCD]. پس آفستِ فهرستِ مرکزی را از EOCD
+    // می‌خوانیم و ۱۶ بایتِ پیش از آن باید رشتهٔ جادویی باشد. این روش به
+    // حجمِ فهرستِ مرکزی وابسته نیست (برخلافِ «دنبالِ رشته بگرد» در انتهای
+    // فایل که برای APKهای بزرگ ممکن است رشته را نبیند).
+    let hasV2 = false;
+    try {
+      const eocdLen = Math.min(size, 65557); // بیشینهٔ EOCD + کامنت
+      const eocd = Buffer.alloc(eocdLen);
+      await fd.read(eocd, 0, eocdLen, size - eocdLen);
+      const eocdPos = eocd.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+      if (eocdPos >= 0) {
+        const cdOffset = eocd.readUInt32LE(eocdPos + 16);
+        if (cdOffset >= 16 && cdOffset <= size) {
+          const magic = Buffer.alloc(16);
+          await fd.read(magic, 0, 16, cdOffset - 16);
+          hasV2 = magic.toString('latin1') === 'APK Sig Block 42';
+        }
+      }
+    } catch { /* اگر ساختار عجیب بود، به v1 تکیه می‌کنیم */ }
+
     return {
       size,
       isZip,
       hasManifest: text.includes('AndroidManifest.xml'),
-      signed: /META-INF\/[^/]*\.(RSA|DSA|EC)/i.test(text)
-        || /META-INF\/[^/]*\.SF/i.test(text),
+      signed: hasV1 || hasV2,
+      scheme: hasV1 && hasV2 ? 'v1+v2/v3' : (hasV2 ? 'v2/v3' : (hasV1 ? 'v1' : 'none')),
     };
   } finally {
     await fd.close();
@@ -262,7 +293,7 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
       if (!info.hasManifest) { await cleanupTmp(); return res.status(400).json({ message: 'فایل APK ناقص است (AndroidManifest.xml ندارد)' }); }
       if (!info.signed) {
         await cleanupTmp();
-        return res.status(400).json({ message: 'این APK امضای دیجیتال ندارد؛ روی گوشیِ کاربر نصب نمی‌شود. از خروجیِ «Build APK» استفاده کن.' });
+        return res.status(400).json({ message: 'این APK امضای دیجیتال ندارد (نه v1 نه v2/v3)؛ اندروید نصبش را رد می‌کند. از خروجیِ «Build APK» استفاده کن.' });
       }
 
       const version = sanitizeVersion(req.body?.version) || `build-${new Date().toISOString().slice(0, 10)}`;
