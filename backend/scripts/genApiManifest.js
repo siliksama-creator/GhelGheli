@@ -43,7 +43,11 @@ for (const m of serverSrc.matchAll(/app\.use\(\s*'([^']+)'\s*,\s*require\(\s*'\.
 const endpoints = [];
 for (const file of walk(ROUTES)) {
   const rel = path.relative(ROUTES, file).replace(/\\/g, '/').replace(/\.js$/, '');
-  const prefix = mounts[rel] ?? mounts[rel.replace(/\/index$/, '')];
+  let prefix = mounts[rel] ?? mounts[rel.replace(/\/index$/, '')];
+  // ماژول‌های تودرتو (مثل photoCards/adminCodes و photoCards/adminUpload)
+  // mount مستقیم در server.js ندارند و از ماژولِ والد به ارث می‌برند؛ بدونِ
+  // این، routeهایشان از manifest جا می‌ماند و نگهبانِ CI کور می‌شود.
+  if (prefix === undefined && rel.includes('/')) prefix = mounts[rel.split('/')[0]];
   if (prefix === undefined) continue; // فایلِ route باید در server.js mount شده باشد
   const src = fs.readFileSync(file, 'utf8');
   for (const m of src.matchAll(/router\.(get|post|put|patch|delete)\(\s*'([^']+)'/g)) {

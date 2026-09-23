@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 260,
+ "count": 272,
  "endpoints": [
   {
    "method": "GET",
@@ -354,8 +354,63 @@
   },
   {
    "method": "GET",
+   "path": "/api/admin/photo-cards/codes",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/codes",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/photo-cards/codes/:id",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/photo-cards/codes/:id",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/photo-cards/codes/:id/void",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/codes/assign-type",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/codes/bulk-delete",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/photo-cards/codes/export",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/photo-cards/codes/stats",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/codes/toggle-by-code",
+   "source": "routes/photoCards/adminCodes.js"
+  },
+  {
+   "method": "GET",
    "path": "/api/admin/photo-cards/designs",
    "source": "routes/photoCards.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/photo-cards/designs",
+   "source": "routes/photoCards/adminUpload.js"
   },
   {
    "method": "DELETE",
@@ -376,6 +431,11 @@
    "method": "POST",
    "path": "/api/admin/photo-cards/designs/:id/face-embedding",
    "source": "routes/photoCards.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/photo-cards/designs/options",
+   "source": "routes/photoCards/adminCodes.js"
   },
   {
    "method": "GET",
