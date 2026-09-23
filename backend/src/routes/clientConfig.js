@@ -307,6 +307,10 @@ module.exports = function createClientConfigRoutes(deps) {
           versionCode: release.versionCode || null,
           sizeBytes: release.sizeBytes || null,
           sha256: release.sha256 || null,
+          // پیامِ نسخهٔ تازه که ادمین همان‌جا در صفحهٔ «انتشار اپ» نوشته —
+          // مستقیم در دیالوگِ به‌روزرسانی اپ نشان داده می‌شود، پس ادمین
+          // لازم نیست برای هر نسخه جای دیگری را ویرایش کند.
+          notes: release.notes || null,
           publishedAt: release.publishedAt || null,
         }
         : null,

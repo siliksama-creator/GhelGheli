@@ -639,12 +639,37 @@ class _HomeShellState extends State<HomeShell>
       const current = String.fromEnvironment(
         'APP_RELEASE', defaultValue: '1.1.17');
       final minStr = '${min['android'] ?? ''}';
-      if (minStr.isNotEmpty && _versionLower(current, minStr)) {
+      // ── نسخهٔ منتشرشده روی سرور (پنل «انتشار اپ») ──────────────────────
+      //
+      // ⚠️ پیش از این، دیالوگ **فقط** وقتی می‌آمد که ادمین «حداقلِ نسخه» را
+      // بالا می‌برد؛ پس نسخهٔ تازه منتشر می‌شد و کاربر پیامی نمی‌گرفت، مگر
+      // ادمین یادش می‌ماند تیکِ حداقلِ نسخه را هم بزند. حالا وجودِ نسخهٔ
+      // تازه‌تر از نسخهٔ نصب‌شده کافی است — همان انتظاری که ادمین از دکمهٔ
+      // «انتشار» دارد.
+      final rel = app['release'] is Map
+          ? Map<String, dynamic>.from(app['release'] as Map)
+          : <String, dynamic>{};
+      final latest = '${rel['version'] ?? ''}'.trim();
+      final notes = '${rel['notes'] ?? ''}'.trim();
+      final sizeBytes =
+          rel['sizeBytes'] is num ? (rel['sizeBytes'] as num).toInt() : 0;
+      final urlA = '${urls['android'] ?? ''}'.trim();
+      final belowMin = minStr.isNotEmpty && _versionLower(current, minStr);
+      final newerExists = latest.isNotEmpty && _versionLower(current, latest);
+      // ⚠️ بی لینک، دیالوگ نمی‌آید: دکمه‌ای که هیچ کاری نمی‌کند از نبودنِ
+      // دیالوگ بدتر است (کاربر گیر می‌افتد). لینک را خودِ سرور از نسخهٔ
+      // منتشرشده می‌سازد، پس در حالتِ سالم همیشه هست.
+      if (urlA.isNotEmpty && (belowMin || newerExists)) {
         unawaited(_showUpdateDialog(
-          forced: force['android'] == true,
-          url: '${urls['android'] ?? ''}',
+          // «اجباری» فقط وقتی معنا دارد که نسخهٔ کاربر از حداقل پایین‌تر
+          // باشد؛ وگرنه یک تیکِ اشتباه، همه را از اپ بیرون می‌انداخت.
+          forced: belowMin && force['android'] == true,
+          url: urlA,
           current: current,
-          min: minStr,
+          min: minStr.isEmpty ? latest : minStr,
+          latest: latest,
+          notes: notes,
+          sizeBytes: sizeBytes,
         ));
       }
       final tabOrder = (m['tabOrder'] as List? ?? const [])
@@ -741,6 +766,45 @@ class _HomeShellState extends State<HomeShell>
     );
   }
 
+  /// کارتِ «چی تازه است»: شمارهٔ نسخهٔ منتشرشده + پیامی که ادمین در صفحهٔ
+  /// «انتشار اپ» نوشته است.
+  ///
+  /// چرا این متن از `live_copy` نمی‌آید: ادمین همان‌جا که فایل را می‌گذارد،
+  /// پیامِ همان نسخه را هم می‌نویسد. دو منبعِ متن برای یک چیز یعنی یکی‌شان
+  /// همیشه کهنه می‌ماند. (`live_copy` هم سرِ جایش هست: تیتر/بدنهٔ ثابت و
+  /// برچسبِ دکمه‌ها از همان‌جا ویرایش می‌شوند.)
+  Widget _updateReleaseCard(BuildContext context,
+      {required String latest, required String notes, required int sizeBytes}) {
+    final theme = Theme.of(context);
+    final mb = sizeBytes > 0
+        ? (sizeBytes / (1024 * 1024)).toStringAsFixed(1)
+        : '';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (latest.isNotEmpty)
+            Text(
+              mb.isEmpty
+                  ? 'نسخهٔ تازه: ${faNum(latest)}'
+                  : 'نسخهٔ تازه: ${faNum(latest)} — $mb مگابایت',
+              style: theme.textTheme.labelLarge,
+            ),
+          if (notes.isNotEmpty) ...[
+            if (latest.isNotEmpty) const SizedBox(height: 6),
+            Text(notes, style: theme.textTheme.bodySmall),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _showUpdateDialog({
     required bool forced,
     required String url,
@@ -749,6 +813,10 @@ class _HomeShellState extends State<HomeShell>
     // دیالوگ خودش می‌خواند، منبعِ حقیقتِ دوم می‌شد.
     required String current,
     required String min,
+    // نسخهٔ منتشرشده + پیامِ ادمین + حجمِ فایل (از `app.release`).
+    required String latest,
+    required String notes,
+    required int sizeBytes,
   }) async {
     if (!mounted) return;
     await showDialog<void>(
@@ -768,7 +836,18 @@ class _HomeShellState extends State<HomeShell>
         // اولین بیلد همین را به‌شکلِ «newline inside string» رد می‌کرد.
         // اگر `update.notice` خالی برگردد (فول‌بکِ آفلاین یا پاک‌کردنِ ادمین)،
         // RichText فقط بدنه را نشان می‌دهد و یک فاصلهٔ یتیم نمی‌افتد.
-        content: _updateBody(context, current: current, min: min),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _updateBody(context, current: current, min: min),
+            if (latest.isNotEmpty || notes.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _updateReleaseCard(context,
+                  latest: latest, notes: notes, sizeBytes: sizeBytes),
+            ],
+          ],
+        ),
         actions: [
           if (!forced)
             TextButton(

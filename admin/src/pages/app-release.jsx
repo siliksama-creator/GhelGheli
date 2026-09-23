@@ -26,7 +26,7 @@ function humanSize(bytes) {
   return `${n} بایت`;
 }
 
-export function AppReleasePage({ request, token, isSuperAdmin }) {
+export function AppReleasePage({ request, token, isSuperAdmin, onNavigate }) {
   const notify = useToast();
   // توکن برای آپلودِ XHR لازم است (fetch نمی‌تواند درصدِ پیشرفت بدهد).
   // پنل توکن را در localStorage نگه می‌دارد؛ اگر به‌عنوان prop هم برسد
@@ -187,7 +187,9 @@ export function AppReleasePage({ request, token, isSuperAdmin }) {
                   {release.forceUpdateApplied ? ' — اجباری' : ' — اختیاری'}
                 </div>
               )}
-              {release.notes && <div style={{ marginTop: 4 }}>یادداشت: {release.notes}</div>}
+              {release.notes && (
+                <div style={{ marginTop: 4 }}>پیام به کاربران: {release.notes}</div>
+              )}
             </div>
           </div>
         ) : (
@@ -196,8 +198,40 @@ export function AppReleasePage({ request, token, isSuperAdmin }) {
       </Card>
 
       <Card
+        title="کاربران این پیام را کجا می‌بینند؟"
+        subtitle="لازم نیست کار خاصی بکنی؛ فقط بدان کجا را نگاه کنی."
+      >
+        <div className="field-hint" style={{ lineHeight: 1.95 }}>
+          <div>
+            <b>۱) داخلِ اپ (مهم‌ترین جا):</b> کاربر اپ را باز می‌کند و اگر نسخهٔ منتشرشدهٔ این صفحه
+            از نسخهٔ نصب‌شدهٔ گوشی تازه‌تر باشد، پنجره‌ای با تیتر «نسخهٔ تازه قلقلی آماده است» بالا
+            می‌آید. دکمهٔ «به‌روزرسانی» همان فایلِ بالای همین صفحه را دانلود می‌کند.
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <b>۲) وب:</b> همین پنجره در وب فقط وقتی می‌آید که «حداقلِ نسخه» را بالا برده باشی؛
+            کاربرِ وب با «تازه‌سازی» صفحه به‌روز می‌شود و فایل APK نمی‌خواهد.
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <b>۳) اعلان (نوتیفیکیشن):</b> برای خبرکردنِ دستی، از صفحهٔ «اطلاعیه‌ها» →
+            «استودیوی اعلان‌های هدفمند» می‌توانی هر متنی را به همهٔ کاربران بفرستی.
+          </div>
+          <div style={{ marginTop: 8 }}>
+            متنِ کادرِ «پیامِ نسخهٔ تازه به کاربران» مخصوصِ همین نسخه است؛ تیتر و متنِ ثابتِ پنجره و
+            برچسبِ دکمه‌ها در صفحهٔ «متن‌های زنده» → گروهِ «پیامِ نسخهٔ تازه» قابل ویرایشاند.
+          </div>
+          {typeof onNavigate === 'function' && (
+            <div style={{ marginTop: 10 }}>
+              <Button variant="secondary" size="sm" onClick={() => onNavigate('live-copy')}>
+                ویرایشِ متن‌های پنجره
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card
         title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Upload size={18} /> آپلودِ نسخهٔ تازه</span>}
-        subtitle="APK را از GitHub → Actions → «Build APK» → Artifacts (پوشهٔ app-release-apks) بگیر. سرور خودش بررسی می‌کند فایل سالم و امضاشده باشد."
+        subtitle="APK را از GitHub → Actions → «Build APK» → Artifacts (پوشهٔ app-release-apks) بگیر (حالا یک فایلِ یونیورسال است که روی هر گوشی نصب می‌شود). سرور خودش بررسی می‌کند فایل سالم و امضاشده باشد."
       >
         <form onSubmit={submit}>
           <Field label="فایل APK" hint="فقط فایلِ امضاشدهٔ ریلیز پذیرفته می‌شود؛ خروجیِ دیباگ روی گوشیِ کاربر نصب نمی‌شود.">
@@ -217,8 +251,11 @@ export function AppReleasePage({ request, token, isSuperAdmin }) {
               <Input dir="ltr" value={versionCode} disabled={!isSuperAdmin} onChange={(e) => setVersionCode(e.target.value.trim())} placeholder="22" />
             </Field>
           </div>
-          <Field label="یادداشتِ نسخه (اختیاری)" hint="مثل «رفع باگِ ورود». در کارتِ انتشار ثبت می‌شود.">
-            <Input value={notes} disabled={!isSuperAdmin} onChange={(e) => setNotes(e.target.value)} maxLength={200} />
+          <Field
+            label="پیامِ نسخهٔ تازه به کاربران (اختیاری)"
+            hint="این جمله در پنجرهٔ به‌روزرسانی داخلِ اپ به کاربر نشان داده می‌شود — همان‌جا که نصب‌کنندگان می‌فهمند نسخهٔ تازه آمده. مثل «رفع مشکل ورود و سرعت بیشتر»."
+          >
+            <Input value={notes} disabled={!isSuperAdmin} onChange={(e) => setNotes(e.target.value)} maxLength={400} />
           </Field>
 
           <div style={{ display: 'grid', gap: 8, marginTop: 6 }}>
