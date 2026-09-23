@@ -304,6 +304,11 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
       const forceUpdate = String(req.body?.forceUpdate ?? 'false') === 'true';
       const minVersion = sanitizeVersion(req.body?.minVersion) || version;
 
+
+      const filename = `ghelgheli-${version}.apk`;
+      const finalPath = path.join(APK_DIR, filename);
+      const latestPath = path.join(APK_DIR, LATEST_NAME);
+
       // ── «آرشیو» یعنی آرشیو، نه انتشار ────────────────────────────────────
       // ⚠️ یافتهٔ آزمونِ زندهٔ ۲ مهر: با `setUpdateUrl=false` هم فایل به
       // نامِ `ghelgheli-latest.apk` هاردلینک می‌شد و رکوردِ نسخهٔ زنده
@@ -311,10 +316,6 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
       // حالا: فایل می‌ماند، نسخهٔ زنده دست‌نخورده.
       const prevRelease = await readRelease().catch(() => null);
       const archiveOnly = !setUpdateUrl && !!prevRelease && prevRelease.filename !== filename;
-
-      const filename = `ghelgheli-${version}.apk`;
-      const finalPath = path.join(APK_DIR, filename);
-      const latestPath = path.join(APK_DIR, LATEST_NAME);
 
       // اگر همین نسخه از قبل هست، جایگزین می‌شود (آپلودِ دوبارهٔ همان نسخه
       // نباید فایلِ دوم بسازد و پنل را شلوغ کند).
