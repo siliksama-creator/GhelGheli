@@ -183,7 +183,8 @@ console.log('\n== هیچ اعلانی تراکنش را نمی‌شکند ==');
   // قرارداد: هر فراخوانی یا `await` با try دارد، یا `.catch()`.
   const raw = serverRaw;
   const calls = raw.split('createNotification(').length - 1;
-  ok(calls >= 10, `${calls} فراخوانیِ اعلان در سرور هست`);
+  // سقف از ۱۰ به ۹ آمد: اعلانِ بنِ چت با حذفِ کاملِ سیستمِ بن (۱ مهر ۱۴۰۵) رفت.
+  ok(calls >= 9, `${calls} فراخوانیِ اعلان در سرور هست`);
 
   // فراخوانی‌های بدونِ await باید .catch داشته باشند.
   let unguarded = 0;
