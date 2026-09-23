@@ -27,7 +27,12 @@ const OBSERVER_PAGES = new Set(['dashboard', 'support']);
 // در بک‌اند `requireRole()` بدونِ آرگومان است — یعنی فقط super_admin. اگر
 // این صفحه برای نقشِ support دیده شود، دکمه‌اش ۴۰۳ می‌دهد و همان تجربهٔ بدی
 // می‌شود که این فایل برای جلوگیری از آن نوشته شده است.
-const SUPER_ONLY_PAGES = new Set(['admins', 'cloudflare', 'recommended-apps', 'league-countdown', 'duel-modes']);
+// «انتشار اپ» هم فقط مدیرکل: آپلودِ یک باینریِ خراب، بدترین نوعِ
+// برگشت‌ناپذیری است (کاربر اپِ خراب را حذف می‌کند و برنمی‌گردد) و
+// بک‌اند هم مسیر آپلود/حذف را با `requireRole()` — یعنی فقط
+// super_admin — بسته است. اگر این صفحه برای support دیده شود،
+// دکمه‌اش ۴۰۳ می‌دهد؛ همان تجربهٔ بدی که این فایل جلوگیری می‌کند.
+const SUPER_ONLY_PAGES = new Set(['admins', 'cloudflare', 'recommended-apps', 'league-countdown', 'duel-modes', 'app-release']);
 
 /** آیا این نقش اجازهٔ دیدنِ این صفحه (کلید NAV) را دارد؟ */
 export function canSeePage(role, pageKey) {

@@ -10,6 +10,10 @@
  */
 const express = require('express');
 const featureFlags = require('../services/featureFlags');
+// آخرین نسخهٔ منتشرشدهٔ اپ (پنلِ «انتشار اپ») — برای ساختِ لینکِ
+// به‌روزرسانی بدونِ دیپلوی. از opsConfig می‌خوانیم تا کشِ مشترک و
+// اعلانِ بین‌پروسه‌ای همان مسیری باشد که هنگامِ انتشار تازه می‌شود.
+const opsConfig = require('../services/opsConfig');
 const notificationService = require('../services/notificationService');
 const zarinpalGateway = require('../services/zarinpalService');
 
@@ -63,7 +67,7 @@ const DEFAULTS = Object.freeze({
   app: {
     minVersion: { android: '1.1.17', ios: '1.1.17' },
     forceUpdate: { android: false, ios: false },
-    updateUrl: { android: '', ios: '' },
+    updateUrl: { android: '', ios: '', web: '' },
     // بستهٔ کافه‌بازار. چرا یک فیلدِ جدا و نه سخت‌نوشتنِ لینک در کلاینت:
     // تا این دور وب این رشته را در خودش داشت —
     // `'https://ghelghelishop.ir'` — یعنی اگر ادمین `updateUrl` را خالی
@@ -276,16 +280,36 @@ module.exports = function createClientConfigRoutes(deps) {
     // بسته ساخته می‌شود. دلیلِ آمدن به سرور: هیچ کلاینتی نباید بداند
     // «سایتِ ما چیست»؛ یک رشتهٔ fallback در دو کلاینت یعنی دو رشتهٔ
     // متفاوت که فردا یکی‌شان کهنه می‌ماند (و وب دقیقاً همین بود).
-    const o = typeof opsLimits?.get === 'function' ? opsLimits.get() : null;
-    const bazaar = o && o.bazaarApiBase
-      ? `${String(o.bazaarApiBase).replace(/\/$/, '')}/ir/package/${cfg.app.bazaarPackage}/`
-      : '';
+    //
+    // ⚠️ به‌روزرسانیِ ۱ مهر ۱۴۰۵: fallbackِ کافه‌بازار **حذف شد**. مالک
+    //    انتشار در بازار را کنار گذاشت، پس لینکی که از
+    //    `ops_limits.bazaarApiBase` + `app.bazaarPackage` ساخته می‌شد کاربر
+    //    را به صفحهٔ یک بستهٔ ناموجود می‌فرستاد («دانلود» می‌زد و به هیچ‌جا
+    //    نمی‌رسید). حالا منبع، فایلِ منتشرشدهٔ خودمان است (پنلِ «انتشار اپ»)
+    //    که هم روی دامنهٔ API و هم روی دامنهٔ وب سرو می‌شود.
+    const release = await opsConfig.get('apk_release').catch(() => null);
+    const hostedAndroid = release && release.url ? String(release.url) : '';
+    const hostedWeb = release && release.webUrl ? String(release.webUrl) : '';
     const app = {
       ...cfg.app,
       updateUrl: {
-        android: cfg.app.updateUrl.android || bazaar,
+        android: cfg.app.updateUrl.android || hostedAndroid,
+        // نسخهٔ وب عمداً هم‌مبدأ است (دامنهٔ کاربر) تا مثلِ درسِ پس از
+        // مهاجرتِ .com به دامنهٔ دوم وابسته نباشد.
+        web: cfg.app.updateUrl.web || hostedWeb,
         ios: cfg.app.updateUrl.ios || '',
       },
+      // خلاصهٔ نسخهٔ منتشرشده — کلاینت‌ها می‌توانند شمارهٔ نسخه و هش را
+      // نشان دهند بی‌آنکه درخواستِ دومی بزنند.
+      release: release
+        ? {
+          version: release.version || null,
+          versionCode: release.versionCode || null,
+          sizeBytes: release.sizeBytes || null,
+          sha256: release.sha256 || null,
+          publishedAt: release.publishedAt || null,
+        }
+        : null,
     };
     res.json({
       smsEnabled,
@@ -398,6 +422,9 @@ module.exports = function createClientConfigRoutes(deps) {
           updateUrl: {
             android: str(b.app?.updateUrl?.android, cur.app.updateUrl.android, 500),
             ios: str(b.app?.updateUrl?.ios, cur.app.updateUrl.ios, 500),
+            // لینکِ نسخهٔ وب — صفحهٔ «انتشار اپ» این را خودکار پر می‌کند؛
+            // دستِ ادمین هم باز است تا اگر خواست به جای دیگری ببردش.
+            web: str(b.app?.updateUrl?.web, cur.app.updateUrl.web, 500),
           },
           // خالی‌کردنِ این فیلد یعنی «همان لینکِ کافه‌بازار را بساز»، پس
           // fallbackِ DEFAULTS لازم است؛ str() با خالی، همان خالی را

@@ -721,6 +721,16 @@ app.use('/api', require('./routes/adminSettings')({
 }));
 // فقط فهرستِ کارت‌های کلکسیونی برای انتخابگرهای پنل (جوایز).
 // مدیریتِ کدِ کارت قدیمی حذف شد؛ ساختِ کارت از مسیرِ «کارت با عکس» می‌گذرد.
+// ── انتشارِ اپ (APK) — پنلِ «انتشار اپ» ────────────────────────────────────
+//
+// با کنارگذاشتنِ کافه‌بازار (تصمیم مالک، ۱ مهر ۱۴۰۵) فایلِ اپ از خودِ سرور
+// سرو می‌شود؛ این روتر آپلود/فهرست/حذف را می‌دهد و لینکِ به‌روزرسانی را
+// زنده در client_config می‌نشاند. وابستگی‌ها مثل بقیهٔ روترها تزریق می‌شوند
+// چون pool/adminAuth/requireRole همین‌جا ساخته شده‌اند.
+app.use('/api', require('./routes/adminApk')({
+  pool, adminAuth, requireRole, asyncHandler, audit,
+}));
+
 app.use('/api', require('./routes/adminCardCatalog')({
   pool, adminAuth, asyncHandler,
 }));

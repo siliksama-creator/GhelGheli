@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 272,
+ "count": 276,
  "endpoints": [
   {
    "method": "GET",
@@ -21,6 +21,21 @@
    "method": "GET",
    "path": "/api/admin/analytics",
    "source": "routes/growth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/apk",
+   "source": "routes/adminApk.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/apk/delete",
+   "source": "routes/adminApk.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/apk/upload",
+   "source": "routes/adminApk.js"
   },
   {
    "method": "GET",
@@ -816,6 +831,11 @@
    "method": "POST",
    "path": "/api/analytics/events",
    "source": "routes/growth.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/app/latest",
+   "source": "routes/adminApk.js"
   },
   {
    "method": "POST",

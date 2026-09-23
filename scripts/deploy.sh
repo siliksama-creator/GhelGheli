@@ -196,6 +196,11 @@ RATELIMIT_SNIPPETS=(
   # SPA هر مسیرِ ناشناس را با ۲۰۰ جواب می‌داد، همه «موفق» شمرده شد.
   # این اسنیپت مسیرهای نقطه‌دار و نشانه‌های CMS/PHP را ۴۰۴ می‌کند.
   "deploy/ghelgheli-scanner-block.conf:ghelgheli-scanner-block.conf"
+  # سروِ APK از خودِ سرور (تصمیمِ مالک: بدونِ کافه‌بازار). همین اسنیپت
+  # هم `/app/` را سرو می‌کند و هم برای `/api/admin/apk/upload` سقفِ
+  # بدنه را به ۲۵۰ مگابایت می‌برد (سقفِ عمومیِ vhostها ۲۰ مگ است و
+  # بدونِ آن، آپلودِ ۶۰ مگابایتی در خودِ nginx با ۴۱۳ می‌مرد).
+  "deploy/ghelgheli-apk.conf:ghelgheli-apk.conf"
 )
 # ⚠️ باگِ واقعی که ۲۹ شهریور پیدا شد: مسیرِ مبدأ نسبی بود و در این نقطه از
 # اسکریپت، cwd روی `$APP_DIR/backend` است — پس `[ -f deploy/... ]` هیچ‌وقت
@@ -243,6 +248,56 @@ ensure_scanner_include() {
 if ! grep -q 'ghelgheli-scanner-block.conf' /etc/nginx/sites-enabled/ghelgheli 2>/dev/null; then
   log "Adding scanner-block include to nginx site config"
   ensure_scanner_include
+fi
+
+# ── زیرساختِ سروِ APK ─────────────────────────────────────────────────────
+#
+# سه کار، همه idempotent:
+#   ۱. پوشهٔ نگه‌داری (بیرونِ APP_DIR تا `git clean` پاکش نکند).
+#   ۲. درجِ include اسنیپت در vhostهایی که باید /app/ را سرو کنند. فایلِ
+#      vhost در گیت نیست (certbot آن را می‌سازد/عوض می‌کند) پس هر بار
+#      بررسی و در صورت نبود درج می‌شود؛ اگر `nginx -t` رد کند، فایل
+#      **بازگردانده می‌شود** و دیپلوی ادامه می‌دهد (سروِ اپ نباید بیلدِ وب
+#      را بخواباند).
+APK_DIR="${APK_DIR:-/var/www/ghelgheli-apk}"
+install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 755 "$APK_DIR"
+log "APK hosting directory ready: $APK_DIR"
+ensure_apk_include() {
+  python3 - "$1" "$2" <<'PYEOF'
+import sys, re, shutil, datetime, subprocess
+vhost, anchor = sys.argv[1], sys.argv[2]
+try:
+    src = open(vhost, encoding='utf-8').read()
+except FileNotFoundError:
+    sys.exit(0)
+lines = src.splitlines(True)
+hits = [i for i, l in enumerate(lines) if anchor in l and 'server_name' in l]
+if not hits:
+    sys.exit(0)
+start = hits[0]
+end = len(lines)
+for j in range(start + 1, len(lines)):
+    if re.match(r'^\s*server\s*\{', lines[j]):
+        end = j
+        break
+if 'ghelgheli-apk.conf' in ''.join(lines[start:end]):
+    sys.exit(0)
+inc = '  include /etc/nginx/snippets/ghelgheli-apk.conf;\n'
+backup = vhost + '.bak.' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+shutil.copy2(vhost, backup)
+open(vhost, 'w', encoding='utf-8').write(''.join(lines[:start + 1] + [inc] + lines[start + 1:]))
+if subprocess.run(['nginx', '-t'], capture_output=True).returncode != 0:
+    shutil.copy2(backup, vhost)
+    print('  ⚠️ nginx -t بعد از درجِ include رد شد — فایل بازگردانده شد: ' + vhost)
+    sys.exit(0)
+print('  ✅ include به ' + vhost + ' اضافه شد (' + anchor + ')')
+PYEOF
+}
+NGINX_MAIN=/etc/nginx/sites-enabled/ghelgheli
+if [ -f "$NGINX_MAIN" ]; then
+  ensure_apk_include "$NGINX_MAIN" 'server_name api.ghelghelishop'
+  ensure_apk_include "$NGINX_MAIN" 'server_name admin.ghelghelishop'
+  ensure_apk_include "$NGINX_MAIN" 'server_name register.ghelghelishop'
 fi
 
 log "Reloading nginx"

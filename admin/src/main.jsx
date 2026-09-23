@@ -45,6 +45,9 @@ const DuelModesPage = lazy(() => import('./pages/duel-modes.jsx').then(m => ({ d
 const GameEconomyPage = lazy(() => import('./pages/game-economy.jsx').then(m => ({ default: m.GameEconomyPage })));
 const WheelPage = lazy(() => import('./pages/wheel.jsx').then(m => ({ default: m.WheelAdminPage })));
 const CardBoxPage = lazy(() => import('./pages/card-box.jsx').then(m => ({ default: m.CardBoxAdminPage })));
+// «انتشار اپ» — آپلودِ نسخهٔ تازهٔ APK و ست‌کردنِ لینکِ به‌روزرسانی
+// (تصمیمِ مالک: بدونِ کافه‌بازار، فایل از خودِ سرور سرو شود).
+const AppReleasePage = lazy(() => import('./pages/app-release.jsx').then(m => ({ default: m.AppReleasePage })));
 const SettingsPage = lazy(() => import('./pages/settings.jsx').then(m => ({ default: m.SettingsPage })));
 const ZarinPalPage = lazy(() => import('./pages/zarinpal.jsx').then(m => ({ default: m.ZarinPalPage })));
 const LiveCopyPage = lazy(() => import('./pages/live-copy.jsx').then(m => ({ default: m.LiveCopyPage })));
@@ -212,6 +215,14 @@ const NAV = [
   ['notifications', 'اطلاعیه‌ها', Bell, NotificationsPage,
     'ارسال اطلاعیهٔ push به همه یا گروهی از کاربران — با پیش‌نمایشِ ساعت تهران.',
     'talk'],
+  // ── انتشار اپ — پیش از «تنظیمات» می‌آید ────────────────────────
+  //
+  // با کنارگذاشتنِ کافه‌بازار، دکمهٔ «به‌روزرسانی» باید به فایلِ
+  // خودمان برود. این صفحه هم فایل را می‌گیرد و هم لینک/حداقلِ نسخه
+  // را زنده ست می‌کند؛ پس جایش کنارِ «تنظیمات» است نه داخلِ آن.
+  ['app-release', 'انتشار اپ', Smartphone, AppReleasePage,
+    'نسخهٔ تازهٔ APK را از همین‌جا منتشر کن: فایل روی سرور می‌نشیند و لینکِ به‌روزرسانی اپ و وب زنده عوض می‌شود.',
+    'config'],
   ['settings', 'تنظیمات', Settings, SettingsPage,
     'تنظیمات چت و پیامک + تنظیمات اپ: نسخهٔ اجباری، بنر اطلاعیه و چیدمان تب‌ها.',
     'config'],
@@ -317,7 +328,7 @@ function App() {
     >
       <AdminErrorBoundary key={effectiveKey} onReset={() => setPage(effectiveKey)}>
         <Suspense fallback={<div className="pageLoading" aria-busy="true" />}>
-          <ActivePage request={request} onNavigate={setPage} isSuperAdmin={isSuperAdmin(role)} />
+          <ActivePage request={request} onNavigate={setPage} isSuperAdmin={isSuperAdmin(role)} token={token} />
         </Suspense>
       </AdminErrorBoundary>
     </AppShell>
