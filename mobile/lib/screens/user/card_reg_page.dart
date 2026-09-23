@@ -115,7 +115,7 @@ class CardRegPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'عکس کارت و کدش را همین‌جا ثبت کن.',
+                            'دقت کنید فقط کارت‌های بالای ۵۰۰ امتیاز ثبت می‌شود.',
                             style: TextStyle(
                               color: Color(0xFFCBD5E1),
                               fontSize: 11.5,

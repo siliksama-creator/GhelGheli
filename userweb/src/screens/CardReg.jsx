@@ -22,7 +22,7 @@ export default function CardReg({ items, grants, token, reload, setMsg }) {
                 <b style={{ color:'#FFF', fontSize:'14px', fontWeight:'900' }}>ثبت کارت‌های قلقلی</b>
                 <span style={{ background:'rgba(245,158,11,0.16)', border:'1px solid rgba(245,158,11,0.45)', color:'#F59E0B', padding:'3px 8px', borderRadius:'99px', fontSize:'10px', fontWeight:'900' }}>ثبت سریع</span>
               </div>
-              <p style={{ color:'#CBD5E1', fontSize:'11.5px', margin:'4px 0 0', lineHeight:1.45, fontWeight:'600' }}>عکس کارت و کدش را همین‌جا ثبت کن.</p>
+              <p style={{ color:'#CBD5E1', fontSize:'11.5px', margin:'4px 0 0', lineHeight:1.45, fontWeight:'600' }}>دقت کنید فقط کارت‌های بالای ۵۰۰ امتیاز ثبت می‌شود.</p>
             </div>
           </div>
           <PhotoCardBox token={token} setMsg={setMsg} onDone={reload} />
