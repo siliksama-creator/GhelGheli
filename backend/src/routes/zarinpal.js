@@ -149,10 +149,37 @@ module.exports = function zarinpalRoutes({
   router.get('/payments/zarinpal/order/:id', auth, validateUuid('id'),
     asyncHandler(async (req, res) => {
       const { rows } = await pool.query(
-        `SELECT id, status, purchase_kind, amount, paid_at FROM payment_orders WHERE id=$1 AND user_id=$2`,
+        `SELECT id, status, purchase_kind, amount, paid_at, granted_reference_id
+           FROM payment_orders WHERE id=$1 AND user_id=$2`,
         [req.params.id, req.user.id]);
       if (!rows[0]) return res.status(404).json({ message: 'سفارش پیدا نشد' });
-      res.json({ order: rows[0] });
+      const order = rows[0];
+      // رونماییِ صندوق بعد از بازگشت از درگاه: کلاینت برای نمایشِ «چه
+      // کارت‌هایی گرفتی» به خودِ کارت‌ها نیاز دارد، نه فقط وضعیت paid.
+      // granted_reference_id همان box_id است که deliverCardBox ثبت کرده.
+      let box = null;
+      if (order.purchase_kind === 'card_box' && order.status === 'paid' && order.granted_reference_id) {
+        const { rows: cards } = await pool.query(
+          `SELECT c.card_type_id, c.slot, c.rarity, c.point_value, t.name, t.image_url
+             FROM card_box_cards c JOIN card_types t ON t.id = c.card_type_id
+            WHERE c.box_id = $1 ORDER BY c.slot`,
+          [order.granted_reference_id]);
+        if (cards.length) {
+          box = {
+            cards: cards.map((c) => ({
+              name: c.name, rarity: c.rarity,
+              pointValue: Number(c.point_value || 0), imageUrl: c.image_url || '',
+            })),
+            points: cards.reduce((s, c) => s + Number(c.point_value || 0), 0),
+            distinct: new Set(cards.map((c) => String(c.card_type_id))).size === cards.length
+              && cards.length > 1,
+          };
+        }
+      }
+      res.json({ order: {
+        id: order.id, status: order.status, purchase_kind: order.purchase_kind,
+        amount: Number(order.amount), paid_at: order.paid_at, box,
+      } });
     }));
 
   // ── تنظیمِ زنده از پنل ادمین ─────────────────────────────────────────

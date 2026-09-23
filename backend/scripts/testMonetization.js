@@ -33,9 +33,11 @@ assert.match(shop, /const ANNUAL_PLUS_PRICE = 499000/);
 assert.match(shop, /monthly:[\s\S]*?price: PLUS_PRICE, days: 30/);
 assert.match(shop, /annual:[\s\S]*?price: ANNUAL_PLUS_PRICE, days: 365/);
 assert.match(shop, /savingPercent: 30/);
-for (const benefit of ['Premium Pass', 'حذف تبلیغات عادی', 'عضویت دائمی در یک باشگاه منتخب']) {
+for (const benefit of ['Premium Pass', 'عضویت دائمی در یک باشگاه منتخب']) {
   assert(shop.includes(benefit), `missing Plus benefit: ${benefit}`);
 }
+// محصول هیچ تبلیغی ندارد؛ وعدهٔ «حذف تبلیغات» گمراه‌کننده است و نباید برگردد.
+assert(!shop.includes('حذف تبلیغات'), 'Plus must not promise ad removal while the product has no ads');
 assert(shop.includes('annual_royal_frame') && migration.includes('annual_royal_frame'), 'missing annual frame grant');
 assert(!shop.includes('annual_royal_result'), 'removed annual result template must not be granted');
 for (const annual of ['ستاره سالانه', 'annual_club_switches']) {

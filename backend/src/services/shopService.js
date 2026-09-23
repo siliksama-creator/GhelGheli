@@ -28,8 +28,11 @@ const PLUS_BENEFITS = Object.freeze([
   'ستاره پلاس در پروفایل، چت، لیگ و بازی',
   'عضویت دائمی در یک باشگاه منتخب',
   'مسیر ویژه گذر نبرد (Premium Pass)',
-  'حذف تبلیغات عادی',
 ]);
+// NOTE (مهر ۱۴۰۵): سطرِ پنجمِ مزایا (مربوط به آگهی‌ها) حذف شد، چون
+// در کلِ محصول هیچ آگهی‌ای وجود ندارد (نه SDK، نه بنر، نه ویدیوی
+// جایزه‌ای) و وعده‌اش گمراه‌کننده بود. اگر روزی آگهی اضافه شد، اول
+// مصرف‌کنندهٔ adFree را بنویسید و بعد مزایا را برگردانید — نه برعکس.
 
 const ANNUAL_BENEFITS = Object.freeze([
   'قاب سلطنتی سالانه؛ هدیه دائمی و انحصاری',
@@ -279,7 +282,7 @@ async function catalogue(userId, shape) {
     },
     plans: [planView(plansCfg.monthly, plansCfg), planView(plansCfg.annual, plansCfg)],
     ...(wantGroups ? { groups } : {}),
-    ...(wantItems ? { items: decorated } : {}),
+    ...(wantItems ? { items: shelf } : {}),
     clubs: clubs.rows,
     purchaseHistory: history.map((row) => ({
       ...row,

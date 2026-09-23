@@ -233,7 +233,7 @@ export default function Shop({ token, reloadProfile }) {
   // روی وب هم کار می‌کند؛ فقط سهمِ بازار به اپ نیاز دارد.
   const purchase = async (order) => {
     if (!window.__ghBazaarPurchase) {
-      throw new Error('برای خرید، اپ اندروید را از کافه‌بازار نصب کنید');
+      throw new Error('درگاه پرداخت فعلاً فعال نیست — کمی بعد دوباره تلاش کنید');
     }
     const purchaseToken = await window.__ghBazaarPurchase(order.productId, order.orderId);
     return req('/api/purchase/verify', 'POST',
@@ -263,8 +263,26 @@ export default function Shop({ token, reloadProfile }) {
     return purchase(order);
   // بدونِ پیامِ گوشه‌ای: نامِ آیتم روی کارتِ لحظه می‌آید.
   }, null, { item: item.name });
-  const equipItem = (item) => act(`equip-${item.id}`,
-    () => req('/api/shop/equip', 'POST', { slug: item.slug, kind: item.kind }, token), `${item.name} فعال شد`);
+  // ── تعویض باشگاه سالانه: تنها جایی که «انتخاب» هزینه دارد ──
+  // پلاس ماهانه باشگاهش ثابت است (سرور ۴۰۹ می‌دهد) و نشانِ خریداری‌شده
+  // هم همیشه رایگان عوض می‌شود؛ فقط وقتی کاربرِ سالانه از روی یک باشگاهِ
+  // اشتراکی به باشگاهِ دیگری می‌رود، یک فرصت مصرف می‌شود. چون این فرصت
+  // در هر دوره فقط یکی است، قبلش تأییدیه می‌گیریم تا تصادفی نسوزد.
+  const clubName = (slug) => (data?.groups?.club_badge || [])
+    .find((c) => (c.payload || c.slug) === slug)?.name || slug;
+  const equipItem = (item) => {
+    const value = item.payload || item.slug;
+    const equippedClub = data?.equipped?.club;
+    const switchesLeft = Number(data?.plus?.clubSwitchesRemaining || 0);
+    if (item.kind === 'club_badge' && !item.owned && equippedClub && equippedClub !== value
+        && data?.plus?.tier === 'annual' && switchesLeft > 0) {
+      const ok = window.confirm(
+        `از «${clubName(equippedClub)}» به «${clubName(value)}» می‌روی و تنها فرصتِ تغییرِ باشگاهِ این دوره مصرف می‌شود. مطمئنی؟`);
+      if (!ok) return;
+    }
+    return act(`equip-${item.id}`,
+      () => req('/api/shop/equip', 'POST', { slug: item.slug, kind: item.kind }, token), `${item.name} فعال شد`);
+  };
 
   if (!data && !error) return <div className="card pad center muted">در حال چیدن ویترین…</div>;
   if (!data) return <div className="card pad center"><p className="err">{error}</p><button onClick={load}>تلاش دوباره</button></div>;
@@ -291,6 +309,7 @@ export default function Shop({ token, reloadProfile }) {
         flex-wrap:wrap;padding:10px 5px 0}
       .shopFeatureHead h3{margin:0;font-size:14.5px;color:#FFD166;font-weight:950}
       .shopFeatureHead span{font-size:10.5px;color:#94a3b8}
+      .clubSwitchNote{margin:0 0 9px;padding:8px 12px;border-radius:12px;background:rgba(255,209,102,.09);border:1px solid rgba(255,209,102,.32);color:#FFD166;font-size:11px;font-weight:850;text-align:center}
       .shopShelf{border:1px solid rgba(255,255,255,.09);background:rgba(7,21,34,.6);border-radius:20px;padding:13px;overflow:hidden}.shopShelfHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.shopShelfHead h3{margin:0;font-size:14px}.shopShelfHead span{font-size:10px;color:#94a3b8}.shopCarousel{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;overflow-x:visible;padding:2px 1px 9px}.shopProduct{scroll-snap-align:start;overflow:hidden;border-radius:18px;border:1px solid rgba(255,255,255,.11);background:linear-gradient(155deg,rgba(255,255,255,.075),rgba(255,255,255,.025));min-height:282px;display:flex;flex-direction:column;box-shadow:0 14px 35px rgba(0,0,0,.22);transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}.shopProduct:hover{transform:translateY(-3px);border-color:rgba(56,189,248,.38);box-shadow:0 18px 42px rgba(0,0,0,.3)}.shopProduct.equipped{border-color:rgba(34,231,166,.7);box-shadow:0 0 0 1px rgba(34,231,166,.2),0 18px 42px rgba(34,231,166,.08)}.shopArtwork{height:144px;position:relative;border-bottom:1px solid rgba(255,255,255,.1);overflow:hidden;background:#03070d}.shopProductBody{padding:11px;display:flex;flex-direction:column;flex:1}.shopProductTitle{display:flex;align-items:center;justify-content:space-between;gap:6px}.shopProduct h3{margin:0;font-size:13.5px}.shopProductTitle span{font-size:9px;background:rgba(34,231,166,.15);color:#22E7A6;border-radius:999px;padding:3px 7px}.shopProduct p{color:#9cabbc;font-size:10px;line-height:1.6;margin:6px 0;min-height:28px}.shopProductFoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}.shopProductFoot strong{color:#FFD166;font-size:11px}.shopProduct button{font-size:10px;padding:7px 11px}.shopProduct button.secondary{background:#1e293b;color:#94a3b8}.plusAccess{display:block;color:#38BDF8;font-size:9px;margin-top:6px}.lockedGift{font-size:9px;color:#c4b5fd}.shopDisclosure{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#94a3b8;font-size:10.5px;padding:3px 5px}.shopDisclosure button{border:0;background:none;color:#38BDF8;cursor:pointer}.historyPanel{border:1px solid rgba(255,255,255,.08);border-radius:15px;padding:10px;background:rgba(255,255,255,.025);display:grid;gap:5px}.historyRow{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:9px;background:rgba(255,255,255,.035);font-size:10px}.historyRow span{color:#94a3b8}
       .planFrameSwatch{width:48px;height:48px;box-shadow:0 0 14px #38bdf855}.planFrameSwatch img{width:100%!important;height:100%!important;border-radius:50%!important;object-fit:cover!important;border:2px solid #071522}.planNameSwatch{display:grid;place-items:center;width:72px;height:42px;border-radius:10px;background:#071522;font-weight:950}.planNameSwatch .animatedName{font-size:14px!important;color:inherit;font-weight:950}
       .shopLiveClub{display:grid;grid-template-columns:1fr 1.3fr;align-items:center;padding:16px 24px;background:radial-gradient(circle at 22% 50%,#38bdf822,transparent 35%),#071522}.shopLiveClub>img{width:88px;height:88px;object-fit:contain;justify-self:center}.shopLiveClub>div{display:grid;grid-template-columns:40px 1fr;align-items:center;gap:3px 8px;padding:9px;border-radius:14px;background:#ffffff0a;border:1px solid #ffffff16}.shopLiveClub>div img{grid-row:1/3;width:40px;height:40px;border-radius:50%;object-fit:cover}.shopLiveClub span{font-size:12px;font-weight:900}.shopLiveClub b{font-size:8px;color:#94a3b8}
@@ -369,6 +388,9 @@ export default function Shop({ token, reloadProfile }) {
 
     <section className="shopShelf">
       <div className="shopShelfHead"><h3>{KINDS.find(([k]) => k === activeKind)?.[1]}</h3><span>{fa(current.length)} مورد در این دسته</span></div>
+      {activeKind === 'club_badge' && data.plus?.tier === 'annual' && (
+        <div className="clubSwitchNote">★ فرصت تغییر باشگاهِ این دوره: {fa(Number(data.plus?.clubSwitchesRemaining || 0))}</div>
+      )}
       <div className="shopCarousel">{current.map((item) => <ShopItem key={item.id} item={item}
         busy={busy === `buy-${item.id}` || busy === `equip-${item.id}`} onBuy={buyItem} onEquip={equipItem} />)}</div>
     </section>

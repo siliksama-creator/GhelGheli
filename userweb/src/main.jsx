@@ -27,6 +27,7 @@ import { LoadingView, ErrorView } from './components/states.jsx';
 import SplashScreen, { SPLASH_STAGES, SPLASH_MIN_MS } from './components/SplashScreen.jsx';
 import { UiIcon } from './components/IconAsset.jsx';
 import RewardMomentHost from './components/RewardMoment.jsx';
+import { CardBoxReveal } from './components/CardBoxReveal.jsx';
 // راهنمای اسکرول — یک پیاده‌سازیِ واحد در وب/ادمین و آینهٔ آن در اندروید.
 // خواستهٔ مالک (۲۹ شهریور): «هر تبی که کاربرا نیاز دارن به اسکرول کنن،
 // راهنمایی نشون داده بشه؛ یکپارچه و برای همیشه درستش کن.»
@@ -710,6 +711,11 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   const [gameLaunch, setGameLaunch] = useState(null);
   const [p, setP] = useState(null);
   const [msg, setMsg] = useState('');
+  // نتیجهٔ بازگشت از درگاه (نوار «بازگشت به اپ» در اندروید) + صندوقِ
+  // خریداری‌شده از درگاه برای رونمایی (null = چیزی برای نمایش نیست).
+  const [payResult, setPayResult] = useState(null);
+  const [payBox, setPayBox] = useState(null);
+  const [payRevealed, setPayRevealed] = useState(0);
   const [publicUser, setPublicUser] = useState(null);
   const [loadError, setLoadError] = useState(null);
   // تعداد چرخش امروز، برای نشان کنار آیکون گردونه — خواستهٔ مالک:
@@ -855,6 +861,11 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
           : null;
         const paid = d?.order?.status === 'paid' && status === 'ok';
         setMsg(paid ? 'پرداخت با موفقیت انجام شد و خریدت تحویل شد.' : 'پرداخت انجام نشد یا لغو شد.');
+        if (orderId) setPayResult({ ok: paid, orderId });
+        // صندوقِ درگاهی هم باید رونمایی شود، مثل خریدِ کیف‌پولی — وگرنه
+        // خریدار هرگز نمی‌بیند چه کارت‌هایی گرفته است.
+        const box = d?.order?.box;
+        if (paid && d?.order?.purchase_kind === 'card_box' && box?.cards?.length) setPayBox(box);
       } catch {
         setMsg(status === 'ok' ? 'نتیجهٔ پرداخت در حال بررسی است؛ صفحه را تازه کن.' : 'پرداخت انجام نشد یا لغو شد.');
       } finally {
@@ -863,6 +874,19 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
       }
     })();
   }, [token]);
+
+  // ── رونمایی تدریجی صندوقِ درگاهی ──
+  // همان ضرباهنگ خرید مستقیم (هر کارت ~۳۰۰ms) تا هر دو مسیر یک حس بدهند.
+  useEffect(() => {
+    if (!payBox?.cards?.length) return;
+    setPayRevealed(0);
+    const total = payBox.cards.length;
+    const t = setInterval(() => setPayRevealed((n) => {
+      if (n >= total) { clearInterval(t); return n; }
+      return n + 1;
+    }), 300);
+    return () => clearInterval(t);
+  }, [payBox]);
 
   // کاوشِ بخشِ «برنامه‌های پیشنهادی» — مستقل از ورود کاربر (مسیر عمومی است).
   useEffect(() => { probeApps(true); // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -912,6 +936,31 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
           </a>
         );
       })()}
+
+      {/* ── بازگشت از درگاه در اندروید ──
+          سرور بعد از پرداخت، مرورگر را با ۳۰۲ به همین صفحه برمی‌گرداند و
+          چون اپ لینکِ تأییدشده (autoVerify) ندارد، اندروید روی ریدایرکتِ
+          خودکار اپ را باز نمی‌کند — صفحه در مرورگر می‌ماند. این نوار فقط
+          برای اندروید است و با intent صریح (package مشخص، بدون نیاز به
+          تأیید دامنه) کاربر را به اپ برمی‌گرداند؛ اگر اپ نصب نباشد،
+          fallback همان صفحه است و هیچ حلقه‌ای ساخته نمی‌شود. */}
+      {payResult?.orderId && /Android/i.test(navigator.userAgent) && (() => {
+        const pq = `?pay=result&status=${payResult.ok ? 'ok' : 'cancel'}&order=${encodeURIComponent(payResult.orderId)}`;
+        const intent = `intent://${window.location.host}${pq}#Intent;scheme=https;package=ir.ghelghelishop.ghelgheli;S.browser_fallback_url=${encodeURIComponent(window.location.href)};end`;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, flexWrap: 'wrap', padding: '9px 14px', fontSize: 12.5, fontWeight: 800, color: '#071522', background: 'linear-gradient(90deg,#22E7A6,#38BDF8)' }}>
+            <span>{payResult.ok ? 'پرداخت موفق بود و خریدت تحویل شد.' : 'پرداخت انجام نشد یا لغو شد.'}</span>
+            <a href={intent} style={{ background: '#071522', color: '#fff', borderRadius: 10, padding: '7px 14px', textDecoration: 'none', fontWeight: 900 }}>بازگشت به اپ قلقلی</a>
+            <button type="button" onClick={() => setPayResult(null)} style={{ background: 'transparent', border: '1px solid rgba(7,21,34,.4)', color: '#071522', borderRadius: 10, padding: '6px 10px', cursor: 'pointer', fontWeight: 800 }}>بستن</button>
+          </div>
+        );
+      })()}
+      {/* رونمایی صندوقِ خریداری‌شده از درگاه — همان انیمیشنی که خریدِ
+          کیف‌پولی می‌دید؛ وگرنه خریدار درگاهی هرگز نمی‌دید چه گرفته. */}
+      {payBox?.cards?.length > 0 && (
+        <CardBoxReveal cards={payBox.cards} points={payBox.points} distinct={payBox.distinct}
+          revealed={payRevealed} onClose={() => setPayBox(null)} title="صندوق باز شد" />
+      )}
 
       <header className="appBar">
         {/* لوگوی درخشان — همان چیزی که در اپ اندروید هست، تا دو کلاینت

@@ -45,8 +45,9 @@ class CardBox extends StatefulWidget {
   final VoidCallback? onGranted;
   /// وقتی پنل زرین‌پال را روشن کرده، خرید از مرورگر و کال‌بکِ سرور انجام می‌شود.
   final bool zarinpalEnabled;
-  /// فروشگاهِ والد خودش نتیجهٔ همهٔ خریدها را می‌گیرد؛ در آنجا false است
-  /// تا یک کال‌بک دو SnackBar نسازد. در صفحهٔ دوئل پیش‌فرض true می‌ماند.
+  /// فروشگاهِ والد فقط خریدهای غیرِصندوق را می‌گیرد و صندوق را به همین
+  /// ویجت می‌سپارد (با رونماییِ کارت‌ها)؛ پس این پرچم در همه‌جا true است
+  /// و پیامِ تکراری ساخته نمی‌شود.
   final bool listenPaymentReturns;
 
   /// حالتِ فشرده — جایی که صندوق داخلِ بن‌بستِ دوئل می‌نشیند و نباید کلِ
@@ -63,7 +64,8 @@ class CardBox extends StatefulWidget {
 /// پرداختِ کند باعث می‌شد صندوق قبل از رسیدنِ کارت‌ها باز شود.
 enum _Phase { idle, shaking, bursting }
 
-class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
+class _CardBoxState extends State<CardBox>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   static const _gold = Color(0xFFFFD166);
   static const _orange = Color(0xFFF97316);
 
@@ -97,6 +99,7 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.listenPaymentReturns) {
       _paymentSub = DeepLinks.instance.payments.listen(_handlePaymentReturn);
       unawaited(_consumeInitialPayment());
@@ -106,7 +109,10 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
 
   Future<void> _consumeInitialPayment() async {
     final result = await DeepLinks.instance.consumeInitialPayment();
-    if (result != null) await _handlePaymentReturn(result);
+    // فقط بازنشر به استریم، نه مدیریتِ مستقیم: چند شنونده (فروشگاه و
+    // صندوق) هرکدام فقط نوعِ خودشان را تحویل می‌گیرند — اگر اینجا مستقیم
+    // مدیریت می‌شد، نتیجه‌ای که مالِ این ویجت نیست گم می‌شد.
+    if (result != null) DeepLinks.instance.republishPayment(result);
   }
 
   Future<void> _handlePaymentReturn(PendingPaymentReturn result) async {
@@ -117,7 +123,20 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
       );
       final order = response is Map ? response['order'] : null;
       if (!mounted) return;
-      if (order is Map && order['status'] == 'paid' && result.status == 'ok') {
+      // فقط صندوق مالِ این ویجت است؛ بقیه (پلاس/آیتم) را والد تحویل می‌گیرد.
+      if (order is! Map || order['purchase_kind'] != 'card_box') return;
+      if (order['status'] == 'paid' && result.status == 'ok') {
+        // سرور خودِ کارت‌ها را هم برمی‌گرداند؛ اگر آمدند، رونمایی می‌کنیم
+        // (همان دیالوگی که خریدِ کیف‌پولی می‌دید) وگرنه فقط پیام + رفرش.
+        final box = order['box'];
+        if (box is Map && (box['cards'] as List?)?.isNotEmpty == true) {
+          await _reveal({
+            'cards': box['cards'],
+            'points': box['points'],
+            'distinctCards': box['distinct'] == true,
+          });
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('پرداخت صندوق با موفقیت انجام شد و کارت‌ها تحویل شدند.')));
         await _load();
@@ -135,12 +154,19 @@ class _CardBoxState extends State<CardBox> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _paymentSub?.cancel();
     unawaited(GameAudio.instance.stopShake());
     _idleCtrl.dispose();
     _shakeCtrl.dispose();
     _burstCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // بازگشت از مرورگرِ درگاه: موجودی/وضعیتِ جعبه را تازه می‌کنیم.
+    if (state == AppLifecycleState.resumed) unawaited(_load());
   }
 
   /// تاریخچهٔ خریدِ صندوق — آینهٔ toggleHistory در CardBox.jsx وب.

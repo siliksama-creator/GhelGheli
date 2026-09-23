@@ -27,7 +27,7 @@ class ShopPage extends StatefulWidget {
   State<ShopPage> createState() => _ShopPageState();
 }
 
-class _ShopPageState extends State<ShopPage> {
+class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
   late Future<dynamic> _future = widget.api.get('/api/shop?shape=items');
   String? _busy;
   String _kind = 'card_frame';
@@ -61,9 +61,17 @@ class _ShopPageState extends State<ShopPage> {
   /// می‌داریم. عددِ نهایی همیشه سمتِ سرور دوباره حساب می‌شود.
   int _walletBalance = 0;
 
+  /// سطح پلاس، موجودی تعویض باشگاه و باشگاهِ تجهیزشده — برای تأییدیهٔ
+  /// تعویضِ سالانه. مثل `_walletBalance` بدونِ setState ذخیره می‌شوند چون
+  /// فقط ورودیِ دیالوگ‌اند، نه چیزی که بیلد بخواند.
+  String _plusTier = '';
+  int _switchesLeft = 0;
+  String? _equippedClub;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AppConfig.instance.addListener(_onLiveConfig);
     _paymentSub = DeepLinks.instance.payments.listen(_handlePaymentReturn);
     unawaited(_consumeInitialPayment());
@@ -71,9 +79,18 @@ class _ShopPageState extends State<ShopPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     AppConfig.instance.removeListener(_onLiveConfig);
     _paymentSub?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // بازگشت از مرورگرِ درگاه: ایونتِ دیپ‌لینک همیشه به اپ نمی‌رسد
+    // (ریدایرکتِ خودکار، مرورگر را ترک نمی‌کند)، پس با هر بازگشت به اپ،
+    // وضعیتِ خرید/پلاس را تازه می‌کنیم تا «غیرفعال»ِ کهنه نماند.
+    if (state == AppLifecycleState.resumed) unawaited(_reload());
   }
 
   void _onLiveConfig() {
@@ -82,7 +99,10 @@ class _ShopPageState extends State<ShopPage> {
 
   Future<void> _consumeInitialPayment() async {
     final result = await DeepLinks.instance.consumeInitialPayment();
-    if (result != null) await _handlePaymentReturn(result);
+    // فقط بازنشر به استریم، نه مدیریتِ مستقیم: چند شنونده (فروشگاه و
+    // صندوق) هرکدام فقط نوعِ خودشان را تحویل می‌گیرند — اگر اینجا مستقیم
+    // مدیریت می‌شد، نتیجه‌ای که مالِ این ویجت نیست گم می‌شد.
+    if (result != null) DeepLinks.instance.republishPayment(result);
   }
 
   Future<void> _handlePaymentReturn(PendingPaymentReturn result) async {
@@ -90,6 +110,9 @@ class _ShopPageState extends State<ShopPage> {
       final response = await widget.api.get('/api/payments/zarinpal/order/${Uri.encodeComponent(result.orderId)}', fresh: true);
       final order = response is Map ? response['order'] : null;
       if (!mounted) return;
+      // صندوقِ کارت را خودِ ویجتِ `CardBox` تحویل می‌گیرد (با رونماییِ
+      // کارت‌ها)؛ اینجا دخالت کنیم هم پیام تکراری می‌شود هم رونمایی.
+      if (order is Map && order['purchase_kind'] == 'card_box') return;
       if (order is Map && order['status'] == 'paid' && result.status == 'ok') {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پرداخت با موفقیت انجام شد و خرید تحویل شد.')));
         await _reload();
@@ -119,7 +142,10 @@ class _ShopPageState extends State<ShopPage> {
     if (url == null || !url.hasScheme) throw const BillingUnavailable('آدرس زرین‌پال معتبر نیست');
     final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
     if (!opened) throw const BillingUnavailable('باز کردن درگاه زرین‌پال ممکن نشد');
-    return response;
+    // مرورگر باز شد ولی پرداخت هنوز انجام نشده — `_run` نباید پیامِ
+    // موفقیت/لحظه نشان بدهد (پرچم `_deferred`). مسیرِ `settled` (تسویهٔ
+    // کامل از کیف پول) بالاتر برگشته و مشمول این پرچم نیست.
+    return {...response, '_deferred': true};
   }
 
   static const _categories = <(String, String, IconData)>[
@@ -206,11 +232,15 @@ class _ShopPageState extends State<ShopPage> {
     try {
       final result = await action();
       if (!mounted) return result;
-      if (success != null) {
+      // خریدِ درگاهی: مرورگر تازه باز شده و پولی هنوز پرداخت نشده؛ «فعال
+      // شد» گفتن و لحظهٔ جایزه، پیش از پرداخت، دروغ است. موفقیتِ واقعی
+      // از ایونتِ بازگشتِ پرداخت (`_handlePaymentReturn`) می‌آید.
+      final deferred = result is Map && result['_deferred'] == true;
+      if (success != null && !deferred) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(success)));
       }
-      if (moment != null) RewardMoment.moment(context, moment);
+      if (moment != null && !deferred) RewardMoment.moment(context, moment);
       await _reload();
       return result;
     } catch (error) {
@@ -250,10 +280,10 @@ class _ShopPageState extends State<ShopPage> {
   Future<void> _buyPlan(Map<String, dynamic> plan) async {
     final price = (plan['price'] as num?)?.toInt() ?? 0;
     final annual = plan['billingCycle'] == 'annual';
-    // مدتِ پلن از خودِ پلن می‌آید (`durationDays`)، با همان فول‌بک‌هایی
+    // مدتِ پلن از خودِ پلن می‌آید (`days`)، با همان فول‌بک‌هایی
     // که وب در `Shop.jsx` می‌گذارد (۳۰/۳۶۵) — تا دو کلاینت در حالتِ
     // بی‌فیلد هم یک عدد ببینند.
-    final days = (plan['durationDays'] as num?)?.toInt() ?? (annual ? 365 : 30);
+    final days = (plan['days'] as num?)?.toInt() ?? (annual ? 365 : 30);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -265,10 +295,10 @@ class _ShopPageState extends State<ShopPage> {
             Text('${Money.withUnit(price)} از طریق $_gatewayName پرداخت می‌شود.'),
             Gaps.vXs,
             Text(annual
-                ? 'قاب، عنوان پروفایل و قالب نتیجهٔ سالانه دائمی هستند؛ یک فرصت تغییر باشگاه هم می‌گیری.'
+                ? 'قاب سلطنتی و عنوان «ستاره سالانه» دائمی هستند؛ یک فرصت تغییر باشگاه هم می‌گیری.'
                 // عددِ «۳۰ روز» داخلِ رشته سفت بود: ادمین اگر مدتِ پلاس را
                 // عوض می‌کرد، جمله دروغ می‌گفت. حالا جمله از
-                // `plus.benefitsNote` و عدد از `durationDays` می‌آید؛
+                // `plus.benefitsNote` و عدد از `days` می‌آید؛
                 // فول‌بک هم *قالب* است (با {days}) تا در حالتِ آفلاین هم
                 // رقمِ سفت‌شده‌ای روی صفحه نماند — `liveText` خودش
                 // `faNum` می‌کند، پس خروجی مو‌به‌مو همان دیروز است.
@@ -276,7 +306,7 @@ class _ShopPageState extends State<ShopPage> {
                 // مخصوصِ دیالوگِ اندروید است و در وب وجود ندارد؛ ساختنِ
                 // کلیدِ نو برای یک رشته، قراردادِ کلیدها را شلوغ می‌کند.
                 : liveText('plus.benefitsNote',
-                    'دسترسی قاب‌ها و افکت نام، ستاره پلاس، Premium Pass و حذف تبلیغات برای {days} روز فعال می‌شود.',
+                    'دسترسی قاب‌ها و افکت نام، ستاره پلاس و Premium Pass برای {days} روز فعال می‌شود.',
                     vars: {'days': days})),
           ],
         ),
@@ -405,6 +435,38 @@ class _ShopPageState extends State<ShopPage> {
   }
 
   Future<void> _equip(Map<String, dynamic> item) async {
+    // ── تعویض باشگاه سالانه: تنها جایی که «انتخاب» هزینه دارد ──
+    // پلاس ماهانه باشگاهش ثابت است (سرور ۴۰۹ می‌دهد) و نشانِ خریداری‌شده
+    // هم همیشه رایگان عوض می‌شود؛ فقط وقتی کاربرِ سالانه از روی یک
+    // باشگاهِ اشتراکی به باشگاهِ دیگری می‌رود، یک فرصت مصرف می‌شود. چون
+    // این فرصت در هر دوره فقط یکی است، قبلش تأییدیه می‌گیریم (آینهٔ وب).
+    final target = '${item['payload'] ?? item['slug']}';
+    if (item['kind'] == 'club_badge' &&
+        item['owned'] != true &&
+        _equippedClub != null &&
+        _equippedClub != target &&
+        _plusTier == 'annual' &&
+        _switchesLeft > 0) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('تعویض باشگاه منتخب'),
+          content: Text(
+              '«${item['name']}» باشگاه منتخبت می‌شود و تنها فرصتِ تغییرِ '
+              'این دوره مصرف می‌شود. مطمئنی؟'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('انصراف')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('تعویض'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
     await _run(
       () => widget.api.post('/api/shop/equip', {
         'slug': item['slug'],
@@ -439,6 +501,12 @@ class _ShopPageState extends State<ShopPage> {
           final balance = (data['walletBalance'] as num?)?.toInt() ?? 0;
           // بدونِ setState — فقط ذخیرهٔ آخرین مقدار برای دیالوگِ خرید.
           _walletBalance = balance;
+          _plusTier = '${plus['tier'] ?? ''}';
+          _switchesLeft =
+              (plus['clubSwitchesRemaining'] as num?)?.toInt() ?? 0;
+          _equippedClub = (data['equipped'] is Map)
+              ? (data['equipped'] as Map)['club']?.toString()
+              : null;
           final available = _categories
               .where((c) => items.any((item) => item['kind'] == c.$1))
               .toList();
@@ -531,7 +599,7 @@ class _ShopPageState extends State<ShopPage> {
                       ),
                     ),
                     CardBox(api: widget.api, zarinpalEnabled: _zarinpalEnabled,
-                      listenPaymentReturns: false, onGranted: _reload),
+                      listenPaymentReturns: true, onGranted: _reload),
                   ],
                 ),
               ),
@@ -557,6 +625,9 @@ class _ShopPageState extends State<ShopPage> {
                 busy: _busy,
                 onBuy: _buyItem,
                 onEquip: _equip,
+                switchesNote: _kind == 'club_badge' && _plusTier == 'annual'
+                    ? '★ فرصت تغییر باشگاه این دوره: ${faNum(_switchesLeft)}'
+                    : null,
               ),
               Gaps.vSm,
               const Padding(
@@ -916,7 +987,7 @@ class _PlanVisuals extends StatelessWidget {
         const SizedBox(width: 7),
         Expanded(
           child: Text(
-            annual ? 'قاب، نتیجه و عنوان دائمی' : 'قاب و افکت نام واقعی',
+            annual ? 'قاب و عنوان دائمی' : 'قاب و افکت نام واقعی',
             maxLines: 2,
             style: const TextStyle(
                 fontSize: 8.5,
@@ -937,12 +1008,14 @@ class _CategoryShelf extends StatelessWidget {
     required this.busy,
     required this.onBuy,
     required this.onEquip,
+    this.switchesNote,
   });
   final String title;
   final List<Map<String, dynamic>> items;
   final String? busy;
   final void Function(Map<String, dynamic>) onBuy;
   final void Function(Map<String, dynamic>) onEquip;
+  final String? switchesNote;
 
   @override
   Widget build(BuildContext context) {
@@ -964,6 +1037,25 @@ class _CategoryShelf extends StatelessWidget {
             Text('${faNum(items.length)} مورد',
                 style: const TextStyle(fontSize: 9.5, color: Colors.white54)),
           ]),
+          if (switchesNote != null) ...[
+            Gaps.vXs,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD166).withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: const Color(0xFFFFD166).withValues(alpha: .32)),
+              ),
+              child: Text(switchesNote!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFFFFD166))),
+            ),
+          ],
           Gaps.vXs,
           if (items.isEmpty)
             const Padding(

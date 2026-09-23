@@ -149,4 +149,16 @@ class DeepLinks {
     _initialPayment = null;
     return value;
   }
+
+  /// بازنشرِ پرداختِ سرد به استریمِ `payments`.
+  ///
+  /// چرا لازم است: چند ویجت (`ShopPage` و `CardBox`) هم‌زمان به بازگشتِ
+  /// پرداخت گوش می‌دهند و هرکدام فقط نوعِ خودشان (`card_box` یا بقیه) را
+  /// تحویل می‌گیرند. `consumeInitialPayment` یک‌بارمصرف است؛ اگر هر ویجت
+  /// مستقیم همان را مدیریت می‌کرد، برندهٔ مسابقه ممکن بود چیزی بگیرد که
+  /// مالِ او نیست و «رد»ش کند — یعنی گم شدنِ نتیجه. پس برنده، آن را به
+  /// استریم برمی‌گرداند تا هر شنونده فیلترِ نوعِ خودش را بزند.
+  void republishPayment(PendingPaymentReturn result) {
+    if (!_paymentController.isClosed) _paymentController.add(result);
+  }
 }

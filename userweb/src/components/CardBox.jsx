@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req, fa, API } from '../lib/api.js';
 import { CARD_RARITY_META } from '../lib/cards.js';
 import { play, playShake, stopShake, warmup } from '../gameAudio.js';
+import { CardBoxReveal } from './CardBoxReveal.jsx';
 
 // ⚠️ `fa()` خودش جداکنندهٔ هزارگان می‌گذارد و ورودی را `Number()` می‌کند.
 // اگر اول `toLocaleString()` بزنیم، رشتهٔ «100,000» به `fa()` می‌رسد و
@@ -125,7 +126,7 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
       // فقط داخل اپ اندروید و از طریق پلِ موجود ادامه پیدا می‌کند.
       const order = await req('/api/card-box/buy', 'POST', {}, token);
       if (!window.__ghBazaarPurchase) {
-        throw new Error('برای خرید صندوق، اپ اندروید را از کافه‌بازار نصب کنید');
+        throw new Error('درگاه پرداخت فعلاً فعال نیست — کمی بعد دوباره تلاش کنید');
       }
       const purchaseToken = await window.__ghBazaarPurchase(order.productId, order.orderId);
       const result = await req('/api/purchase/verify', 'POST',

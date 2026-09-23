@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
@@ -28,7 +30,8 @@ class PassPage extends StatefulWidget {
   State<PassPage> createState() => _PassPageState();
 }
 
-class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin {
+class _PassPageState extends State<PassPage>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   Map<String, dynamic>? _data;
   bool _loading = true;
   bool _busy = false;
@@ -45,7 +48,15 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // کاربر ممکن است پلاس را از مرورگر خریده و برگشته باشد؛ قفلِ مسیرِ
+    // ویژه را با هر بازگشت، تازه می‌کنیم.
+    if (state == AppLifecycleState.resumed) unawaited(_load(jump: false));
   }
 
   void _syncPulse() {
@@ -61,6 +72,7 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_scroll.hasClients) _scroll.jumpTo(_scroll.offset);
     _scroll.dispose();
     _pulse.dispose();
@@ -374,7 +386,7 @@ class _PassPageState extends State<PassPage> with SingleTickerProviderStateMixin
                       children: [
                         Text('مسیر طلایی قفل است',
                             style: TextStyle(color: _plusGold, fontWeight: FontWeight.w900, fontSize: 12.5)),
-                        Text('چرخش گردونه، آیتم‌های ویژه و امتیاز دو برابر',
+                        Text('جوایز نقدی، چرخش گردونه و آیتم‌های ویژه',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(color: Colors.white70, fontSize: 10.5)),

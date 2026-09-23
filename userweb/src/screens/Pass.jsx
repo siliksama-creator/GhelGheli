@@ -244,7 +244,7 @@ export default function Pass({ token, setMsg, openShop }) {
                     <RewardTile r={row.free} unlocked={row.unlocked}
                       track="free" onClaim={claim} busy={busy} />
                     <RewardTile r={row.plus} unlocked={row.unlocked}
-                      track="plus" onClaim={claim} busy={busy} />
+                      track="plus" onClaim={claim} onOpenShop={openShop} busy={busy} />
                   </div>
                 );
               })}
