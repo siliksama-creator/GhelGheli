@@ -276,7 +276,7 @@ install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 755 "$APK_DIR"
 log "APK hosting directory ready: $APK_DIR"
 ensure_apk_include() {
   python3 - "$1" "$2" <<'PYEOF'
-import sys, re, shutil, datetime, subprocess
+import sys, re, os, time, shutil, subprocess
 vhost, anchor = sys.argv[1], sys.argv[2]
 try:
     src = open(vhost, encoding='utf-8').read()
@@ -295,9 +295,20 @@ for j in range(start + 1, len(lines)):
 if 'ghelgheli-apk.conf' in ''.join(lines[start:end]):
     sys.exit(0)
 inc = '  include /etc/nginx/snippets/ghelgheli-apk.conf;\n'
-backup = vhost + '.bak.' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+# ⚠️ بکاپ **هرگز** داخلِ مسیرهای بارگذاری‌شدهٔ nginx نمی‌نشیند. نسخهٔ اول این
+# تابع بکاپ را کنارِ خودِ vhost می‌گذاشت و nginx آن را vhostِ دوم می‌شمرد →
+# `duplicate upstream` و شکستِ nginx -t. همان درسِ nginx-add-include.py.
+mk = os.makedirs
+BKDIR = '/root/ghelgheli-backups/nginx'
+mk(BKDIR, exist_ok=True)
+stamp = time.strftime('%Y%m%d-%H%M%S')
+backup = os.path.join(BKDIR, os.path.basename(vhost) + '.' + stamp)
 shutil.copy2(vhost, backup)
-open(vhost, 'w', encoding='utf-8').write(''.join(lines[:start + 1] + [inc] + lines[start + 1:]))
+# نوشتنِ اتمیک: اگر وسطِ کار قطع شد، کانفیگِ نیمه‌کاره روی دیسک نمی‌ماند.
+tmp = vhost + '.new'
+with open(tmp, 'w', encoding='utf-8') as fh:
+    fh.write(''.join(lines[:start + 1] + [inc] + lines[start + 1:]))
+os.replace(tmp, vhost)
 if subprocess.run(['nginx', '-t'], capture_output=True).returncode != 0:
     shutil.copy2(backup, vhost)
     print('  ⚠️ nginx -t بعد از درجِ include رد شد — فایل بازگردانده شد: ' + vhost)
@@ -311,6 +322,15 @@ if [ -f "$NGINX_MAIN" ]; then
   ensure_apk_include "$NGINX_MAIN" 'server_name admin.ghelghelishop'
   ensure_apk_include "$NGINX_MAIN" 'server_name register.ghelghelishop'
 fi
+
+# ── پاکسازیِ بکاپ‌های سرگردانِ داخلِ sites-enabled ─────────────────────────
+# nginx همهٔ فایل‌های این پوشه را می‌خواند و بکاپی که این‌جا بماند یک vhostِ
+# دوم می‌شود (خطای `duplicate upstream` و شکستِ nginx -t). نسخهٔ اولِ تابعِ
+# include در APK دقیقاً همین را کرد؛ حالا هر دیپلوی تله را جمع می‌کند تا اگر
+# کسی (یا نسخهٔ قدیمی) دوباره گذاشت، سرور سالم بماند.
+find /etc/nginx/sites-enabled -maxdepth 1 -type f \
+  \( -name '*.bak' -o -name '*.bak.*' -o -name '*.new' -o -name '*~' \) \
+  -printf '  پاک شد (بکاپِ سرگردان): %p\n' -delete 2>/dev/null || true
 
 log "Reloading nginx"
 nginx -t && systemctl reload nginx
