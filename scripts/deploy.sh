@@ -27,6 +27,7 @@ SERVICE_USER="${SERVICE_USER:-ghelgheli}"
 PM2_HOME="${PM2_HOME:-/home/$SERVICE_USER/.pm2}"
 PM2_BIN="${PM2_BIN:-$(command -v pm2)}"
 BACKUP_SCRIPT="${BACKUP_SCRIPT:-/usr/local/bin/ghelgheli-backup-latest.sh}"
+DB_NAME="${DB_NAME:-ghelgheli}"
 
 log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 die() { printf '\n\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -46,16 +47,36 @@ cd "$APP_DIR"
 PREVIOUS_SHA="$(git rev-parse HEAD)"
 log "Current commit: $PREVIOUS_SHA"
 
+# ── همراستاسازیِ مالکیتِ اشیاءِ دیتابیس پیش از بکاپ ───────────────────
+#
+# این گام پیش از بکاپ اجرا می‌شود و از یک اسکریپتِ جدا صدا زده می‌شود تا
+# همین یک پیاده‌سازی در سه جا (دیپلوی، بکاپِ زمان‌بندی‌شده، پس از بازیابی)
+# استفاده شود و سه نسخهٔ موازی از یک SQL نداشته باشیم.
+#
+# چرا لازم است (حادثهٔ واقعی، ۱ مهر ۱۴۰۵): یک بازیابی با کاربرِ postgres
+# چند جدول را با مالکِ postgres گذاشت؛ بکاپِ پیش از دیپلوی با کاربرِ
+# ghelgheli حقِ خواندنِ آن‌ها را نداشت، pg_dump شکست خورد و کلِ دیپلوی با
+# «pre-deploy backup failed؛ deployment aborted» لغو شد — دو بار پشتِ سرِ
+# هم. با این گام، مالکیت پیش از هر بکاپ خودترمیم می‌شود.
 [ -x "$BACKUP_SCRIPT" ] || die "backup script is missing or not executable: $BACKUP_SCRIPT"
-log "Backing up database before deploying"
-"$BACKUP_SCRIPT" || die "pre-deploy backup failed; deployment aborted"
-
 log "Fetching origin/$BRANCH"
 git fetch origin "$BRANCH"
 # Hard reset instead of pull: the server used to accumulate local changes in
 # the (previously tracked) userweb/dist, which made `git pull` fail with
 # "local changes would be overwritten".
 git reset --hard "origin/$BRANCH"
+
+# ترتیب مهم است: تازه بعد از reset، اسکریپتِ تازهٔ db-ownership-fix.sh روی
+# دیسک هست. خودِ reset دیتابیس را لمس نمی‌کند (مایگریشن‌ها پایین‌ترند)، پس
+# بکاپی که بعد از آن گرفته می‌شود، هنوز «دیتابیسِ پیش از این دیپلوی» است.
+OWNERSHIP_FIX="$APP_DIR/scripts/db-ownership-fix.sh"
+[ -x "$OWNERSHIP_FIX" ] || die "ownership fix script missing or not executable: $OWNERSHIP_FIX"
+log "Aligning database object ownership"
+"$OWNERSHIP_FIX"
+
+[ -x "$BACKUP_SCRIPT" ] || die "backup script is missing or not executable: $BACKUP_SCRIPT"
+log "Backing up database before deploying"
+"$BACKUP_SCRIPT" || die "pre-deploy backup failed; deployment aborted"
 # ⚠️ .env.staging فایل پیکربندیِ استیجینگِ دائمی است (تولید را لمس نمی‌کند)
 # و مثلِ .env نباید با پاک‌سازیِ دیپلوی از بین برود، وگرنه اپِ استیجینگ بعد از
 # دیپلویِ تولید به‌خاطر گم‌شدن env پایین نمی‌آید.

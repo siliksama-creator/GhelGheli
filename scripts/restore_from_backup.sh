@@ -186,6 +186,21 @@ export PGPASSWORD="$DB_PASS"
 # harmless on a fresh database.
 psql -h localhost -U "$DB_USER" -d "$DB_NAME" -q -f "$HERE/db/ghelgheli.sql" \
   > /tmp/restore_db.log 2>&1 || warn "psql چند هشدار داد (روی دیتابیس خالی طبیعی است) — /tmp/restore_db.log"
+# ── مالکیتِ اشیاء پس از بازیابی ───────────────────────────────────────
+#
+# دامپ‌هایی که با کاربرِ `postgres` گرفته می‌شوند جدول‌ها را با مالکِ
+# postgres می‌سازند. آن‌وقت بکاپِ بعدیِ سرویس (با $DB_USER) با
+# «permission denied» شکست می‌خورد و **دیپلوی را لغو می‌کند** — دقیقاً
+# همان چیزی که ۱ مهر ۱۴۰۵ دو دیپلوی را سوزاند. پس بازیابی بدونِ این گام
+# کامل نیست. تعمیر در scripts/db-ownership-fix.sh است (یک پیاده‌سازی برای
+# هر سه مصرف‌کننده).
+OWNERSHIP_FIX="$(cd "$(dirname "$0")" && pwd)/db-ownership-fix.sh"
+if [ -x "$OWNERSHIP_FIX" ]; then
+  DB_NAME="$DB_NAME" DB_OWNER="$DB_USER" "$OWNERSHIP_FIX" \
+    && ok "مالکیتِ اشیاءِ دیتابیس با $DB_USER هم‌راستا شد" \
+    || warn "هم‌راستاسازیِ مالکیت شکست خورد — بکاپِ بعدیِ دیپلوی ممکن است permission denied بدهد"
+fi
+
 ROWS=$(psql -h localhost -U "$DB_USER" -d "$DB_NAME" -tAc 'SELECT count(*) FROM users' 2>/dev/null || echo 0)
 unset PGPASSWORD
 [ "$ROWS" -gt 0 ] 2>/dev/null && ok "دیتابیس بازگردانده شد — $ROWS کاربر" || warn "جدول users خالی است؛ /tmp/restore_db.log را ببین"
@@ -326,7 +341,7 @@ step "بازگرداندن زمان‌بندی بکاپ"
 [ -f "$HERE/server/root.crontab" ] && crontab "$HERE/server/root.crontab" 2>/dev/null || true
 # Put the backup tooling back in place so the restored server keeps protecting
 # itself — a restored box with no backups is a trap waiting to spring.
-for s in backup_telegram.sh backup_latest.sh fetch_backup_from_telegram.sh; do
+for s in backup_telegram.sh backup_latest.sh fetch_backup_from_telegram.sh db-ownership-fix.sh; do
   [ -f "$APP_DIR/scripts/$s" ] && install -m 700 "$APP_DIR/scripts/$s" "/usr/local/bin/ghelgheli-${s%.sh}.sh"
 done
 [ -f "$APP_DIR/scripts/restore_from_backup.sh" ] && install -m 700 "$APP_DIR/scripts/restore_from_backup.sh" /usr/local/bin/ghelgheli-restore.sh

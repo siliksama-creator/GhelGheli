@@ -13,6 +13,21 @@ DB_PASS_FILE="${DB_PASS_FILE:-/root/.ghelgheli_db_pass}"
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
+# ── خودترمیمیِ مالکیت پیش از دامپ ──────────────────────────────────────
+#
+# دامپ با کاربرِ $DB_USER گرفته می‌شود؛ اگر جدولی مالکِ کسِ دیگری باشد
+# (مثلاً بعد از یک بازیابی با postgres) pg_dump با «permission denied»
+# می‌ترکد. چون این اسکریپت از cron هم اجرا می‌شود، آن خطا آن‌جا فقط یک
+# بکاپِ تازه‌نشده است — و بامدادی که کسی نگاه نمی‌کند، یعنی بی‌بکاپ
+# ماندن. منطقِ تعمیر در یک فایل جدا است (scripts/db-ownership-fix.sh) تا
+# همان یک پیاده‌سازی در دیپلوی، cron و بازیابی استفاده شود؛ نبودنش
+# کشنده نیست، فقط رد می‌شود (سرورِ قدیمی نباید بشکند).
+OWNERSHIP_FIX="${OWNERSHIP_FIX:-/usr/local/bin/ghelgheli-db-ownership-fix.sh}"
+[ -x "$OWNERSHIP_FIX" ] || OWNERSHIP_FIX="$(cd "$(dirname "$0")" && pwd)/db-ownership-fix.sh"
+if [ -x "$OWNERSHIP_FIX" ]; then
+  DB_OWNER="$DB_USER" "$OWNERSHIP_FIX" || echo "backup: WARNING ownership fix failed" >&2
+fi
+
 export PGPASSWORD="$(cat "$DB_PASS_FILE")"
 TMP_DB="$BACKUP_DIR/ghelgheli_latest.sql.gz.tmp"
 FINAL_DB="$BACKUP_DIR/ghelgheli_latest.sql.gz"
