@@ -70,7 +70,17 @@ const DEFAULTS = Object.freeze({
     // می‌گذاشت (که حالتِ پیش‌فرضِ همین مخزن است!) دکمهٔ «دانلود / ورود»
     // کاربر را به سایت می‌برد، نه به صفحهٔ نصب؛ و در اندروید هم هیچ
     // لینکی نبود و دکمه بی‌کار می‌شد. حالا لینک *یک‌جا* ساخته می‌شود.
-    bazaarPackage: 'ir.ghelgheli.shop',
+    // ⚠️ این مقدار باید **دقیقاً** همان applicationIdی باشد که APK با آن
+    // امضا و منتشر می‌شود: `mobile/tool/patch_android.sh` بستهٔ نهایی را
+    // روی `ir.ghelghelishop.ghelgheli` پین می‌کند و همین رشته هم در
+    // `test/patch_android` و گاردِ پورتیبیلیتی بررسی می‌شود.
+    //
+    // قبلاً این‌جا `ir.ghelgheli.shop` بود؛ نتیجه: `/api/config` لینکِ
+    // به‌روزرسانی را به صفحهٔ یک بستهٔ **دیگر** می‌فرستاد و کاربری که
+    // دکمهٔ «دانلود/به‌روزرسانی» را می‌زد به بیراهه می‌رفت (بررسی زندهٔ
+    // ۱ مهر ۱۴۰۵: config گفت ir.ghelgheli.shop، APK گفت
+    // ir.ghelghelishop.ghelgheli). حالا هر دو یکی‌اند.
+    bazaarPackage: 'ir.ghelghelishop.ghelgheli',
   },
   announcement: { active: false, text: '', link: null, accent: 'gold' },
   features: featureFlags.DEFAULTS,

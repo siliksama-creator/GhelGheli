@@ -262,7 +262,7 @@ export function SettingsPage({ request }) {
               فکر می‌کند باید هر دو را پر کند. */}
           <Field label="نامِ بستهٔ اپ در کافه‌بازار (برای ساختنِ لینک، وقتی لینکِ بالا خالی است)">
             <Input value={client.app.bazaarPackage || ''}
-              placeholder="ir.ghelgheli.shop"
+              placeholder="ir.ghelghelishop.ghelgheli"
               onChange={e => setClient({ ...client, app: { ...client.app, bazaarPackage: e.target.value } })} />
           </Field>
           <Field label="متن اطلاعیه (خالی = غیرفعال)"
