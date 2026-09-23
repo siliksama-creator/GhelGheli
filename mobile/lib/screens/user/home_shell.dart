@@ -666,7 +666,10 @@ class _HomeShellState extends State<HomeShell>
           forced: belowMin && force['android'] == true,
           url: urlA,
           current: current,
-          min: minStr.isEmpty ? latest : minStr,
+          // اگر واقعاً «حداقلِ نسخه» در کار نیست (حالتِ «نسخهٔ تازه‌تر
+          // منتشر شد»)، رشتهٔ خالی می‌فرستیم تا سطرِ «حداقلِ لازم X» نشان
+          // داده نشود — وگرنه جمله با عددِ مساوی، کاربر را گیج می‌کند.
+          min: belowMin ? minStr : '',
           latest: latest,
           notes: notes,
           sizeBytes: sizeBytes,
@@ -751,6 +754,19 @@ class _HomeShellState extends State<HomeShell>
   /// کل جمله را پاک کند — فقط بدنه چاپ می‌شود و فاصلهٔ یتیمی نمی‌ماند.
   Widget _updateBody(BuildContext context,
       {required String current, required String min}) {
+    // سطرِ «حداقلِ نسخه» فقط وقتی معنا دارد که حداقلی واقعاً وجود داشته
+    // باشد (کاربر از آن پایین‌تر باشد). در حالتِ صرفاً «نسخهٔ تازه‌تر آمده»
+    // این جمله با عددِ مساوی چاپ می‌شد و کاربر را گیج می‌کرد.
+    if (min.trim().isEmpty) {
+      final bodyOnly = liveText('update.body',
+          'برای اینکه همه‌چیز درست کار کند، لطفاً به تازه‌ترین نسخه به‌روزرسانی کنید.');
+      return RichText(
+        text: TextSpan(
+          style: Theme.of(context).textTheme.bodyMedium,
+          children: [TextSpan(text: bodyOnly)],
+        ),
+      );
+    }
     final notice = liveText('update.notice', '',
         vars: {'current': faNum(current), 'min': faNum(min)});
     final body = liveText('update.body',
