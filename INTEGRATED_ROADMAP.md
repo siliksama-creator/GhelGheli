@@ -6,7 +6,7 @@
 - بک‌اند: 88 migration، pointService تک‌منبع، 82 تست (1099 assertion) سبز
 - userweb: style.css 6364 خط / 376KB تک‌فایل، Vite build 225KB gz46KB
 - admin: styles.css 1903 خط تمیزتر
-- mobile: Flutter 1.1.18+20، 587 تست سبز، تم تیره واحد
+- mobile: Flutter 1.1.19+21، 587 تست سبز، تم تیره واحد
 - یکپارچگی: 23 گارد tool/*parity.mjs، ولی پالت 3 کپی دستی (userweb theme.css / admin theme.css / mobile colors.dart)
 
 ---
