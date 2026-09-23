@@ -75,6 +75,12 @@ jobs:
       - name: Patch release AndroidManifest
         run: cd mobile && bash tool/patch_android.sh
 
+      # قفل‌کردنِ معماری‌ها روی arm64+arm32 (بدونِ x86_64 که فقط شبیه‌ساز
+      # است). بدونِ این، APKِ یونیورسال کتابخانه‌های بومیِ پلاگین‌ها را برای
+      # هر سه معماری داخلِ فایل می‌گذارد.
+      - name: Lock APK ABIs to real phone architectures
+        run: cd mobile && bash tool/patch_abi.sh
+
       # ── RELEASE SIGNING ──────────────────────────────────────────────────
       #
       # WHY THIS MATTERS MORE THAN IT LOOKS. Without a signing config,
@@ -273,6 +279,31 @@ jobs:
           [ "$ok" = 1 ] || { echo "::error::flutter build apk after 4 attempts failed"; exit 1; }
           echo "── خروجی‌ها ──"
           ls -lh build/app/outputs/flutter-apk/*.apk
+
+      # ── سنجشِ خودِ فایلِ خروجی ─────────────────────────────────────────
+      # بیلدِ تازهٔ یونیورسال ۹۰ مگابایت درآمد و ~۴ مگابایت معماریِ شبیه‌ساز
+      # (x86_64) هم داخلش بود — چیزی که هیچ خطِ لاگی نشانش نمی‌داد و باید
+      # خودِ فایل باز می‌شد تا دیده شود. این استپ همان کار را خودکار می‌کند.
+      - name: Sanity check the universal APK
+        run: |
+          APK=mobile/build/app/outputs/flutter-apk/app-release.apk
+          [ -f "$APK" ] || { echo "::error::خروجیِ universal ساخته نشد: $APK"; ls -l mobile/build/app/outputs/flutter-apk/ || true; exit 1; }
+          LIBS=$(unzip -l "$APK" | awk '/lib\// {split($4,a,"/"); print a[2]}' | sort -u)
+          echo "معماری‌های داخلِ APK:"; echo "$LIBS"
+          echo "$LIBS" | grep -q '^arm64-v8a$' || { echo "::error::arm64-v8a داخلِ APK نیست — کاربرانِ ۶۴بیتی نصب نمی‌کنند"; exit 1; }
+          echo "$LIBS" | grep -q '^armeabi-v7a$' || { echo "::error::armeabi-v7a داخلِ APK نیست — گوشی‌های ۳۲بیتی نصب نمی‌کنند"; exit 1; }
+          BAD=$(echo "$LIBS" | grep -vE '^(arm64-v8a|armeabi-v7a)$' || true)
+          if [ -n "$BAD" ]; then
+            echo "::error::معماریِ اضافه در APKِ یونیورسال: $BAD (فقط شبیه‌ساز است و حجمِ کاربر را بالا می‌برد)"
+            exit 1
+          fi
+          SIZE=$(stat -c %s "$APK")
+          echo "حجم: $((SIZE / 1048576)) مگابایت"
+          if [ "$SIZE" -gt 110000000 ]; then
+            echo "::error::حجمِ APK غیرمنتظره بزرگ است ($((SIZE / 1048576)) مگابایت) — وابستگیِ ناخواسته اضافه شده؟"
+            exit 1
+          fi
+          echo "✓ APKِ یونیورسال سالم است: هر دو معماریِ arm، بدونِ معماریِ اضافه"
 
       # Prove the output is signed with OUR key before anyone uploads it.
       # A debug-signed APK is indistinguishable from a release one until
