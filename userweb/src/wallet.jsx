@@ -77,6 +77,10 @@ const SOURCE_LABEL = {
   admin_debit: 'کسر توسط مدیریت',
   withdrawal_hold: 'درخواست برداشت',
   withdrawal_refund: 'برگشت وجه',
+  purchase_referral: 'کمیسیون معرفی از خرید',
+  shop: 'خرید فروشگاه',
+  card_box: 'خرید صندوق کارت',
+  pass: 'گذر نبرد',
 };
 
 const STATUS_CLASS = {

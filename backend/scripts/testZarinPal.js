@@ -81,6 +81,8 @@ ok(shop.includes('async function deliverForOrder(') && shop.includes('deliverFor
   'تحویلِ مشترک بین verify بازار و کال‌بک زرین‌پال');
 ok(shop.includes("provider = 'cafebazaar'"),
   'خرید آیتم امکان انتخاب provider دارد و پیش‌فرض قدیمی حفظ شده');
+ok(shop.includes('createShopOrder(userId, slug, { provider })'),
+  'موجودی صفر کیف پول، درگاه درخواستی (زرین‌پال) را دور نمی‌اندازد');
 const cfg = read('src/routes/clientConfig.js');
 ok(cfg.includes('zarinpalEnabled'),
   '/api/config پرچم زندهٔ درگاه را به وب و اندروید می‌دهد');

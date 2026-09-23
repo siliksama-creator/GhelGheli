@@ -647,7 +647,11 @@ async function buyShopItem(userId, slug, { useWallet = false, provider = 'cafeba
     const balance = Number(locked.rows[0].wallet_balance || 0);
     if (balance <= 0) {
       await client.query('ROLLBACK');
-      return payments.createShopOrder(userId, slug);
+      // ⚠️ `provider` باید همان درگاهِ درخواستی بماند.
+      // بدون آن، وب با تیکِ پیش‌فرضِ کیف پول و موجودیِ صفر، سفارش
+      // کافه‌بازار می‌ساخت و با درگاهِ خاموشِ بازار خطای ۵۰۳ می‌داد —
+      // حتی وقتی مرچنت زرین‌پال وارد و فعال بود.
+      return payments.createShopOrder(userId, slug, { provider });
     }
 
     const fromWallet = Math.min(balance, price);

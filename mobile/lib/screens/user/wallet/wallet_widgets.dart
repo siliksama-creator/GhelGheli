@@ -412,6 +412,10 @@ class WalletTransactionTile extends StatelessWidget {
     'admin_debit': ('کسر توسط مدیریت', Icons.admin_panel_settings_rounded),
     'withdrawal_hold': ('درخواست برداشت', Icons.north_east_rounded),
     'withdrawal_refund': ('برگشت وجه', Icons.undo_rounded),
+    'purchase_referral': ('کمیسیون معرفی از خرید', Icons.group_add_rounded),
+    'shop': ('خرید فروشگاه', Icons.storefront_rounded),
+    'card_box': ('خرید صندوق کارت', Icons.inventory_2_rounded),
+    'pass': ('گذر نبرد', Icons.military_tech_rounded),
   };
 
   @override
