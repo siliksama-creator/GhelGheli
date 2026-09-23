@@ -270,7 +270,7 @@ async function verifyWithBazaar(productId, purchaseToken) {
  */
 async function createShopOrder(userId, slug, { walletAmount = 0, provider = 'cafebazaar' } = {}) {
   if (provider !== 'zarinpal' && !configured() && !cfg().sandbox) {
-    throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
+    throw fail('درگاه پرداخت هنوز فعال نشده است', 503, 'GATEWAY_OFF');
   }
   // کلاینت ممکن است slug بفرستد یا UUID. روت قدیمیِ
   // `/api/shop/items/:id/buy` با UUID کار می‌کرد و اپ‌های نصب‌شده هنوز
@@ -346,7 +346,7 @@ async function createShopOrder(userId, slug, { walletAmount = 0, provider = 'caf
  */
 async function createCardBoxOrder(userId, { provider = 'cafebazaar' } = {}) {
   if (provider !== 'zarinpal' && !configured() && !cfg().sandbox) {
-    throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
+    throw fail('درگاه پرداخت هنوز فعال نشده است', 503, 'GATEWAY_OFF');
   }
 
   const { rows } = await pool.query(
@@ -377,7 +377,7 @@ async function createCardBoxOrder(userId, { provider = 'cafebazaar' } = {}) {
 /** سفارش خرید اشتراک پلاس. */
 async function createPlusOrder(userId, billingCycle, { provider = 'cafebazaar' } = {}) {
   if (provider !== 'zarinpal' && !configured() && !cfg().sandbox) {
-    throw fail('پرداخت درون‌برنامه‌ای هنوز فعال نشده است', 503, 'GATEWAY_OFF');
+    throw fail('درگاه پرداخت هنوز فعال نشده است', 503, 'GATEWAY_OFF');
   }
   const clean = String(billingCycle || 'monthly').toLowerCase();
   const cycle = ['annual', 'yearly', 'year'].includes(clean) ? 'annual'

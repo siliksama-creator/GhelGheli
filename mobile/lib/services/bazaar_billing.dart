@@ -35,7 +35,7 @@ import 'dart:async';
 
 /// خطای در دسترس نبودن پرداخت — با پیام فارسیِ قابل نمایش به کاربر.
 class BillingUnavailable implements Exception {
-  const BillingUnavailable([this.message = 'پرداخت درون‌برنامه‌ای هنوز فعال نشده است']);
+  const BillingUnavailable([this.message = 'درگاه پرداخت هنوز فعال نشده است']);
   final String message;
   @override
   String toString() => message;

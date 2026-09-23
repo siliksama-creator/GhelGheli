@@ -34,7 +34,10 @@ class _ShopPageState extends State<ShopPage> {
   StreamSubscription<PendingPaymentReturn>? _paymentSub;
 
   bool get _zarinpalEnabled => AppConfig.instance.zarinpalEnabled;
-  String get _gatewayName => _zarinpalEnabled ? 'زرین‌پال' : 'کافه‌بازار';
+  // کافه‌بازار از پروژه حذف شد (تصمیم مالک، ۱ مهر ۱۴۰۵): پرداخت فقط زرین‌پال است.
+  // این fallback فقط وقتی نشان داده می‌شود که درگاه خاموش باشد، و باید
+  // نامِ درگاهِ واقعی را بگوید نه یک فروشگاهِ حذف‌شده.
+  String get _gatewayName => _zarinpalEnabled ? 'زرین‌پال' : 'درگاه بانکی';
   bool _showPlans = true;
 
   /// سوابق خرید — مثل وب، با تپ باز/بسته می‌شود و تنبلانه از
