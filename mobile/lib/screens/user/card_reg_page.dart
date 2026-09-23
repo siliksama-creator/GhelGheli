@@ -26,6 +26,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../core/app_config.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
@@ -114,13 +115,34 @@ class CardRegPage extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          const Text(
-                            'دقت کنید فقط کارت‌های بالای ۵۰۰ امتیاز ثبت می‌شود.',
-                            style: TextStyle(
-                              color: Color(0xFFCBD5E1),
-                              fontSize: 11.5,
-                              height: 1.45,
-                              fontWeight: FontWeight.w600,
+                          ListenableBuilder(
+                            listenable: AppConfig.instance,
+                            builder: (context, _) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  liveText('cardReg.lead',
+                                      'از کارت عکس بگیرید و کد را وارد کنید'),
+                                  style: const TextStyle(
+                                    color: Color(0xFFCBD5E1),
+                                    fontSize: 11.5,
+                                    height: 1.45,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  liveText(
+                                      'cardReg.minPointsNote',
+                                      'فقط کارت‌های ۵۰۰ امتیازی و بالاتر ثبت می‌شود.'),
+                                  style: const TextStyle(
+                                    color: Color(0xFFFBBF24),
+                                    fontSize: 11.5,
+                                    height: 1.45,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

@@ -94,7 +94,7 @@ const int _leaveMs = 420;
 
 /// مدتِ نمایش از پنل (قاعدهٔ `rewardSeconds`) با فول‌بکِ امروزِ محصول.
 int _visibleMs() {
-  final sec = AppConfig.instance.rule('rewardSeconds', 3);
+  final sec = AppConfig.instance.rule('rewardSeconds', 4);
   return math.max(1500, sec * 1000);
 }
 

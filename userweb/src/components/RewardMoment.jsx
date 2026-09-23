@@ -45,7 +45,7 @@ const QUEUE_LIMIT = 4;
 
 /** مدتِ نمایش: از پنل (قاعدهٔ `rewardSeconds`) با فول‌بکِ امروزِ محصول. */
 function visibleMs() {
-  return Math.max(1500, ruleNumber('rewardSeconds', 3) * 1000);
+  return Math.max(1500, ruleNumber('rewardSeconds', 4) * 1000);
 }
 
 /** بهانهٔ خروجِ نرم: قبل از برداشتنِ کارت، محو می‌شود. */

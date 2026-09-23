@@ -7,8 +7,12 @@
 import React from 'react';
 import PhotoCardBox from '../components/PhotoCardBox.jsx';
 import Inventory from './Inventory.jsx';
+import { text, useLive } from '../lib/liveConfig.js';
 
 export default function CardReg({ items, grants, token, reload, setMsg }) {
+  // متنِ راهنما از پنل می‌آید؛ بدونِ این، عوض‌کردن در «متن‌های زنده»
+  // تا رفرشِ کاملِ صفحه دیده نمی‌شد.
+  useLive();
   return (
     <>
       <div style={{ padding:'12px 12px 0', marginBottom:'12px' }}>
@@ -22,7 +26,8 @@ export default function CardReg({ items, grants, token, reload, setMsg }) {
                 <b style={{ color:'#FFF', fontSize:'14px', fontWeight:'900' }}>ثبت کارت‌های قلقلی</b>
                 <span style={{ background:'rgba(245,158,11,0.16)', border:'1px solid rgba(245,158,11,0.45)', color:'#F59E0B', padding:'3px 8px', borderRadius:'99px', fontSize:'10px', fontWeight:'900' }}>ثبت سریع</span>
               </div>
-              <p style={{ color:'#CBD5E1', fontSize:'11.5px', margin:'4px 0 0', lineHeight:1.45, fontWeight:'600' }}>دقت کنید فقط کارت‌های بالای ۵۰۰ امتیاز ثبت می‌شود.</p>
+              <p style={{ color:'#CBD5E1', fontSize:'11.5px', margin:'4px 0 0', lineHeight:1.45, fontWeight:'600' }}>{text('cardReg.lead', 'از کارت عکس بگیرید و کد را وارد کنید')}</p>
+              <p style={{ color:'#FBBF24', fontSize:'11.5px', margin:'3px 0 0', lineHeight:1.45, fontWeight:'700' }}>{text('cardReg.minPointsNote', 'فقط کارت‌های ۵۰۰ امتیازی و بالاتر ثبت می‌شود.')}</p>
             </div>
           </div>
           <PhotoCardBox token={token} setMsg={setMsg} onDone={reload} />

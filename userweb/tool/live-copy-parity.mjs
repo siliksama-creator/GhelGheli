@@ -422,7 +422,7 @@ for (const [label, map] of Object.entries(used)) {
 // تصمیمِ فاز است. گاردِ مبهم، روزی که کسی آن‌ها را اضافه کند، بی‌سر‌و‌صدا
 // سبز می‌ماند — و روزی که کسی یکی را حذف کند هم همین‌طور.
 const SHARED_GROUPS = ['coinGuide', 'referral', 'reconnect', 'games', 'wheel',
-  'avatars', 'plus', 'photoReview', 'streak'];
+  'avatars', 'plus', 'photoReview', 'streak', 'cardReg'];
 
 // استثناهای **صریح و ثبت‌شده**، به‌جای شل‌کردنِ کل قاعده.
 //

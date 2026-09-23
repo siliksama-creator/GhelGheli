@@ -38,6 +38,7 @@ const GROUP_LABEL = {
   streak: 'استریک ورود روزانه',
   support: 'پشتیبانی و منشور حریم خصوصی',
   photoReview: 'بررسی عکس کارت',
+  cardReg: 'ثبت کارت',
   wheel: 'گردونه شانس',
   games: 'بازی‌ها',
   reconnect: 'اتصالِ دوباره',
