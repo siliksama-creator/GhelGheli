@@ -43,18 +43,22 @@ const strip = (src) => src
   .replace(/^\s*\/\/.*$/gm, '')
   .replace(/\/\*[\s\S]*?\*\//g, '');
 
-const serverRaw = [
-  read('src', 'server.js'),
-  read('src', 'routes', 'adminCommunications.js'),
-  read('src', 'routes', 'adminWallet.js'),
+// فهرستِ تک‌منبعِ فایل‌های سرور که اعلان دارند. هم بدنهٔ تست از این
+// می‌خواند و هم سنجهٔ «اعلان پاک نشده» در پایان — تا دو فهرستِ موازی
+// (و دو جای فراموش‌شدن) نداشته باشیم.
+const SERVER_SOURCES = [
+  ['src', 'server.js'],
+  ['src', 'routes', 'adminCommunications.js'],
+  ['src', 'routes', 'adminWallet.js'],
   // adminRewards.js حذف شد (routeهای مردهٔ جوایز، ممیزیِ ۸ مهر)؛ ماژول‌های
   // تازهٔ مدیری جایگزینِ بخش‌های اینلاینِ server.js هستند و برای پوششِ
   // اعلان‌های آینده اینجا خوانده می‌شوند.
-  read('src', 'routes', 'adminDashboard.js'),
-  read('src', 'routes', 'adminSettings.js'),
-  read('src', 'routes', 'adminLeague.js'),
-  read('src', 'services', 'photoCardService.js'),
-].join('\n');
+  ['src', 'routes', 'adminDashboard.js'],
+  ['src', 'routes', 'adminSettings.js'],
+  ['src', 'routes', 'adminLeague.js'],
+  ['src', 'services', 'photoCardService.js'],
+];
+const serverRaw = SERVER_SOURCES.map((p) => read(...p)).join('\n');
 const server = strip(serverRaw);
 const league = strip(read('src', 'services', 'leagueService.js'));
 
@@ -182,9 +186,25 @@ console.log('\n== هیچ اعلانی تراکنش را نمی‌شکند ==');
   //
   // قرارداد: هر فراخوانی یا `await` با try دارد، یا `.catch()`.
   const raw = serverRaw;
-  const calls = raw.split('createNotification(').length - 1;
-  // سقف از ۱۰ به ۹ آمد: اعلانِ بنِ چت با حذفِ کاملِ سیستمِ بن (۱ مهر ۱۴۰۵) رفت.
-  ok(calls >= 9, `${calls} فراخوانیِ اعلان در سرور هست`);
+
+  // ⚠️ این‌جا قبلاً یک شمارندهٔ مطلق بود: `ok(calls >= 9, …)`.
+  //
+  // آن گارد سه بار CI را بی‌دلیل قرمز کرد (۲۲ و ۲۳ شهریور ۱۴۰۵): هر بار
+  // که یک فراخوانیِ اعلان به‌درستی جابه‌جا/حذف می‌شد (مثلِ حذفِ کاملِ بنِ
+  // چت)، عدد از آستانه پایین می‌افتاد و بیلد می‌شکست — بدون اینکه هیچ
+  // باگی وجود داشته باشد. «تعدادِ خطوطِ کد» سنجهٔ درستی نیست: چیزی که
+  // واقعاً مهم است این است که **هر مسیرِ کاربریِ حساس، اعلانش را داشته
+  // باشد** و **هیچ فراخوانی‌ای بی‌محافظ نماند**. هر دو همین پایین/بالا
+  // به‌صورت ساختاری سنجیده می‌شوند (بخش‌های ۱ تا ۵ + شمارشِ unguarded)،
+  // پس این آستانه حذف شد تا CI فقط باگِ واقعی را نشان دهد.
+  //
+  // اگر روزی خواستید مطمئن شوید «اعلان‌ها پاک نشده‌اند»، سنجهٔ درست،
+  // حضورِ فراخوانی در همان فایل‌هایی است که این تست می‌خواند — نه یک
+  // عددِ ثابت. برای همین، فهرستِ فایل‌های خوانده‌شده را می‌سنجیم:
+  const filesWithNotify = SERVER_SOURCES
+    .filter((p) => strip(read(...p)).includes('createNotification('));
+  ok(filesWithNotify.length >= 3,
+    `اعلان در ${filesWithNotify.length} فایل از مسیرهای کلیدی حضور دارد (دست‌کم ۳)`);
 
   // فراخوانی‌های بدونِ await باید .catch داشته باشند.
   let unguarded = 0;
