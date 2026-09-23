@@ -128,6 +128,18 @@ done
 # نگه‌داشت: فقط ۱۰ ریلیزِ آخر (هر سری .map چند مگ است).
 ls -1t /root/ghelgheli-sourcemaps | tail -n +11 | while read -r _old; do rm -rf "/root/ghelgheli-sourcemaps/$_old"; done || true
 
+# ── پیش‌نیازِ زودهنگامِ سروِ APK (۲ مهر ۱۴۰۵) ──────────────────────────────
+# ماژولِ `/admin/apk` در بوتِ خودِ API پوشهٔ انتشار را می‌سازد. اگر آن پوشه
+# نباشد و کاربرِ سرویس هم اجازهٔ ساختش را نداشته باشد (مالکِ /var/www روت
+# است)، API **در بوت کرش می‌کند** — و چون health-checkِ همین اسکریپت قبل از
+# فازِ nginx اجرا می‌شود، دیپلوی نخست با ۵۰۲ و rollback تمام شد.
+# پس پوشه را پیش از ری‌استارتِ API می‌سازیم؛ فازِ nginx پایین‌تر هم همان را
+# دوباره و بی‌ضرر تأیید می‌کند.
+APK_DIR="${APK_DIR:-/var/www/ghelgheli-apk}"
+install -d -o "$SERVICE_USER" -g "$SERVICE_USER" -m 755 "$APK_DIR" \
+  && chown -R "$SERVICE_USER:$SERVICE_USER" "$APK_DIR" \
+  && log "APK hosting directory ready (pre-API): $APK_DIR"
+
 log "Reloading API as unprivileged user $SERVICE_USER"
 cd "$APP_DIR/backend"
 # Root performs deploy/migrations, but the network-facing Node process must

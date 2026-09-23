@@ -171,10 +171,34 @@ async function pruneOldVersions() {
   return removed;
 }
 
+// پوشه را در بارگذاریِ ماژول می‌سازیم، ولی **شکستِ آن هرگز نباید کلِ API را
+// بخواباند**. درسِ گرانِ ۲ مهر ۱۴۰۵: نسخهٔ اول همین‌جا `mkdirSync` لخت داشت؛
+// روی سرورِ واقعی، دیپلوی پوشه را با مالکیتِ کاربرِ سرویس نساخته بود، mkdir
+// اجازه نگرفت، ماژول در بوتِ سرور استثنا داد و **کلِ سایت** (نه فقط انتشارِ
+// اپ) در حلقهٔ کرش افتاد و health-check دیپلوی را رد کرد. حالا نبودِ پوشه
+// فقط یعنی «انتشار اپ کار نمی‌کند» — بقیهٔ API سالم می‌ماند.
+function ensureApkDir() {
+  try {
+    fs.mkdirSync(APK_DIR, { recursive: true });
+    return true;
+  } catch (e) {
+    console.error(`[apk] پوشهٔ انتشار در دسترس نیست (${APK_DIR}): ${e.code || e.message}`);
+    return false;
+  }
+}
+ensureApkDir();
+
 module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
   const router = express.Router();
 
-  fs.mkdirSync(APK_DIR, { recursive: true });
+  // محافظِ میانی برای مسیرهایی که واقعاً به دیسک می‌نویسند: اگر پوشه نیست و
+  // ساختنی هم نیست، پیامِ فارسیِ روشن بده (۵۰۰)، نه استثنای گنگِ multer.
+  const requireApkDir = (req, res, next) => {
+    if (fs.existsSync(APK_DIR) || ensureApkDir()) return next();
+    return res.status(500).json({
+      message: `پوشهٔ انتشار روی سرور در دسترس نیست (${APK_DIR}) — به مدیرِ سرور اطلاع بده`,
+    });
+  };
 
   const upload = multer({
     storage: multer.diskStorage({
@@ -209,10 +233,14 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
       const st = fs.statfsSync(APK_DIR);
       freeBytes = Number(st.bavail) * Number(st.bsize);
     } catch { /* statfs روی همهٔ فایل‌سیستم‌ها نیست؛ نبودنش مشکلی نیست */ }
+    // `writable` را صریح می‌فرستیم: اگر پوشه روی سرور با مالکیتِ اشتباه
+    // ساخته شود، پنل باید همین‌جا هشدار بدهد، نه بعد از آپلودِ ۶۰ مگابایتی.
+    let writable = false;
+    try { fs.accessSync(APK_DIR, fs.constants.W_OK); writable = true; } catch { /* نه */ }
     res.json({
       release,
       files,
-      dir: { path: APK_DIR, totalBytes, freeBytes },
+      dir: { path: APK_DIR, totalBytes, freeBytes, writable },
       limits: { maxBytes: MAX_APK_BYTES, keepVersions: KEEP_VERSIONS },
       latestUrl: urlFor(LATEST_NAME),
       latestWebUrl: webUrlFor(LATEST_NAME),
@@ -220,7 +248,7 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
   }));
 
   // ── آپلودِ نسخهٔ تازه ──────────────────────────────────────────────────
-  router.post('/admin/apk/upload', adminAuth, requireRole(), uploadOne, asyncHandler(async (req, res) => {
+  router.post('/admin/apk/upload', adminAuth, requireRole(), requireApkDir, uploadOne, asyncHandler(async (req, res) => {
     const tmpPath = req.file?.path;
     if (!tmpPath) return res.status(400).json({ message: 'فایلی ارسال نشد' });
 
@@ -324,7 +352,7 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
   }));
 
   // ── حذفِ یک فایلِ قدیمی ────────────────────────────────────────────────
-  router.post('/admin/apk/delete', adminAuth, requireRole(), asyncHandler(async (req, res) => {
+  router.post('/admin/apk/delete', adminAuth, requireRole(), requireApkDir, asyncHandler(async (req, res) => {
     const name = path.basename(String(req.body?.name || ''));
     if (!/^[0-9A-Za-z._+-]+\.apk$/.test(name)) return res.status(400).json({ message: 'نام فایل معتبر نیست' });
     if (name === LATEST_NAME) {
