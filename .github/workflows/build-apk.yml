@@ -75,6 +75,13 @@ jobs:
       - name: Patch release AndroidManifest
         run: cd mobile && bash tool/patch_android.sh
 
+      # نصب‌کنندهٔ داخل‌اپی (دانلودِ خودکار + نصب با یک لمس — مهر ۱۴۰۵).
+      # کانالِ بومیِ `ghelgheli/update` + دسترسیِ نصب + FileProvider را به
+      # پروژهٔ بازساخته‌شده تزریق می‌کند. باید *بعد* از patch_android اجرا
+      # شود، چون MainActivity را همان اسکریپت به پکیجِ نهایی می‌برد.
+      - name: Patch in-app update installer
+        run: cd mobile && bash tool/patch_update_install.sh
+
       # قفل‌کردنِ معماری‌ها روی arm64+arm32 (بدونِ x86_64 که فقط شبیه‌ساز
       # است). بدونِ این، APKِ یونیورسال کتابخانه‌های بومیِ پلاگین‌ها را برای
       # هر سه معماری داخلِ فایل می‌گذارد.

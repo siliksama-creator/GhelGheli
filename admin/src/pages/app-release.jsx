@@ -195,6 +195,18 @@ export function AppReleasePage({ request, token, isSuperAdmin, onNavigate }) {
         ) : (
           <p className="topbar-sub">هنوز فایلی منتشر نشده. اولین APK را از پایین آپلود کن.</p>
         )}
+        {/* فوترِ فروشگاه به همین انتشار وصل است (مهر ۱۴۰۵): دکمهٔ دانلودِ
+            فوترِ سایت، لینک و نسخه را زنده از `/api/app/latest` می‌خواند —
+            پس با هر انتشارِ تازه، سایت خودکار به‌روز می‌شود و نیازی به
+            ویرایشِ دستیِ وردپرس نیست. */}
+        <div className="field-hint" style={{ marginTop: 12, padding: 10, borderRadius: 10, background: 'rgba(181,239,88,.08)' }}>
+          <b>فوترِ فروشگاه وصل است</b>
+          <div>
+            دکمهٔ «دانلود اپلیکیشن» در فوترِ سایت، لینک و نسخه را زنده از همین انتشار می‌خواند
+            (<span dir="ltr">/api/app/latest</span>) — با هر انتشارِ تازه، سایت خودکار به‌روز
+            می‌شود و نیازی به ویرایشِ دستی نیست.
+          </div>
+        </div>
       </Card>
 
       <Card

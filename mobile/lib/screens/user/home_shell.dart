@@ -12,10 +12,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../api_client.dart';
 import '../../core/app_config.dart';
+import '../../services/app_updater.dart';
 import '../../services/image_disk_cache.dart';
 import '../../widgets/app_bar_logo.dart';
 import '../../widgets/notification_bell.dart';
 import '../../widgets/scroll_hint.dart';
+import '../../widgets/update_dialog.dart';
 import 'social_page.dart';
 import 'dashboard_page.dart';
 import 'inventory_page.dart';
@@ -653,6 +655,9 @@ class _HomeShellState extends State<HomeShell>
       final notes = '${rel['notes'] ?? ''}'.trim();
       final sizeBytes =
           rel['sizeBytes'] is num ? (rel['sizeBytes'] as num).toInt() : 0;
+      // اثرِ انگشتِ فایل برای راستی‌آزماییِ بعد از دانلود — اگر خالی
+      // باشد، دانلودر فقط حجم را می‌سنجد و رد می‌شود.
+      final sha = '${rel['sha256'] ?? ''}'.trim();
       final urlA = '${urls['android'] ?? ''}'.trim();
       final belowMin = minStr.isNotEmpty && _versionLower(current, minStr);
       final newerExists = latest.isNotEmpty && _versionLower(current, latest);
@@ -673,6 +678,7 @@ class _HomeShellState extends State<HomeShell>
           latest: latest,
           notes: notes,
           sizeBytes: sizeBytes,
+          sha256: sha,
         ));
       }
       final tabOrder = (m['tabOrder'] as List? ?? const [])
@@ -742,85 +748,14 @@ class _HomeShellState extends State<HomeShell>
     return false;
   }
 
-  /// بدنهٔ دیالوگِ آپدیت: «نسخهٔ فعلی …» + جملهٔ اصلی.
+  /// دیالوگِ آپدیتِ داخل‌اپی (مهر ۱۴۰۵): دانلودِ خودکار + نصب.
   ///
-  /// چرا یک متدِ جدا و نه `Builder` داخلِ `content`: `Builder` فقط برایِ
-  /// گرفتنِ context است و این‌جا contextِ خودِ State کافی بود — یک wrapperِ
-  /// بی‌مورد یعنی یک parameterِ سایه‌دار (`_`) که analyzerِ سخت‌گیرِ این
-  /// پروژه دوست ندارد. رشته‌ها هم نمی‌توانستند در یک `'${…}'` چندسطری
-  /// بچرخند: رشتهٔ دارت از میانِ خط نمی‌شکند و بیلد «newline inside string»
-  /// می‌داد (همان چیزی که در دورِ قبل CI را قرمز کرد).
-  /// اگر `update.notice` خالی برگردد — فول‌بکِ آفلاین، یا این‌که ادمین
-  /// کل جمله را پاک کند — فقط بدنه چاپ می‌شود و فاصلهٔ یتیمی نمی‌ماند.
-  Widget _updateBody(BuildContext context,
-      {required String current, required String min}) {
-    // سطرِ «حداقلِ نسخه» فقط وقتی معنا دارد که حداقلی واقعاً وجود داشته
-    // باشد (کاربر از آن پایین‌تر باشد). در حالتِ صرفاً «نسخهٔ تازه‌تر آمده»
-    // این جمله با عددِ مساوی چاپ می‌شد و کاربر را گیج می‌کرد.
-    if (min.trim().isEmpty) {
-      final bodyOnly = liveText('update.body',
-          'برای اینکه همه‌چیز درست کار کند، لطفاً به تازه‌ترین نسخه به‌روزرسانی کنید.');
-      return RichText(
-        text: TextSpan(
-          style: Theme.of(context).textTheme.bodyMedium,
-          children: [TextSpan(text: bodyOnly)],
-        ),
-      );
-    }
-    final notice = liveText('update.notice', '',
-        vars: {'current': faNum(current), 'min': faNum(min)});
-    final body = liveText('update.body',
-        'برای اینکه همه‌چیز درست کار کند، لطفاً به تازه‌ترین نسخه به‌روزرسانی کنید.');
-    return RichText(
-      text: TextSpan(
-        style: Theme.of(context).textTheme.bodyMedium,
-        children: [
-          if (notice.trim().isNotEmpty) TextSpan(text: '$notice '),
-          TextSpan(text: body),
-        ],
-      ),
-    );
-  }
-
-  /// کارتِ «چی تازه است»: شمارهٔ نسخهٔ منتشرشده + پیامی که ادمین در صفحهٔ
-  /// «انتشار اپ» نوشته است.
-  ///
-  /// چرا این متن از `live_copy` نمی‌آید: ادمین همان‌جا که فایل را می‌گذارد،
-  /// پیامِ همان نسخه را هم می‌نویسد. دو منبعِ متن برای یک چیز یعنی یکی‌شان
-  /// همیشه کهنه می‌ماند. (`live_copy` هم سرِ جایش هست: تیتر/بدنهٔ ثابت و
-  /// برچسبِ دکمه‌ها از همان‌جا ویرایش می‌شوند.)
-  Widget _updateReleaseCard(BuildContext context,
-      {required String latest, required String notes, required int sizeBytes}) {
-    final theme = Theme.of(context);
-    final mb = sizeBytes > 0
-        ? (sizeBytes / (1024 * 1024)).toStringAsFixed(1)
-        : '';
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (latest.isNotEmpty)
-            Text(
-              mb.isEmpty
-                  ? 'نسخهٔ تازه: ${faNum(latest)}'
-                  : 'نسخهٔ تازه: ${faNum(latest)} — $mb مگابایت',
-              style: theme.textTheme.labelLarge,
-            ),
-          if (notes.isNotEmpty) ...[
-            if (latest.isNotEmpty) const SizedBox(height: 6),
-            Text(notes, style: theme.textTheme.bodySmall),
-          ],
-        ],
-      ),
-    );
-  }
-
+  /// تا دیروز این‌جا یک `AlertDialog` با دکمهٔ «به‌روزرسانی» بود که مرورگر
+  /// را باز می‌کرد؛ حالا `showAppUpdateDialog` (در `widgets/update_dialog.dart`)
+  /// به‌محض آمدن، دانلود را شروع می‌کند و بعد نصب‌کننده را باز می‌کند.
+  /// در حالتِ اجباری هیچ راهِ بستنی نیست تا کاربر بدونِ آپدیت نتواند
+  /// با اپ کار کند. بدنه و کارتِ نسخه هم به همان فایل منتقل شدند تا
+  /// این شلِ ۱۸۰۰ خطی یک مسئولیت کمتر داشته باشد.
   Future<void> _showUpdateDialog({
     required bool forced,
     required String url,
@@ -829,58 +764,24 @@ class _HomeShellState extends State<HomeShell>
     // دیالوگ خودش می‌خواند، منبعِ حقیقتِ دوم می‌شد.
     required String current,
     required String min,
-    // نسخهٔ منتشرشده + پیامِ ادمین + حجمِ فایل (از `app.release`).
+    // نسخهٔ منتشرشده + پیامِ ادمین + حجمِ فایل + اثرِ انگشت (از `app.release`).
     required String latest,
     required String notes,
     required int sizeBytes,
+    required String sha256,
   }) async {
     if (!mounted) return;
-    await showDialog<void>(
+    await showAppUpdateDialog(
       context: context,
-      barrierDismissible: !forced,
-      builder: (ctx) => AlertDialog(
-        // هر سه سطر از `live_copy.update` می‌آید (آینهٔ `main.jsx`).
-        // فول‌بکِ `update.body` واژه‌به‌واژه جملهٔ دیروزِ همین دیالوگ است —
-        // پس اگر config نرسد، صفحه دقیقاً همان چیزی را می‌بیند که الان
-        // می‌بیند. وقتی config برسد، سطرِ «نسخهٔ فعلی شما X و حداقلِ
-        // لازم Y است» هم *جلویِ* بدنه می‌آید: عددِ نسخه از `minVersion`
-        // می‌آید و اگر ادمین بخواهد، می‌تواند جمله را عوض کند؛ قبلاً کاربر
-        // می‌فهمید «اپت قدیمی است» ولی نمی‌فهمید چقدر قدیمی.
-        title: Text(liveText('update.title', 'نسخهٔ تازه قلقلی آماده است')),
-        // دو جمله، دو `liveText`ی جدا و سپس *الحاق* — نه یک interpolationِ
-        // چندسطری داخلِ `'${…}'`: رشتهٔ دارت نمی‌تواند از میانِ خط بشکند و
-        // اولین بیلد همین را به‌شکلِ «newline inside string» رد می‌کرد.
-        // اگر `update.notice` خالی برگردد (فول‌بکِ آفلاین یا پاک‌کردنِ ادمین)،
-        // RichText فقط بدنه را نشان می‌دهد و یک فاصلهٔ یتیم نمی‌افتد.
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _updateBody(context, current: current, min: min),
-            if (latest.isNotEmpty || notes.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _updateReleaseCard(context,
-                  latest: latest, notes: notes, sizeBytes: sizeBytes),
-            ],
-          ],
-        ),
-        actions: [
-          if (!forced)
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(liveText('update.later', 'بعداً')),
-            ),
-          FilledButton(
-            onPressed: () {
-              if (url.isNotEmpty) {
-                launchUrl(Uri.parse(url),
-                    mode: LaunchMode.externalApplication).catchError((_) => false);
-              }
-              if (!forced) Navigator.pop(ctx);
-            },
-            child: Text(liveText('update.action', 'به‌روزرسانی')),
-          ),
-        ],
+      info: AppUpdateInfo(
+        version: latest,
+        notes: notes,
+        sizeBytes: sizeBytes,
+        sha256: sha256,
+        url: url,
+        forced: forced,
+        current: current,
+        min: min,
       ),
     );
   }
