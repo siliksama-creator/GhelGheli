@@ -304,6 +304,14 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
       const forceUpdate = String(req.body?.forceUpdate ?? 'false') === 'true';
       const minVersion = sanitizeVersion(req.body?.minVersion) || version;
 
+      // ── «آرشیو» یعنی آرشیو، نه انتشار ────────────────────────────────────
+      // ⚠️ یافتهٔ آزمونِ زندهٔ ۲ مهر: با `setUpdateUrl=false` هم فایل به
+      // نامِ `ghelgheli-latest.apk` هاردلینک می‌شد و رکوردِ نسخهٔ زنده
+      // نوشته می‌شد — پس «فقط آرشیو» عملاً اپِ همهٔ کاربران را عوض می‌کرد.
+      // حالا: فایل می‌ماند، نسخهٔ زنده دست‌نخورده.
+      const prevRelease = await readRelease().catch(() => null);
+      const archiveOnly = !setUpdateUrl && !!prevRelease && prevRelease.filename !== filename;
+
       const filename = `ghelgheli-${version}.apk`;
       const finalPath = path.join(APK_DIR, filename);
       const latestPath = path.join(APK_DIR, LATEST_NAME);
@@ -317,13 +325,33 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
 
       // نسخهٔ جاری = hardlink (فضای اضافه نمی‌گیرد، ولی دو نامِ مستقل دارد).
       // اگر hardlink ممکن نبود (فایل‌سیستمِ متفاوت)، کپی می‌کنیم.
-      await fsp.rm(latestPath, { force: true });
-      try {
-        await fsp.link(finalPath, latestPath);
-      } catch {
-        await fsp.copyFile(finalPath, latestPath);
+      // در حالتِ آرشیوی، نامِ «latest» دست‌نخورده می‌ماند تا فایلِ منتشرشدهٔ
+      // فعلی همان باشد که کاربران می‌گیرند.
+      if (!archiveOnly) {
+        await fsp.rm(latestPath, { force: true });
+        try {
+          await fsp.link(finalPath, latestPath);
+        } catch {
+          await fsp.copyFile(finalPath, latestPath);
+        }
       }
       await fsp.writeFile(`${finalPath}.sha256`, `${sha256}  ${filename}\n`, 'utf8');
+
+      if (archiveOnly) {
+        await audit(req.admin.id, 'archive_apk', 'app_settings', null, null, {
+          version, versionCode, sizeBytes: stat.size, sha256, keptRelease: prevRelease.version,
+        }).catch(() => {});
+        return res.json({
+          ok: true,
+          archiveOnly: true,
+          file: {
+            filename, version, versionCode, sizeBytes: stat.size, sha256, signed: true,
+          },
+          release: prevRelease,
+          applied: null,
+          message: `فایلِ ${version} آرشیو شد — نسخهٔ زنده (${prevRelease.version}) عوض نشد`,
+        });
+      }
 
       const record = {
         version,

@@ -225,7 +225,7 @@ export function AppReleasePage({ request, token, isSuperAdmin }) {
             <label className="checkbox-row">
               <input type="checkbox" checked={setUpdateUrl} disabled={!isSuperAdmin}
                 onChange={(e) => setSetUpdateUrl(e.target.checked)} />
-              لینکِ به‌روزرسانیِ اپ و وب به همین فایل وصل شود
+              این فایل «نسخهٔ زنده» شود (لینکِ به‌روزرسانیِ اپ و وب به آن وصل شود)
             </label>
             <label className="checkbox-row">
               <input type="checkbox" checked={promoteMin} disabled={!isSuperAdmin}
