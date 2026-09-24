@@ -8,7 +8,7 @@ module.exports = ({
   pool, auth, asyncHandler, referrals,
   pass, loginStreak, loginStreakLimiter, UUID_RE,
   cacheGet, cacheSet, getLeaderboard, level,
-  points, shop,
+  points, shop, coinVault,
 }) => {
   const router = express.Router();
 
@@ -47,6 +47,32 @@ router.post('/pass/claim-all', auth, asyncHandler(async (req, res) => {
 // ── معرفی دوستان ─────────────────────────────────────────────────────────
 router.get('/referrals', auth, asyncHandler(async (req, res) => {
   res.json(await referrals.summary(req.user.id));
+}));
+
+// ── صندوق سکه ────────────────────────────────────────────────────────────
+//
+// خواستهٔ مالک (۱۴۰۵/۰۷/۰۲): تبِ تازه‌ای که «سکهٔ موقتِ لیگِ جاری» و
+// «سکهٔ بدست‌آمده» را جدا نشان می‌دهد و اجازه می‌دهد کاربر خودش سکهٔ
+// بدست‌آمده را به هر لیگِ در جریانی که خواست واریز کند.
+router.get('/coin-vault', auth, asyncHandler(async (req, res) => {
+  res.json(await coinVault.overview(req.user.id));
+}));
+
+router.get('/coin-vault/history', auth, asyncHandler(async (req, res) => {
+  res.json(await coinVault.history(req.user.id, {
+    limit: req.query.limit,
+    offset: req.query.offset,
+  }));
+}));
+
+router.post('/coin-vault/deposit', auth, asyncHandler(async (req, res) => {
+  try {
+    res.json(await coinVault.deposit(
+      req.user.id, req.body?.seasonId, req.body?.amount));
+  } catch (e) {
+    res.status(e.status || 500)
+      .json({ message: e.message || 'خطا در واریز سکه', code: e.code });
+  }
 }));
 
 router.get('/league/current', auth, asyncHandler(async (req, res) => {

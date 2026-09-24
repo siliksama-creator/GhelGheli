@@ -2249,7 +2249,13 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
    اسکرولر بالا را غیرقابل‌دسترس می‌کند، پس مرکزچینی با `margin:auto`
    انجام می‌شود. */
 .invModalShade{position:fixed;inset:0;z-index:1300;background:#000c;display:flex;align-items:center;justify-content:center;padding:18px;overflow-y:auto;overscroll-behavior:contain}
-.invModalShade>.invModal{margin:auto}.invModal{width:min(420px,94vw);padding:16px;position:relative}.invModal>img{width:100%;max-height:55vh;object-fit:contain;border-radius:18px;background:#02070d}.invModal h2{text-align:center;margin:10px 0}.invModalClose{position:absolute;top:-15px;inset-inline-end:-12px;z-index:12;width:40px;height:40px;padding:0;border-radius:50%;background:#071522e8;border:1px solid #ffffff38;box-shadow:0 7px 20px #000b;font-size:22px}.invDetailStats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.invDetailStats span{padding:8px;border-radius:11px;background:#ffffff0b;text-align:center;color:#9fb6d0;font-size:10.5px}.invDetailStats b{display:block;color:#fff;font-size:13px}
+/* ⚠️ `!important` لازم است، نه سلیقه: `base.css` با
+   `.wide,.card{width:100%!important}` تمام می‌شود و `.invModal` کلاسِ
+   `card` را هم دارد. تا وقتی این لایه داخلِ تبِ ~۹۰۰ پیکسلی حبس بود،
+   «۱۰۰٪» تصادفاً کوچک می‌ماند؛ به‌محضِ اینکه لایه واقعاً تمام‌صفحه شد،
+   پنجره به عرضِ کلِ مانیتور کش آمد. عرض باید همان چیزی بماند که برای
+   وب طراحی شده. */
+.invModalShade>.invModal{width:min(420px,94vw)!important;margin:auto}.invModal{width:min(420px,94vw);padding:16px;position:relative}.invModal>img{width:100%;max-height:55vh;object-fit:contain;border-radius:18px;background:#02070d}.invModal h2{text-align:center;margin:10px 0}.invModalClose{position:absolute;top:-15px;inset-inline-end:-12px;z-index:12;width:40px;height:40px;padding:0;border-radius:50%;background:#071522e8;border:1px solid #ffffff38;box-shadow:0 7px 20px #000b;font-size:22px}.invDetailStats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.invDetailStats span{padding:8px;border-radius:11px;background:#ffffff0b;text-align:center;color:#9fb6d0;font-size:10.5px}.invDetailStats b{display:block;color:#fff;font-size:13px}
 @media(max-width:520px){.inventoryGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.inventoryTile:last-child:nth-child(odd){grid-column:1/-1;width:calc(50% - 5px);justify-self:center}.inventoryTile .invArt{height:190px}.inventoryTools{align-items:stretch}.inventoryTools>*{width:100%}}
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -4784,3 +4790,61 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
   font-weight:800;color:#9fb6d0}
 .invPagerAt b{color:#fff}
 .invPagerAt i{font-style:normal;color:#6f8399;font-size:11px}
+
+/* ════════════════════════════════════════════════════════════════════
+   صندوق سکه — تبِ چهارمِ صفحهٔ لیگ
+   ════════════════════════════════════════════════════════════════════ */
+.coinVault{display:flex;flex-direction:column;gap:14px}
+
+.vaultStats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:560px){.vaultStats{grid-template-columns:1fr}}
+
+.vaultStat{display:flex;gap:10px;padding:14px;border-radius:18px;
+  background:#ffffff0b;border:1px solid #ffffff18}
+/* دو رنگِ متفاوت چون دو چیزِ متفاوت‌اند: موقت در برابر ماندگار. */
+.vaultStat[data-tone='league']{background:linear-gradient(150deg,#38bdf81f,#ffffff08);
+  border-color:#38bdf840}
+.vaultStat[data-tone='vault']{background:linear-gradient(150deg,#ffd16622,#ffffff08);
+  border-color:#ffd16647}
+.vaultStatIcon{display:grid;place-items:center;width:40px;height:40px;flex:0 0 40px;
+  border-radius:12px;background:#ffffff14}
+.vaultStat[data-tone='vault'] .vaultStatIcon{color:#ffd166}
+.vaultStatBody{display:flex;flex-direction:column;gap:2px;min-width:0}
+.vaultStatLabel{font-size:12px;font-weight:800;color:#9fb6d0}
+.vaultStatValue{font-size:26px;font-weight:900;color:#fff;line-height:1.15;
+  font-variant-numeric:tabular-nums}
+.vaultStatNote{font-size:11px;font-weight:600;color:#8ea6bd;line-height:1.55}
+
+.vaultDeposit{padding:14px;border-radius:18px;background:#ffffff09;
+  border:1px solid #ffffff16}
+.vaultSectionTitle{display:block;font-size:14px;font-weight:900;color:#fff;
+  margin-bottom:6px}
+.vaultHint{margin:0 0 10px;font-size:11.5px;font-weight:600;color:#8ea6bd;
+  line-height:1.6}
+.vaultEmpty{margin:0;font-size:12px;font-weight:700;color:#9fb6d0;line-height:1.7}
+
+.vaultLeaguePick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.vaultLeaguePick button{display:flex;flex-direction:column;align-items:flex-start;
+  gap:2px;padding:9px 14px;border-radius:14px;background:#0b2039;
+  border:1px solid #ffffff1a;color:#dbeeff}
+.vaultLeaguePick button b{font-size:12.5px;font-weight:900}
+.vaultLeaguePick button small{font-size:10.5px;color:#8ea6bd}
+.vaultLeaguePick button.on{background:#b5ef58;border-color:transparent;color:#10210a}
+.vaultLeaguePick button.on small{color:#2c4a12}
+
+.vaultAmountRow{display:flex;gap:8px;align-items:center}
+.vaultAmountRow input{margin:0;flex:1}
+.vaultAmountRow button{flex:0 0 auto;padding:12px 18px}
+
+.vaultOk{margin:10px 0 0;font-size:12px;font-weight:800;color:#b5ef58}
+.vaultErr{margin:10px 0 0;font-size:12px;font-weight:800;color:#ff9db0}
+
+/* «بزودی» — عمداً خاموش و بی‌تعامل، تا وعده با دکمهٔ فعال اشتباه نشود. */
+.vaultSoon{padding:14px;border-radius:18px;background:#ffffff06;
+  border:1px dashed #ffffff26;opacity:.72}
+.vaultSoonHead{display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-bottom:4px}
+.vaultSoonHead b{font-size:13.5px;font-weight:900;color:#dbeeff}
+.vaultSoonBadge{flex:0 0 auto;padding:3px 11px;border-radius:99px;font-size:11px;
+  font-weight:900;background:#ffd16622;border:1px solid #ffd16655;color:#ffd166}
+.vaultSoon p{margin:0;font-size:11.5px;font-weight:600;color:#8ea6bd;line-height:1.6}

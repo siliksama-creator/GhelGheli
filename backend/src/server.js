@@ -656,7 +656,7 @@ app.use('/api', require('./routes/progression')({
   pool, auth, asyncHandler, referrals,
   pass, loginStreak, loginStreakLimiter, UUID_RE,
   cacheGet, cacheSet, getLeaderboard, level,
-  points, shop,
+  points, shop, coinVault: require('./services/coinVaultService'),
 }));
 app.use('/api', require('./routes/chat')({
   pool, auth, asyncHandler, validateUuid,

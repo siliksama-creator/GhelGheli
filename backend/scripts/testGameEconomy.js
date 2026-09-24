@@ -55,8 +55,10 @@ console.log('\n══ ۲. محاسبهٔ سهمِ انتقالی ══');
     'سکهٔ صفر/نامعتبر انتقالی ندارد');
 }
 
-console.log('\n══ ۳. carryoverBetween با client جعلی ══');
+console.log('\n══ ۳. carryoverToVault با client جعلی ══');
 {
+  // خواستهٔ مالک (۱۴۰۵/۰۷/۰۲): درصدِ پایانِ لیگ دیگر به لیگِ بعدی نمی‌رود،
+  // به **صندوق سکهٔ** خودِ کاربر می‌رود و کاربر بعداً خودش واریز می‌کند.
   const log = [];
   const client = {
     async query(sql, params) {
@@ -64,25 +66,42 @@ console.log('\n══ ۳. carryoverBetween با client جعلی ══');
       if (/FROM league_leaderboard_entries/.test(sql) && /coins > 0/.test(sql)) {
         return { rows: [{ user_id: 'u1', coins: 1000 }, { user_id: 'u2', coins: 999 }] };
       }
+      if (/UPDATE users SET vault_coins/.test(sql)) {
+        return { rows: [{ vault_coins: Number(params[1]) }] };
+      }
       return { rowCount: 1, rows: [] };
     },
   };
   economy.setCachedForTest({ coinCarryoverPercent: 10 });
   (async () => {
-    const r = await league.carryoverBetween(client, 'season-old', 'season-new');
-    ok(r.pct === 10 && r.carriedUsers === 2, 'دو کاربر سکه داشتند و هر دو سهم گرفتند', JSON.stringify(r));
-    const inserts = log.filter(l => /INSERT INTO league_leaderboard_entries/.test(l.sql));
-    ok(inserts.length === 2, 'دو ردیف در لیگِ هدف ساخته شد');
-    ok(inserts[0].params[0] === 'season-new' && inserts[0].params[2] === 100,
-      'کاربر اول: ۱۰۰۰ × ۱۰٪ = ۱۰۰ → لیگ جدید', JSON.stringify(inserts[0].params));
-    ok(inserts[1].params[2] === 99, 'کاربر دوم: ۹۹۹ × ۱۰٪ = ۹۹ (floor)');
-    const display = log.find(l => /UPDATE users u SET/.test(l.sql) && /coins = COALESCE/.test(l.sql));
-    ok(Boolean(display) && display.params[0].length === 2,
-      'شمارندهٔ نمایشی از لیگ‌های فعال بازسازی شد');
-    // ⚠️ نشانِ انتقال: بدونِ آن، سکهٔ یک لیگِ بسته دو بار منتقل می‌شد
-    //    (بستنِ لیگ + ساختِ لیگِ بعدی توسط ادمین).
+    const r = await league.carryoverToVault(client, 'season-old');
+    ok(r.pct === 10 && r.carriedUsers === 2,
+      'دو کاربر سکه داشتند و هر دو سهم گرفتند', JSON.stringify(r));
+    ok(r.totalCarried === 199, 'مجموعِ واریز = ۱۰۰ + ۹۹', String(r.totalCarried));
+
+    const credits = log.filter(l => /UPDATE users SET vault_coins/.test(l.sql));
+    ok(credits.length === 2, 'دو واریز به صندوق انجام شد');
+    ok(credits[0].params[1] === 100,
+      'کاربر اول: ۱۰۰۰ × ۱۰٪ = ۱۰۰ → صندوق', JSON.stringify(credits[0].params));
+    ok(credits[1].params[1] === 99, 'کاربر دوم: ۹۹۹ × ۱۰٪ = ۹۹ (floor)');
+
+    // ⛔ مهم‌ترین بند: هیچ ردیفی نباید در هیچ لیگی ساخته شود.
+    const leagueWrites = log.filter(
+      l => /INSERT INTO league_leaderboard_entries/.test(l.sql));
+    ok(leagueWrites.length === 0,
+      'هیچ سکه‌ای مستقیم وارد لیگِ بعدی نشد (خواستهٔ مالک)',
+      String(leagueWrites.length));
+
+    const ledger = log.filter(
+      l => /INSERT INTO coin_vault_transactions/.test(l.sql));
+    ok(ledger.length === 2, 'هر واریز در دفترِ صندوق ثبت شد');
+    ok(ledger[0].params[3] === 'season-old',
+      'دفتر می‌گوید سکه از کدام لیگ آمده');
+
+    // ⚠️ نشانِ واریز: بدونِ آن، سکهٔ یک لیگِ بسته دو بار به صندوق می‌رفت.
     const marker = log.find(l => /INSERT INTO app_settings/.test(l.sql));
-    ok(Boolean(marker), 'نشانِ «این لیگ منتقل شد» ثبت می‌شود', JSON.stringify(marker?.params || null));
+    ok(Boolean(marker), 'نشانِ «این لیگ به صندوق رفت» ثبت می‌شود',
+      JSON.stringify(marker?.params || null));
     ok(String(marker?.params?.[0] || '').startsWith('coin_carryover_seeded:'),
       'کلیدِ نشان با پیشوندِ استاندارد است');
     ok(league.carryoverMarkerKey('s-x') === 'coin_carryover_seeded:s-x',

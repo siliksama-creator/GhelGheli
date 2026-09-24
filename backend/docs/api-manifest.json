@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 277,
+ "count": 280,
  "endpoints": [
   {
    "method": "GET",
@@ -966,6 +966,21 @@
    "method": "GET",
    "path": "/api/clubs/:slug/members",
    "source": "routes/commerce.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/coin-vault",
+   "source": "routes/progression.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/coin-vault/deposit",
+   "source": "routes/progression.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/coin-vault/history",
+   "source": "routes/progression.js"
   },
   {
    "method": "GET",

@@ -494,17 +494,19 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
  *    کرونِ شبانه بدونِ آرگومان صدا می‌زند و رفتارش دست‌نخورده می‌ماند.
  */
 /**
- * سکه‌های یک لیگِ بسته را با درصدِ تنظیم‌شده به لیگِ بعدی منتقل می‌کند.
+ * سکه‌های یک لیگِ بسته را با درصدِ تنظیم‌شده به **صندوقِ سکهٔ** هر کاربر
+ * واریز می‌کند.
  *
- * خواستهٔ مالک: «مشخص کنه چند درصد از سکه به لیگ بعدی منتقل شه؛ ممکنه
- * ۰ قرار بده». پس:
- *   • درصدِ ۰ ⇒ هیچ انتقالی رخ نمی‌دهد (سکه‌ها با پایانِ لیگ می‌سوزند).
- *   • سهمِ هر کاربر = floor(سکهٔ لیگِ قبلی × درصد / ۱۰۰) و روی ردیفِ
- *     همان کاربر در لیگِ هدف جمع می‌شود.
+ * خواستهٔ مالک (۱۴۰۵/۰۷/۰۲): «اون ۱۰ درصد سکه بعد پایان لیگ ذخیره بشه
+ * داخلش و دیگه به لیگ جدید منتقل نشه.» پس مقصد عوض شد — نه درصد:
+ *   • درصدِ ۰ ⇒ هیچ واریزی رخ نمی‌دهد (سکه‌ها با پایانِ لیگ می‌سوزند).
+ *   • سهمِ هر کاربر = floor(سکهٔ لیگِ بسته × درصد / ۱۰۰) و روی
+ *     `users.vault_coins` جمع می‌شود، نه روی هیچ لیگی.
+ *   • کاربر خودش بعداً از تبِ «صندوق سکه» به لیگِ دلخواه واریز می‌کند.
  *
- * ⚠️ باید داخلِ همان تراکنشِ بستن/ساختنِ لیگ صدا زده شود.
+ * ⚠️ باید داخلِ همان تراکنشِ بستنِ لیگ صدا زده شود.
  *
- * @returns {{pct:number, targetSeasonId:string|null, carriedUsers:number}|null}
+ * @returns {{pct:number, carriedUsers:number, totalCarried:number}}
  */
 // ── نشانِ انتقال ─────────────────────────────────────────────────────────
 //
@@ -520,12 +522,12 @@ function carryoverMarkerKey(sourceSeasonId) {
   return CARRYOVER_MARKER_PREFIX + sourceSeasonId;
 }
 
-async function carryoverBetween(client, sourceSeasonId, targetSeasonId) {
+async function carryoverToVault(client, sourceSeasonId) {
   let cfg = null;
   try { cfg = await economy.load(); } catch { /* پیش‌فرض */ }
   const pct = Number(cfg?.coinCarryoverPercent ?? 10);
   if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
-    return { pct: 0, targetSeasonId, carriedUsers: 0 };
+    return { pct: 0, carriedUsers: 0, totalCarried: 0 };
   }
 
   const { rows: entries } = await client.query(
@@ -534,76 +536,40 @@ async function carryoverBetween(client, sourceSeasonId, targetSeasonId) {
     [sourceSeasonId]);
 
   let carriedUsers = 0;
-  const touched = [];
+  let totalCarried = 0;
   for (const e of entries) {
     const carry = carryoverAmount(e.coins, pct);
     if (carry <= 0) continue;
+    // موجودیِ صندوق **جمع** می‌شود (نه بازمحاسبه): صندوق تاریخچه‌دار است و
+    // هر لیگ یک واریزِ مستقل به آن دارد.
+    const { rows: after } = await client.query(
+      `UPDATE users SET vault_coins = vault_coins + $2, updated_at = NOW()
+        WHERE id = $1 RETURNING vault_coins`,
+      [e.user_id, carry]);
+    if (!after[0]) continue;
     await client.query(
-      `INSERT INTO league_leaderboard_entries
-         (league_season_id, user_id, points, coins)
-       VALUES ($1,$2,0,$3)
-       ON CONFLICT (league_season_id, user_id)
-       DO UPDATE SET coins = league_leaderboard_entries.coins + EXCLUDED.coins,
-                     updated_at = NOW()`,
-      [targetSeasonId, e.user_id, carry]);
+      `INSERT INTO coin_vault_transactions
+         (user_id, delta, balance_after, source, season_id, description)
+       VALUES ($1,$2,$3,'league_end',$4,$5)`,
+      [e.user_id, carry, Number(after[0].vault_coins), sourceSeasonId,
+        `${pct}٪ سکهٔ لیگِ پایان‌یافته به صندوق سکه اضافه شد`]);
     carriedUsers += 1;
-    touched.push(e.user_id);
+    totalCarried += carry;
   }
 
-  if (touched.length) {
-    // ── موجودیِ «قبل» را نگه می‌داریم تا تفاوت را در دفترِ سکه بنویسیم ──
-    //
-    // ⚠️ این UPDATE عدد را **بازمحاسبه** می‌کند (جمعِ سکهٔ لیگ‌های فعال)،
-    //    نه اینکه جمع بزند. پس بدونِ قبل/بعد، جهت و اندازهٔ تغییر معلوم
-    //    نمی‌شد — و این تغییر معمولاً **کاهش** است: سکه‌های لیگِ بسته‌شده
-    //    از شمارنده می‌افتند و فقط درصدِ انتقالی به لیگِ بعد می‌رود. همان
-    //    لحظه‌ای که کاربر سکه‌اش را «کم‌شده» می‌بیند و باید توضیح داشته
-    //    باشد، نه سکوت.
-    const { rows: beforeRows } = await client.query(
-      'SELECT id, coins FROM users WHERE id = ANY($1::uuid[])', [touched]);
-    const beforeMap = new Map(beforeRows.map(r => [r.id, Number(r.coins) || 0]));
-
-    // شمارندهٔ نمایشیِ users.coins باید مجموعِ سکهٔ لیگ‌های **فعالِ**
-    // همان کاربر باشد — وگرنه بعد از انتقال، کاربر سکه‌ای را می‌بیند که
-    // در هیچ لیگِ فعالی ندارد.
-    await client.query(
-      `UPDATE users u SET
-         coins = COALESCE((
-           SELECT SUM(e.coins)::int
-             FROM league_leaderboard_entries e
-             JOIN league_seasons s ON s.id = e.league_season_id
-            WHERE e.user_id = u.id AND s.status='active'), 0),
-         updated_at = NOW()
-       WHERE u.id = ANY($1::uuid[])`,
-      [touched]);
-
-    const { rows: afterRows } = await client.query(
-      'SELECT id, coins FROM users WHERE id = ANY($1::uuid[])', [touched]);
-    await coinLedger.recordBulk(client, afterRows
-      .map((r) => {
-        const after = Number(r.coins) || 0;
-        return {
-          userId: r.id,
-          delta: after - (beforeMap.get(r.id) ?? 0),
-          balanceAfter: after,
-          source: 'league_carryover',
-          referenceType: 'league_season',
-          referenceId: targetSeasonId,
-          description: `انتقالِ ${pct}٪ سکه به لیگِ بعد (سکهٔ لیگِ بسته‌شده از شمارنده کم شد)`,
-        };
-      })
-      .filter(e => e.delta !== 0));
-  }
-
-  // نشانِ «این لیگِ بسته منتقل شد» — جلوی انتقالِ دوباره را می‌گیرد.
+  // نشانِ «سکهٔ این لیگ به صندوق رفت» — جلوی واریزِ دوباره را می‌گیرد.
+  //
+  // ⚠️ همان مکانیزمِ قبلی عمداً حفظ شد. قبلاً خطر این بود که سکهٔ یک لیگ
+  //    دو بار به لیگِ بعدی منتقل شود؛ حالا خطر این است که دو بار به
+  //    صندوق ریخته شود — یعنی همان «چاپِ سکه»، فقط در ظرفِ تازه.
   await client.query(
     `INSERT INTO app_settings(key, value)
      VALUES ($1, $2)
      ON CONFLICT (key) DO NOTHING`,
     [carryoverMarkerKey(sourceSeasonId),
-      JSON.stringify({ target: targetSeasonId, at: new Date().toISOString() })]);
+      JSON.stringify({ toVault: true, at: new Date().toISOString() })]);
 
-  return { pct, targetSeasonId, carriedUsers };
+  return { pct, carriedUsers, totalCarried };
 }
 
 /**
@@ -613,7 +579,7 @@ async function carryoverBetween(client, sourceSeasonId, targetSeasonId) {
  */
 /**
  * سهمِ انتقالیِ یک کاربر: floor(سکه × درصد / ۱۰۰). خالص و قابل تست.
- * درصدِ ۰ یا نامعتبر ⇒ ۰ — یعنی «انتقال به لیگِ بعدی صفر می‌شود» (خواستهٔ مالک).
+ * درصدِ ۰ یا نامعتبر ⇒ ۰ — یعنی «هیچ سکه‌ای وارد صندوق نمی‌شود» (خواستهٔ مالک).
  */
 function carryoverAmount(coins, pct) {
   const c = Number(coins);
@@ -623,12 +589,12 @@ function carryoverAmount(coins, pct) {
   return Math.floor(c * p / 100);
 }
 
-async function seedCarryoverFromLatestClosed({ leagueType = null, targetSeasonId }) {
+async function seedCarryoverFromLatestClosed({ leagueType = null, targetSeasonId = null } = {}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // ⚠️ فقط لیگِ بسته‌ای که هنوز نشانِ انتقال ندارد — وگرنه سکهٔ یک لیگ
-    //    دو بار منتقل می‌شود (توضیح کامل بالای `carryoverBetween`).
+    // ⚠️ فقط لیگِ بسته‌ای که هنوز نشانِ واریز ندارد — وگرنه سکهٔ یک لیگ
+    //    دو بار به صندوق می‌رود (توضیح کامل بالای `carryoverToVault`).
     //    `IS NOT DISTINCT FROM` چون لیگ‌های قدیمیِ خودکار league_type=NULL
     //    دارند و باید با هم‌نوعِ NULL خودشان جفت شوند.
     const { rows } = await client.query(
@@ -648,7 +614,10 @@ async function seedCarryoverFromLatestClosed({ leagueType = null, targetSeasonId
       await client.query('COMMIT');
       return { seeded: false, reason: 'no unseeded closed season' };
     }
-    const result = await carryoverBetween(client, source.id, targetSeasonId);
+    // مقصد دیگر «لیگِ بعدی» نیست؛ صندوقِ خودِ کاربر است. این مسیر فقط
+    // شبکهٔ ایمنی است: لیگ‌هایی که پیش از این تغییر بسته شده‌اند و نشانِ
+    // واریز نگرفته‌اند، موقعِ ساختِ لیگِ تازه جبران می‌شوند.
+    const result = await carryoverToVault(client, source.id);
     await client.query('COMMIT');
     return { seeded: true, sourceSeasonId: source.id, ...result };
   } catch (e) {
@@ -917,22 +886,16 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
     await client.query(
       "UPDATE league_seasons SET status='closed', paid_at=NOW(), updated_at=NOW() WHERE id=$1",
       [season.id]);
-    // ── انتقالِ درصدیِ سکه به لیگِ بعدی (خواستهٔ مالک) ──────────────────
+    // ── درصدِ سکه به «صندوق سکه» (خواستهٔ مالک، ۱۴۰۵/۰۷/۰۲) ────────────
     //
-    // «لیگِ بعدی» = فعال‌ترین لیگِ هم‌نوع که بعد از پایانِ این لیگ شروع
-    // شده. اگر هنوز ساخته نشده، موقعِ ساخت توسط ادمین
-    // (`seedCarryoverFromLatestClosed`) منتقل می‌شود.
-    const { rows: nextSeasons } = await client.query(
-      `SELECT id FROM league_seasons
-        WHERE id <> $1 AND status='active'
-          AND league_type IS NOT DISTINCT FROM $2
-          AND starts_at >= $3
-        ORDER BY starts_at ASC LIMIT 1`,
-      [season.id, season.league_type, season.ends_at]);
-    let carryover = null;
-    if (nextSeasons[0]) {
-      carryover = await carryoverBetween(client, season.id, nextSeasons[0].id);
-    }
+    // پیش از این همین درصد مستقیماً روی ردیفِ کاربر در لیگِ بعدی می‌نشست.
+    // حالا به صندوق می‌رود و تا وقتی خودِ کاربر تصمیم نگیرد وارد هیچ
+    // لیگی نمی‌شود: «دیگه به لیگ جدید منتقل نشه».
+    //
+    // اینجا (لحظهٔ بستن) درست‌ترین نقطه است چون دیگر به لیگِ مقصد نیازی
+    // نیست — قبلاً اگر لیگِ بعدی هنوز ساخته نشده بود، انتقال معلق می‌ماند
+    // تا ادمین لیگِ تازه بسازد.
+    const carryover = await carryoverToVault(client, season.id);
     // Reset ONLY the monthly counter. current_points (spendable) and
     // lifetime_points (history) are untouched: a user's saved-up points and
     // their all-time total must survive the month rolling over.
@@ -1296,6 +1259,6 @@ async function approvePayouts(payoutId, adminId) {
 module.exports = {
   ensureActiveSeason, addLeaguePoints, getLeaderboard, closeActiveSeason,
   closeExpiredSeasons, defaultPrizeTable, approvePayouts, winnerNotifyBody,
-  carryoverBetween, seedCarryoverFromLatestClosed, carryoverAmount,
+  carryoverToVault, seedCarryoverFromLatestClosed, carryoverAmount,
   carryoverMarkerKey,
 };

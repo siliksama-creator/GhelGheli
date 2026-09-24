@@ -18,6 +18,7 @@ import '../../widgets/coin_guide.dart';
 // شماره معکوس نمایش داده بشه.» آینهٔ userweb/src/components/LeagueCountdown.jsx.
 import '../../widgets/league_countdown.dart';
 import 'clubs_page.dart';
+import '../../widgets/coin_vault.dart';
 import '../../widgets/ui_icon.dart';
 import '../../core/app_config.dart';
 
@@ -163,10 +164,16 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
           Padding(
             padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, 0),
             child: SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 0, label: Text('جدول لیگ')),
-                ButtonSegment(value: 1, label: Text('باشگاه‌ها')),
-                ButtonSegment(value: 2, label: Text('برندگان قبل')),
+              segments: [
+                const ButtonSegment(value: 0, label: Text('جدول لیگ')),
+                const ButtonSegment(value: 1, label: Text('باشگاه‌ها')),
+                // ترتیب عمداً با وب یکی است (جدول/باشگاه/صندوق/برندگان)
+                // تا کاربری که هر دو را دارد جای تب‌ها را عوض‌شده نبیند.
+                // نامِ تب از پنل می‌آید — همان کلیدی که وب می‌خواند.
+                ButtonSegment(
+                    value: 2,
+                    label: Text(liveText('vault.title', 'صندوق سکه'))),
+                const ButtonSegment(value: 3, label: Text('برندگان قبل')),
               ],
               selected: {_tab},
               showSelectedIcon: false,
@@ -253,6 +260,21 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
     }
 
     if (_tab == 2) {
+      return Column(
+        children: [
+          _tabs(),
+          Expanded(
+            child: CoinVaultTab(
+              api: widget.api,
+              economy: _economy,
+              onChanged: _load,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_tab == 3) {
       return Column(
         children: [
           _tabs(),

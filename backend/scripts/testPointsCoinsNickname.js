@@ -315,7 +315,19 @@ const server = src('src/server.js') + src('src/routes/games.js') + src('src/rout
   ok(/nickCheck/.test(server) && /status\(400\)\.json\(\{ message: nickCheck\.error/.test(server),
     'PATCH /api/profile نامِ نامردود را با پیامِ فارسی رد می‌کند');
   const league = src('src/services/leagueService.js');
-  ok(/source: 'league_carryover'/.test(league), 'انتقالِ سکهٔ لیگ در دفتر ثبت می‌شود');
+  // ⚠️ از ۱۴۰۵/۰۷/۰۲ مقصدِ درصدِ پایانِ لیگ عوض شد: دیگر به لیگِ بعدی
+  // نمی‌رود، به «صندوق سکه» می‌رود (خواستهٔ مالک). پس دفترِ درست هم
+  // عوض شده — `coin_vault_transactions` به‌جای `coin_transactions`.
+  ok(/INSERT INTO coin_vault_transactions/.test(league)
+    && /'league_end'/.test(league),
+  'واریزِ پایانِ لیگ به صندوق در دفترِ صندوق ثبت می‌شود');
+  // و هیچ سکه‌ای مستقیم وارد لیگِ بعدی نمی‌شود.
+  ok(!/carryoverBetween/.test(league),
+    'مسیرِ قدیمیِ انتقال به لیگِ بعدی حذف شده');
+  // واریزِ خودِ کاربر از صندوق به لیگ، چون `users.coins` را بالا می‌برد،
+  // در دفترِ سکهٔ معمولی ثبت می‌شود.
+  ok(/'vault_deposit'/.test(src('src/services/coinVaultService.js')),
+    'واریز از صندوق به لیگ در دفترِ سکه ثبت می‌شود');
   ok(/source: 'league_end'/.test(league), 'صفرشدنِ سکه در پایانِ لیگ در دفتر ثبت می‌شود');
   const auth = src('src/routes/auth.js');
   ok((auth.match(/nicknamePolicy\.validate/g) || []).length >= 2,

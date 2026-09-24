@@ -136,11 +136,31 @@ const DEFAULT_COPY = Object.freeze({
     quota: 'هر روز تا {qLow} بازی در {stakeLowText} و {qHigh} بازی در {stakeHighText} سکه می‌دهد. بعد از آن، بازی امتیاز دارد ولی سکه نه.',
     tapCoins: 'بازی ضربه‌زن هم سکه دارد: هر لول {tapCoins} سکه — همان لحظهٔ لول‌آپ به موجودی‌ات اضافه می‌شود.',
     league: 'مبنای دریافتِ جایزهٔ لیگ، رتبه بر اساسِ سکه است و با سکه‌ها در استخرِ جایزه شرکت می‌کنی. در پایانِ فصل جوایز بر اساسِ سکه پرداخت و سکه‌ها صفر می‌شوند؛ {carryover}.',
-    carryoverZero: 'انتقالِ سکه به لیگِ بعدی صفر است',
-    carryoverPercent: '{percent}٪ از سکه به لیگِ بعدی منتقل می‌شود',
+    carryoverZero: 'سهمِ صندوق سکه صفر است',
+    // ⚠️ مقصد از «لیگِ بعدی» به «صندوق سکه» عوض شد (۱۴۰۵/۰۷/۰۲). درصد
+    //    همان تنظیمِ ادمین است؛ فقط دیگر خودکار وارد لیگ نمی‌شود.
+    carryoverPercent: '{percent}٪ از سکه به صندوق سکه می‌رود',
     stakeLabel: 'ورودی {stake}',
     botNote: 'تمرین با ربات سکه ندارد — برای سکه، {stakeLowText} یا {stakeHighText} را انتخاب کن.',
     privateNote: 'اتاق خصوصی سکه ندارد — برای سکه، {stakeLowText} یا {stakeHighText} را انتخاب کن.',
+  },
+  // ── صندوق سکه ──
+  vault: {
+    title: 'صندوق سکه',
+    leagueCoinsLabel: 'سکهٔ موقت در لیگ جاری',
+    leagueCoinsNote: 'این سکه رتبهٔ تو را در لیگ می‌سازد و با پایانِ لیگ صفر می‌شود.',
+    earnedLabel: 'سکهٔ بدست آمده',
+    earnedNote: 'سهمی که از لیگ‌های پایان‌یافته ذخیره شده. صفر نمی‌شود و هر وقت خواستی به لیگِ دلخواهت واریزش کن.',
+    depositTitle: 'واریز به لیگ',
+    depositHint: 'لیگ را انتخاب کن و مبلغ را بنویس. بعد از واریز، سکه واردِ رتبه‌بندیِ همان لیگ می‌شود و برگشت ندارد.',
+    depositCta: 'واریز به این لیگ',
+    depositAll: 'همه',
+    depositDone: '{amount} سکه به {league} واریز شد',
+    empty: 'هنوز سکه‌ای در صندوق نداری. با پایانِ هر لیگ، {percent}٪ سکه‌ات اینجا ذخیره می‌شود.',
+    noLeague: 'الان هیچ لیگی در جریان نیست. به‌محضِ شروعِ لیگِ بعدی می‌توانی واریز کنی.',
+    prizesTitle: 'دریافت جوایز مخصوص سکه',
+    prizesSoon: 'بزودی',
+    prizesNote: 'به‌زودی می‌توانی سکه‌هایت را مستقیم با جوایزِ ویژه عوض کنی.',
   },
   plus: {
     monthlyBadge: '{days} روز',
@@ -291,6 +311,14 @@ const COPY_CONTRACT = Object.freeze({
     // نمی‌توانست بگوید «این متن عددِ لازم را ندارد» و اشتباهِ ادمین فقط روی
     // گوشیِ کاربر دیده می‌شد.
     dailySpinRule: ['invitesPerDailySpin', 'spinsPerDailyThreshold', 'maxInvitesForDaily'],
+  },
+  vault: {
+    title: [], leagueCoinsLabel: [], leagueCoinsNote: [],
+    earnedLabel: [], earnedNote: [],
+    depositTitle: [], depositHint: [], depositCta: [], depositAll: [],
+    depositDone: ['amount', 'league'],
+    empty: ['percent'], noLeague: [],
+    prizesTitle: [], prizesSoon: [], prizesNote: [],
   },
   coinGuide: {
     // تیترِ کارت — وب و اندروید هر دو همین را می‌خوانند.

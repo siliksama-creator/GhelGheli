@@ -35,7 +35,8 @@ const logger = require('../lib/logger');
 const SOURCES = Object.freeze([
   'game',           // بردِ بازیِ آنلاین (دوئل و…) — از gameStakeService
   'tap',            // لول‌های ضربه‌زن
-  'league_carryover', // درصدی که به لیگِ بعدی منتقل می‌شود
+  'league_carryover', // (تاریخی) درصدی که به لیگِ بعدی منتقل می‌شد
+  'vault_deposit',  // واریزِ کاربر از صندوق سکه به یک لیگِ فعال
   'league_end',     // سکه‌هایی که با بسته‌شدنِ لیگ از شمارندهٔ نمایشی می‌رود
   'wheel',          // گردونهٔ شانس (اگر روزی سکه بدهد)
   'admin_adjust',   // دستِ مدیر
@@ -46,6 +47,7 @@ const SOURCE_LABELS = Object.freeze({
   game: 'بردِ بازی',
   tap: 'ضربه‌زن',
   league_carryover: 'انتقالِ سکه به لیگِ بعد',
+  vault_deposit: 'واریز از صندوق سکه',
   league_end: 'پایانِ لیگ',
   wheel: 'گردونهٔ شانس',
   admin_adjust: 'تنظیمِ مدیر',

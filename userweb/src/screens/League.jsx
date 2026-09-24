@@ -11,11 +11,12 @@ import CoinChip from '../components/CoinChip.jsx';
 import CoinGuide from '../components/CoinGuide.jsx';
 // اقتصادِ بازی از کشِ مشترکِ config خوانده می‌شود (فاز ۲). این صفحه یکی از
 // fetchهای تکراریِ `/api/config` بود که حالا حذف شده است.
-import { useLive } from '../lib/liveConfig.js';
+import { text, useLive } from '../lib/liveConfig.js';
 // کارتِ شماره معکوسِ شروعِ لیگ — خواستهٔ مالک: «وقتی واردِ قسمتِ لیگ شد،
 // شماره معکوس نمایش داده بشه.» این کارت خودش داده‌اش را می‌گیرد و وقتی
 // شمارش تمام/خاموش شود هیچ‌چیز رندر نمی‌کند.
 import LeagueCountdown from '../components/LeagueCountdown.jsx';
+import CoinVault from '../components/CoinVault.jsx';
 
 /**
  * نشانِ سکه در ردیفِ جدول.
@@ -203,6 +204,38 @@ function PreviousWinners({ data }) {
   );
 }
 
+/**
+ * نوارِ تبِ صفحهٔ لیگ — **یک** تعریف برای همهٔ شاخه‌ها.
+ *
+ * ⚠️ قبلاً همین سه دکمه در چهار شاخهٔ مختلفِ `League` کپی شده بود. افزودنِ
+ *    تبِ «صندوق سکه» یعنی کپیِ پنجم؛ و اولین شاخه‌ای که یادت برود، تبی
+ *    دارد که در بقیه هست و در آن نیست. پس یک‌بار تعریف می‌شود.
+ */
+function leagueTabs() {
+  return [
+    ['table', 'جدول لیگ'],
+    ['clubs', 'باشگاه‌ها'],
+    // نامِ تب از پنل قابلِ تغییر است — همان کلیدی که اندروید هم می‌خواند.
+    ['vault', text('vault.title', 'صندوق سکه')],
+    ['prev', 'برندگان قبل'],
+  ];
+}
+
+function LeagueTabs({ tab, setTab }) {
+  return (
+    <div className="leagueTabs">
+      {leagueTabs().map(([id, label]) => (
+        <button
+          key={id}
+          className={tab === id ? 'on' : ''}
+          aria-current={tab === id ? 'page' : undefined}
+          onClick={() => setTab(id)}
+        >{label}</button>
+      ))}
+    </div>
+  );
+}
+
 export default function League({ token, openProfile }) {
   const [selectedLeagueId, setSelectedLeagueId] = useState(null);
   // اقتصادِ بازی‌ها (نرخِ سکه، درصدِ انتقال بین لیگ‌ها) — از همان کشِ مشترک؛
@@ -280,14 +313,22 @@ export default function League({ token, openProfile }) {
     };
   }, [tab, token]);
 
+  // ── صندوق سکه ──
+  // بیرونِ AsyncSectionِ جدول: صندوق دادهٔ خودش را می‌گیرد و نباید منتظرِ
+  // بارگذاریِ جدولِ لیگ بماند (یا با خطای آن از کار بیفتد).
+  if (tab === 'vault') {
+    return (
+      <section className="card wide leaguePage" style={{ padding:'16px' }}>
+        <LeagueTabs tab={tab} setTab={setTab} />
+        <CoinVault token={token} onChanged={() => state.reload?.()} />
+      </section>
+    );
+  }
+
   if (tab === 'clubs') {
     return (
       <section className="card wide leaguePage">
-        <div className="leagueTabs">
-          <button onClick={()=>setTab('table')} >جدول لیگ</button>
-          <button className="on">باشگاه‌ها</button>
-          <button onClick={()=>setTab('prev')} >برندگان قبل</button>
-        </div>
+        <LeagueTabs tab={tab} setTab={setTab} />
         <LeagueCountdown />
         <Clubs token={token} openProfile={openProfile} />
       </section>
@@ -311,11 +352,7 @@ export default function League({ token, openProfile }) {
         if (tab === 'prev') {
           return (
             <section className="card wide leaguePage">
-              <div className="leagueTabs">
-                <button onClick={()=>setTab('table')} >جدول لیگ</button>
-                <button onClick={()=>setTab('clubs')} >باشگاه‌ها</button>
-                <button className="on">برندگان قبل</button>
-              </div>
+              <LeagueTabs tab={tab} setTab={setTab} />
               <PreviousWinners data={d} />
             </section>
           );
@@ -327,11 +364,7 @@ export default function League({ token, openProfile }) {
         if (d.noLeague || !d.season) {
           return (
             <section className="card wide leaguePage" style={{ padding:'16px' }}>
-              <div className="leagueTabs">
-                <button className="on">جدول لیگ</button>
-                <button onClick={()=>setTab('clubs')} >باشگاه‌ها</button>
-                <button onClick={()=>setTab('prev')} >برندگان قبل</button>
-              </div>
+              <LeagueTabs tab={tab} setTab={setTab} />
               <NoLeagueYet />
             </section>
           );
@@ -339,11 +372,7 @@ export default function League({ token, openProfile }) {
 
         return (
           <section className="card wide leaguePage" style={{ padding:'16px' }}>
-            <div className="leagueTabs">
-              <button className="on">جدول لیگ</button>
-              <button onClick={()=>setTab('clubs')} >باشگاه‌ها</button>
-              <button onClick={()=>setTab('prev')} >برندگان قبل</button>
-            </div>
+            <LeagueTabs tab={tab} setTab={setTab} />
 
             <LeagueSwitcher
               leagues={d.activeLeagues}
