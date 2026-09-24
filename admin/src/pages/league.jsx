@@ -8,7 +8,7 @@ import { RankList } from '../components/rank-list.jsx';
 import { useToast } from '../lib/toast.jsx';
 
 /**
- * `datetime-local` قالبِ `YYYY-MM-DDTHH:mm` می‌خواهد و **بدونِ** منطقهٔ
+ * `datetime-local` قالبِ `YYYY-MM-DDTHH:mm:ss` می‌خواهد؛ ثانیه هم قابل تنظیم است و **بدونِ** منطقهٔ
  * زمانی. `toISOString()` به UTC تبدیل می‌کند و ساعت را ۳:۳۰ جابه‌جا
  * نشان می‌دهد — یعنی مدیر تاریخی را می‌بیند که خودش نگذاشته.
  *
@@ -20,7 +20,7 @@ function toLocalInput(value) {
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-    + `T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    + `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 export function LeaguePage({ request }) {
@@ -61,6 +61,14 @@ export function LeaguePage({ request }) {
   const [creating, setCreating] = useState(false);
   const [closingId, setClosingId] = useState('');
 
+  // شمارش شروع مستقیماً کنار همان لیگ‌هاست؛ صفحهٔ جداگانه‌ای لازم نیست.
+  const [countdown, setCountdown] = useState(null);
+  const [countdownForm, setCountdownForm] = useState({
+    enabled: false, startsAt: '', seasonId: '', title: '', subtitle: '', note: '', message: '', leagueAutostart: false,
+  });
+  const [savingCountdown, setSavingCountdown] = useState(false);
+  const [, setCountdownTick] = useState(0);
+
   const load = () =>
     request('/api/admin/league').then((x) => {
       setData(x);
@@ -83,6 +91,21 @@ export function LeaguePage({ request }) {
       .then((x) => setSeasons(x.seasons || []))
       .catch(() => setSeasons([])), [request]);
 
+  const loadCountdown = useCallback(() =>
+    request('/api/admin/league-countdown')
+      .then((x) => {
+        const s = x?.settings || {};
+        setCountdown(x?.state || null);
+        setCountdownForm({
+          enabled: !!s.enabled,
+          startsAt: toLocalInput(s.startsAt),
+          seasonId: s.seasonId || '',
+          title: s.title || '', subtitle: s.subtitle || '', note: s.note || '', message: s.message || '',
+          leagueAutostart: !!s.leagueAutostart,
+        });
+      })
+      .catch(() => {}), [request]);
+
   const loadPayouts = useCallback(
     () => request('/api/admin/league/payouts').then(setPayouts).catch(() => {}),
     [request]);
@@ -101,8 +124,14 @@ export function LeaguePage({ request }) {
   //
   // پیچیدنِ فراخوانی در آکولاد یعنی effect همیشه undefined برمی‌گرداند
   // و ری‌اکت هیچ‌وقت چیزی را به‌عنوان cleanup صدا نمی‌زند.
-  useEffect(() => { load(); loadPayouts(); loadSeasons(); },
-    [request, loadPayouts, loadSeasons]);
+  useEffect(() => { load(); loadPayouts(); loadSeasons(); loadCountdown(); },
+    [request, loadPayouts, loadSeasons, loadCountdown]);
+
+  useEffect(() => {
+    if (!countdownForm.enabled) return undefined;
+    const timer = window.setInterval(() => setCountdownTick((v) => v + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [countdownForm.enabled]);
 
   async function createLeague() {
     const t = newLeague.title.trim();
@@ -133,6 +162,26 @@ export function LeaguePage({ request }) {
     } catch (e) {
       notify(e?.message || 'ساخت لیگ ناموفق بود', 'error');
     } finally { setCreating(false); }
+  }
+
+  async function saveCountdown() {
+    if (countdownForm.enabled && (!countdownForm.startsAt || !countdownForm.seasonId)) {
+      notify('برای شروع خودکار، زمان و لیگ انتخابی را کامل کنید', 'error');
+      return;
+    }
+    setSavingCountdown(true);
+    try {
+      const body = {
+        ...countdownForm,
+        startsAt: countdownForm.startsAt ? new Date(countdownForm.startsAt).toISOString() : null,
+        seasonId: countdownForm.seasonId || null,
+      };
+      const x = await request('/api/admin/league-countdown', { method: 'PUT', body });
+      setCountdown(x?.state || null);
+      notify(countdownForm.enabled ? 'شمارش این لیگ ذخیره شد' : 'شمارش لیگ خاموش شد');
+    } catch (e) {
+      notify(e?.message || 'ذخیره شمارش ناموفق بود', 'error');
+    } finally { setSavingCountdown(false); }
   }
 
   async function closeSeason(id) {
@@ -311,6 +360,43 @@ export function LeaguePage({ request }) {
         </Card>
       )}
 
+      {/* ══ شمارش شروعِ همان لیگ، کنارِ تنظیماتِ خودِ لیگ ══ */}
+      <Card title="شروع زمان‌بندی‌شدهٔ لیگ"
+        subtitle="لیگ، زمان شروع و شمارش معکوس را همین‌جا یک‌جا تنظیم کنید؛ تنظیمات روی وب و اندروید اعمال می‌شود."
+        action={countdown?.active ? <Badge tone="success">شمارش فعال</Badge> : <Badge tone="neutral">خاموش</Badge>}>
+        <div className="lgDates">
+          <Field label="لیگ انتخابی" hint="فقط لیگ ساخته‌شده توسط ادمین در زمان تعیین‌شده شروع می‌شود.">
+            <select className="input" value={countdownForm.seasonId}
+              onChange={(e) => setCountdownForm({ ...countdownForm, seasonId: e.target.value })}>
+              <option value="">— انتخاب لیگ —</option>
+              {seasons.filter((x) => x.status !== 'closed').map((x) => (
+                <option key={x.id} value={x.id}>{x.title} · {fmtDateTime(x.starts_at)}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="زمان شروع (با ثانیه)" hint="در همین لحظه شمارش به صفر می‌رسد و لیگ انتخابی آزاد می‌شود.">
+            <Input type="datetime-local" step="1" value={countdownForm.startsAt}
+              onChange={(e) => setCountdownForm({ ...countdownForm, startsAt: e.target.value })} />
+          </Field>
+        </div>
+        <label className="lgCheck" style={{ margin: '8px 0 10px' }}>
+          <input type="checkbox" checked={countdownForm.enabled}
+            onChange={(e) => setCountdownForm({ ...countdownForm, enabled: e.target.checked })} />
+          <span>شمارش شروع و قفل موقت مسیرهای سکه‌ای فعال باشد</span>
+        </label>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button icon={CalendarClock} onClick={saveCountdown} loading={savingCountdown}>ذخیره شمارش این لیگ</Button>
+          <span className="lgHint" style={{ margin: 0 }}>
+            {countdownForm.enabled && countdownForm.startsAt
+              ? (() => {
+                const left = Math.max(0, Math.ceil((new Date(countdownForm.startsAt).getTime() - Date.now()) / 1000));
+                return left > 0 ? `باقی‌مانده: ${fmtNumber(left)} ثانیه` : 'به صفر رسید؛ لیگ در حال آزاد شدن است';
+              })()
+              : 'بدون شمارش، لیگ خودکار شروع نمی‌شود.'}
+          </span>
+        </div>
+      </Card>
+
       {/* ══ تاریخِ فصل ══ */}
       <Card title="تاریخ شروع و پایان لیگ"
         subtitle={data?.season?.manual_dates
@@ -321,11 +407,11 @@ export function LeaguePage({ request }) {
           : <Badge tone="neutral">خودکار</Badge>}>
         <div className="lgDates">
           <Field label="شروع فصل">
-            <Input type="datetime-local" value={startsAt}
+            <Input type="datetime-local" step="1" value={startsAt}
               onChange={(e) => setStartsAt(e.target.value)} />
           </Field>
           <Field label="پایان فصل">
-            <Input type="datetime-local" value={endsAt}
+            <Input type="datetime-local" step="1" value={endsAt}
               onChange={(e) => setEndsAt(e.target.value)} />
           </Field>
         </div>
@@ -395,12 +481,12 @@ export function LeaguePage({ request }) {
           </Field>
           <Field label="شروع"
               hint="اگر پایان بعد از شروع نباشد، سرور «تاریخ پایان باید بعد از تاریخ شروع باشد» می‌گوید؛ فاصلهٔ بیش از دو سال هم رد می‌شود (لیگی که هرگز بسته نشود، جایزه‌اش پرداخت نمی‌شود).">
-            <Input type="datetime-local" value={newLeague.startsAt}
+            <Input type="datetime-local" step="1" value={newLeague.startsAt}
               onChange={(e) => setNewLeague({ ...newLeague, startsAt: e.target.value })} />
           </Field>
           <Field label="پایان"
               hint="در پایانِ بازه، جایزه‌ها خودکار پرداخت می‌شود؛ پیش از آن، «ثبتِ جایزه» چیزی واریز نمی‌کند تا لیگِ نیمه‌تمام تسویه نشود.">
-            <Input type="datetime-local" value={newLeague.endsAt}
+            <Input type="datetime-local" step="1" value={newLeague.endsAt}
               onChange={(e) => setNewLeague({ ...newLeague, endsAt: e.target.value })} />
           </Field>
           <Field label="حداقل امتیاز ورود"

@@ -253,8 +253,12 @@ console.log('\n══ ۴) قراردادِ مشترک: سرور، وب، اند�
     && /note/.test(adminPage) && /seasonId/.test(adminPage));
   ok('پنل پیش‌نمایشِ همان کارتی را نشان می‌دهد که کاربر می‌بیند',
     /پیش‌نمایش/.test(adminPage) && /شماره معکوس|شمارش/.test(adminPage));
-  ok('پنل به منو وصل شده و تنبل بارگذاری می‌شود',
-    /lazy\(\(\) => import\('\.\/pages\/league-countdown\.jsx'\)/.test(read('admin/src/main.jsx')));
+  const adminMain = read('admin/src/main.jsx');
+  const combinedAdminPage = read('admin/src/pages/league.jsx');
+  ok('شمارش مستقیماً داخل صفحهٔ لیگ ادمین ترکیب شده است',
+    /شروع زمان‌بندی‌شدهٔ لیگ/.test(combinedAdminPage)
+    && /saveCountdown/.test(combinedAdminPage)
+    && !/league-countdown.*LeagueCountdownPage/.test(adminMain));
   ok('صفحهٔ پنل فقط برای مدیرکل است (قفلِ اقتصادِ بازی)',
     /league-countdown/.test(read('admin/src/lib/roles.js')));
   ok('پنل دربارهٔ «لیگِ خودکار» هم تصمیم می‌گیرد (خواستهٔ مالک)',
