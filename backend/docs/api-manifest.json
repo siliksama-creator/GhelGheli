@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 276,
+ "count": 277,
  "endpoints": [
   {
    "method": "GET",
@@ -235,6 +235,11 @@
   {
    "method": "POST",
    "path": "/api/admin/league/seasons",
+   "source": "routes/adminLeague.js"
+  },
+  {
+   "method": "DELETE",
+   "path": "/api/admin/league/seasons/:id",
    "source": "routes/adminLeague.js"
   },
   {
