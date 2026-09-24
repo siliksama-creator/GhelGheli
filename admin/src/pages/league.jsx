@@ -7,6 +7,25 @@ import {
 import { RankList } from '../components/rank-list.jsx';
 import { useToast } from '../lib/toast.jsx';
 
+const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+function latinDigits(value) { return String(value || '').replace(/[۰-۹]/g, (d) => String(FA_DIGITS.indexOf(d))); }
+function jalaliToGregorian(inputDate, inputTime = '00:00:00') {
+  const m = latinDigits(inputDate).trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+  if (!m) return null;
+  let jy = Number(m[1]); const jm = Number(m[2]); const jd = Number(m[3]);
+  if (jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
+  jy += 1595;
+  const days = -355668 + 365 * jy + Math.floor(jy / 33) * 8 + Math.floor(((jy % 33) + 3) / 4) + jd + (jm < 7 ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
+  let gy = 400 * Math.floor(days / 146097); let rem = days % 146097;
+  if (rem > 36524) { gy += 100 * Math.floor(--rem / 36524); rem %= 36524; if (rem >= 365) rem += 1; }
+  gy += 4 * Math.floor(rem / 1461); rem %= 1461;
+  if (rem > 365) { gy += Math.floor((rem - 1) / 365); rem = (rem - 1) % 365; }
+  const gd = rem + 1; const sal = [0,31,((gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0) ? 29 : 28,31,30,31,30,31,31,30,31,30,31];
+  let gm = 1; let left = gd; while (gm <= 12 && left > sal[gm]) { left -= sal[gm]; gm += 1; }
+  const tm = String(inputTime || '00:00:00').split(':').map(Number); const d = new Date(0);
+  d.setFullYear(gy, gm - 1, left); d.setHours(tm[0] || 0, tm[1] || 0, tm[2] || 0, 0); return d;
+}
+
 /**
  * `datetime-local` قالبِ `YYYY-MM-DDTHH:mm:ss` می‌خواهد؛ ثانیه هم قابل تنظیم است و **بدونِ** منطقهٔ
  * زمانی. `toISOString()` به UTC تبدیل می‌کند و ساعت را ۳:۳۰ جابه‌جا
@@ -42,6 +61,8 @@ export function LeaguePage({ request }) {
   // ── تاریخِ فصل، به‌دستِ مدیر ──
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
+  const [seasonStartTime, setSeasonStartTime] = useState('00:00:00');
+  const [seasonEndTime, setSeasonEndTime] = useState('23:59:59');
   const [savingDates, setSavingDates] = useState(false);
 
   // ── جوایزِ منتظرِ تأیید ──
@@ -55,7 +76,7 @@ export function LeaguePage({ request }) {
   // ولی هیچ رابطی برای ساختنشان نبود — لیگِ دوم دستی با SQL درج شده بود.
   const [seasons, setSeasons] = useState([]);
   const [newLeague, setNewLeague] = useState({
-    title: '', leagueType: 'weekly', startsAt: '', endsAt: '',
+    title: '', leagueType: 'weekly', startsAt: '', endsAt: '', startTime: '00:00:00', endTime: '23:59:59', countdownEnabled: false, countdownLead: 1, countdownUnit: 'hours',
     minPointsEntry: 0, plusOnly: false,
   });
   const [creating, setCreating] = useState(false);
@@ -82,8 +103,10 @@ export function LeaguePage({ request }) {
       setPerks(Array.isArray(x.perkTable) ? x.perkTable : []);
       setShopItems(x.shopItems || []);
       setEditingTitle(x.editingSeasonTitle || '');
-      setStartsAt(toLocalInput(x.season?.starts_at));
-      setEndsAt(toLocalInput(x.season?.ends_at));
+      setStartsAt(toJalaliInput(x.season?.starts_at));
+      setEndsAt(toJalaliInput(x.season?.ends_at));
+      if (x.season?.starts_at) setSeasonStartTime(new Date(x.season.starts_at).toLocaleTimeString('en-GB', { timeZone: 'Asia/Tehran', hour12: false }));
+      if (x.season?.ends_at) setSeasonEndTime(new Date(x.season.ends_at).toLocaleTimeString('en-GB', { timeZone: 'Asia/Tehran', hour12: false }));
     });
 
   const loadSeasons = useCallback(() =>
@@ -136,28 +159,23 @@ export function LeaguePage({ request }) {
   async function createLeague() {
     const t = newLeague.title.trim();
     if (t.length < 3) { notify('عنوان لیگ حداقل ۳ نویسه باشد', 'error'); return; }
-    if (!newLeague.startsAt || !newLeague.endsAt) {
-      notify('تاریخ شروع و پایان را کامل کنید', 'error'); return;
-    }
-    if (new Date(newLeague.endsAt) <= new Date(newLeague.startsAt)) {
-      notify('تاریخ پایان باید بعد از شروع باشد', 'error'); return;
-    }
+    const startAt = jalaliToGregorian(newLeague.startsAt, newLeague.startTime);
+    const endAt = jalaliToGregorian(newLeague.endsAt, newLeague.endTime);
+    if (!startAt || !endAt) { notify('تاریخ شمسی شروع و پایان را به شکل ۱۴۰۵/۰۷/۰۲ وارد کنید', 'error'); return; }
+    if (endAt <= startAt) { notify('تاریخ پایان باید بعد از شروع باشد', 'error'); return; }
     setCreating(true);
     try {
-      await request('/api/admin/league/seasons', {
-        method: 'POST',
-        body: {
-          title: t,
-          leagueType: newLeague.leagueType,
-          startsAt: new Date(newLeague.startsAt).toISOString(),
-          endsAt: new Date(newLeague.endsAt).toISOString(),
-          minPointsEntry: Number(newLeague.minPointsEntry) || 0,
-          plusOnly: newLeague.plusOnly,
-        },
-      });
-      notify('لیگ تازه ساخته شد');
-      setNewLeague({ title: '', leagueType: 'weekly', startsAt: '', endsAt: '',
-        minPointsEntry: 0, plusOnly: false });
+      const created = await request('/api/admin/league/seasons', { method: 'POST', body: {
+        title: t, leagueType: newLeague.leagueType, startsAt: startAt.toISOString(), endsAt: endAt.toISOString(),
+        minPointsEntry: Number(newLeague.minPointsEntry) || 0, plusOnly: newLeague.plusOnly,
+      } });
+      if (newLeague.countdownEnabled) {
+        const lead = Math.max(1, Number(newLeague.countdownLead) || 1);
+        const ms = newLeague.countdownUnit === 'days' ? lead * 86400000 : newLeague.countdownUnit === 'minutes' ? lead * 60000 : lead * 3600000;
+        await request('/api/admin/league-countdown', { method: 'PUT', body: { enabled: true, startsAt: new Date(startAt.getTime() - ms).toISOString(), seasonId: created?.season?.id || null, leagueAutostart: false } });
+      }
+      notify(newLeague.countdownEnabled ? 'لیگ ساخته شد و شمارش معکوسش تنظیم شد' : 'لیگ تازه ساخته شد');
+      setNewLeague({ title: '', leagueType: 'weekly', startsAt: '', endsAt: '', startTime: '00:00:00', endTime: '23:59:59', countdownEnabled: false, countdownLead: 1, countdownUnit: 'hours', minPointsEntry: 0, plusOnly: false });
       loadSeasons(); load();
     } catch (e) {
       notify(e?.message || 'ساخت لیگ ناموفق بود', 'error');
@@ -219,24 +237,15 @@ export function LeaguePage({ request }) {
   }
 
   async function saveDates() {
-    if (!startsAt || !endsAt) {
-      notify('هر دو تاریخ را وارد کنید', 'error');
-      return;
-    }
-    if (new Date(endsAt) <= new Date(startsAt)) {
-      notify('تاریخ پایان باید بعد از تاریخ شروع باشد', 'error');
-      return;
-    }
+    const start = jalaliToGregorian(startsAt, seasonStartTime);
+    const end = jalaliToGregorian(endsAt, seasonEndTime);
+    if (!start || !end) { notify('تاریخ شمسی را به شکل ۱۴۰۵/۰۷/۰۲ وارد کنید', 'error'); return; }
+    if (end <= start) { notify('تاریخ پایان باید بعد از شروع باشد', 'error'); return; }
     setSavingDates(true);
     try {
-      // ⚠️ `new Date(local).toISOString()` لازم است: ورودی زمانِ محلی
-      //    است و سرور ISO با منطقهٔ زمانی می‌خواهد.
       await request('/api/admin/league/current/dates', {
         method: 'PATCH',
-        body: {
-          startsAt: new Date(startsAt).toISOString(),
-          endsAt: new Date(endsAt).toISOString(),
-        },
+        body: { startsAt: start.toISOString(), endsAt: end.toISOString() },
       });
       notify('تاریخ لیگ ذخیره شد');
       load();
@@ -406,13 +415,13 @@ export function LeaguePage({ request }) {
           ? <Badge tone="success">دستی</Badge>
           : <Badge tone="neutral">خودکار</Badge>}>
         <div className="lgDates">
-          <Field label="شروع فصل">
-            <Input type="datetime-local" step="1" value={startsAt}
-              onChange={(e) => setStartsAt(e.target.value)} />
+          <Field label="شروع فصل (شمسی)" hint="مثال: ۱۴۰۵/۰۷/۰۲">
+            <Input value={startsAt} placeholder="۱۴۰۵/۰۷/۰۲" onChange={(e) => setStartsAt(e.target.value)} />
+            <Input type="time" step="1" value={seasonStartTime} onChange={(e) => setSeasonStartTime(e.target.value)} />
           </Field>
-          <Field label="پایان فصل">
-            <Input type="datetime-local" step="1" value={endsAt}
-              onChange={(e) => setEndsAt(e.target.value)} />
+          <Field label="پایان فصل (شمسی)" hint="مثال: ۱۴۰۵/۰۷/۰۹">
+            <Input value={endsAt} placeholder="۱۴۰۵/۰۷/۰۹" onChange={(e) => setEndsAt(e.target.value)} />
+            <Input type="time" step="1" value={seasonEndTime} onChange={(e) => setSeasonEndTime(e.target.value)} />
           </Field>
         </div>
         <p className="lgHint">
@@ -479,15 +488,22 @@ export function LeaguePage({ request }) {
               <option value="special">ویژه</option>
             </select>
           </Field>
-          <Field label="شروع"
-              hint="اگر پایان بعد از شروع نباشد، سرور «تاریخ پایان باید بعد از تاریخ شروع باشد» می‌گوید؛ فاصلهٔ بیش از دو سال هم رد می‌شود (لیگی که هرگز بسته نشود، جایزه‌اش پرداخت نمی‌شود).">
-            <Input type="datetime-local" step="1" value={newLeague.startsAt}
-              onChange={(e) => setNewLeague({ ...newLeague, startsAt: e.target.value })} />
+          <Field label="شروع لیگ (تاریخ شمسی)" hint="مثال: ۱۴۰۵/۰۷/۰۲ — تقویم کاملاً شمسی است.">
+            <Input value={newLeague.startsAt} placeholder="۱۴۰۵/۰۷/۰۲" onChange={(e) => setNewLeague({ ...newLeague, startsAt: e.target.value })} />
+            <Input type="time" step="1" value={newLeague.startTime} onChange={(e) => setNewLeague({ ...newLeague, startTime: e.target.value })} />
           </Field>
-          <Field label="پایان"
-              hint="در پایانِ بازه، جایزه‌ها خودکار پرداخت می‌شود؛ پیش از آن، «ثبتِ جایزه» چیزی واریز نمی‌کند تا لیگِ نیمه‌تمام تسویه نشود.">
-            <Input type="datetime-local" step="1" value={newLeague.endsAt}
-              onChange={(e) => setNewLeague({ ...newLeague, endsAt: e.target.value })} />
+          <Field label="پایان لیگ (تاریخ شمسی)" hint="مثال: ۱۴۰۵/۰۷/۰۹ — ساعت پایان را دقیق وارد کنید.">
+            <Input value={newLeague.endsAt} placeholder="۱۴۰۵/۰۷/۰۹" onChange={(e) => setNewLeague({ ...newLeague, endsAt: e.target.value })} />
+            <Input type="time" step="1" value={newLeague.endTime} onChange={(e) => setNewLeague({ ...newLeague, endTime: e.target.value })} />
+          </Field>
+          <Field label="شمارش معکوس قبل از شروع" hint="مسیرهای دریافت سکه تا شروع لیگ بسته می‌شوند؛ وب و اندروید همان وضعیت را می‌خوانند.">
+            <label className="lgCheck"><input type="checkbox" checked={newLeague.countdownEnabled} onChange={(e) => setNewLeague({ ...newLeague, countdownEnabled: e.target.checked })} /><span>فعال باشد</span></label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <Input type="number" min="1" value={newLeague.countdownLead} onChange={(e) => setNewLeague({ ...newLeague, countdownLead: e.target.value })} />
+              <select className="input" value={newLeague.countdownUnit} onChange={(e) => setNewLeague({ ...newLeague, countdownUnit: e.target.value })}>
+                <option value="minutes">دقیقه قبل</option><option value="hours">ساعت قبل</option><option value="days">روز قبل</option>
+              </select>
+            </div>
           </Field>
           <Field label="حداقل امتیاز ورود"
               hint="با «امتیازِ کلِ عمر» سنجیده می‌شود (`lifetime_points`)، نه موجودیِ امروز؛ ۰ یعنی بدونِ شرط. کاربری که نرسد، در لیگ امتیاز نمی‌گیرد هرچقدر هم بازی کند.">
