@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { fa, API, req } from '../lib/api.js';
 import { CARD_RARITY_META } from '../lib/cards.js';
 import { play, playShake, stopShake, warmup } from '../gameAudio.js';
@@ -11,11 +12,12 @@ const REVEAL_SFX = {
 };
 
 const REVEAL_CSS = `
-  .cardBoxReveal{position:fixed;inset:0;z-index:1300;display:grid;place-items:center;padding:18px;
+  .cardBoxReveal{position:fixed;inset:0;z-index:1300;display:flex;align-items:center;
+    justify-content:center;padding:18px;
     background:radial-gradient(circle at 50% 42%,rgba(42,17,64,.94),rgba(4,8,15,.97));
-    animation:cbFade .3s ease both;overflow-y:auto}
+    animation:cbFade .3s ease both;overflow-y:auto;overscroll-behavior:contain}
   @keyframes cbFade{from{opacity:0}to{opacity:1}}
-  .cardBoxRevealInner{width:min(100%,540px);display:grid;gap:16px;justify-items:center}
+  .cardBoxRevealInner{width:min(100%,540px);margin:auto;display:grid;gap:16px;justify-items:center}
   .cardBoxRevealTitle{margin:0;text-align:center;font-size:19px;font-weight:950;color:#FFD166}
   .cardBoxRevealSub{margin:0;text-align:center;font-size:11.5px;color:#a9b7c8}
   .cardBoxDeck{display:flex;flex-wrap:wrap;gap:11px;justify-content:center}
@@ -88,6 +90,36 @@ const REVEAL_CSS = `
   }
 `;
 
+
+/**
+ * پوششِ تمام‌صفحه که هیچ والدی نتواند حبسش کند.
+ *
+ * ── چرا portal لازم شد ──
+ *
+ * `position:fixed` نسبت به viewport می‌نشیند «مگر» جدِ نزدیکی
+ * transform/filter/backdrop-filter داشته باشد؛ آن وقت همان جد
+ * می‌شود مبدأ. کلاسِ `.card` ما `backdrop-filter:blur(20px)` دارد و
+ * صندوق دقیقاً داخلِ همین کارت باز می‌شد (کلکسیون، گردونه، فروشگاه).
+ * نتیجه: صحنهٔ رونمایی به‌جای وسطِ صفحه، پایینِ یک کارتِ بلند ظاهر
+ * می‌شد و کاربر باید اسکرول می‌کرد. portal به body این را از ریشه
+ * حل می‌کند — نه با تنظیمِ z-index یا افزایشِ inset.
+ */
+function FullScreenLayer({ label, children }) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <div className="cardBoxReveal" role="dialog" aria-modal="true" aria-label={label}>
+      <style>{REVEAL_CSS}</style>
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
 /**
  * رونمایی تمام‌صفحهٔ کارت‌های صندوق.
  *
@@ -98,8 +130,7 @@ const REVEAL_CSS = `
 export function CardBoxReveal({ cards, points, distinct, revealed, onClose, title }) {
   const list = Array.isArray(cards) ? cards : [];
   return (
-    <div className="cardBoxReveal" role="dialog" aria-label="کارت‌های صندوق">
-      <style>{REVEAL_CSS}</style>
+    <FullScreenLayer label="کارت‌های صندوق">
       <div className="cardBoxRevealInner">
         <h4 className="cardBoxRevealTitle">{title || 'صندوق باز شد'}</h4>
         <p className="cardBoxRevealSub">
@@ -142,7 +173,7 @@ export function CardBoxReveal({ cards, points, distinct, revealed, onClose, titl
           </button>
         )}
       </div>
-    </div>
+    </FullScreenLayer>
   );
 }
 
@@ -246,7 +277,7 @@ export function GrantChestOpener({
       </button>
       {error && <p style={{ color: '#FCA5A5', fontSize: 12 }}>{error}</p>}
       {phase !== 'idle' && phase !== 'revealing' && (
-        <div className="cardBoxReveal" role="dialog" aria-label="باز کردن صندوق">
+        <FullScreenLayer label="باز کردن صندوق">
           <div className="cardBoxRevealInner">
             <div className={`grantChestStage ${phase}`}>
               <span className="grantChestGlow" />
@@ -262,7 +293,7 @@ export function GrantChestOpener({
               {phase === 'shaking' ? 'صندوق داره باز می‌شه…' : 'صندوق باز شد'}
             </h4>
           </div>
-        </div>
+        </FullScreenLayer>
       )}
       {phase === 'revealing' && won && (
         <CardBoxReveal

@@ -5,61 +5,12 @@ import {
   Badge, Button, Card, EmptyState, Field, Input, Select, Table,
 } from '../components/ui.jsx';
 import { RankList } from '../components/rank-list.jsx';
+import {
+  JalaliDateInput, gregorianToJalali, jalaliToGregorian,
+} from '../components/jalali-picker.jsx';
 import { useToast } from '../lib/toast.jsx';
 
-const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
 const MAX_PRIZE_RANK = 50;
-
-function latinDigits(value) {
-  return String(value || '').replace(/[۰-۹]/g, (d) => String(FA_DIGITS.indexOf(d)));
-}
-
-function pad2(n) { return String(n).padStart(2, '0'); }
-
-/** شمسی → میلادی. ورودیِ مدیر همیشه شمسی است؛ تقویمِ میلادی اینجا بی‌معناست. */
-function jalaliToGregorian(inputDate, inputTime = '00:00:00') {
-  const m = latinDigits(inputDate).trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
-  if (!m) return null;
-  let jy = Number(m[1]); const jm = Number(m[2]); const jd = Number(m[3]);
-  if (jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
-  jy += 1595;
-  const days = -355668 + 365 * jy + Math.floor(jy / 33) * 8 + Math.floor(((jy % 33) + 3) / 4) + jd + (jm < 7 ? (jm - 1) * 31 : ((jm - 7) * 30) + 186);
-  let gy = 400 * Math.floor(days / 146097); let rem = days % 146097;
-  if (rem > 36524) { gy += 100 * Math.floor(--rem / 36524); rem %= 36524; if (rem >= 365) rem += 1; }
-  gy += 4 * Math.floor(rem / 1461); rem %= 1461;
-  if (rem > 365) { gy += Math.floor((rem - 1) / 365); rem = (rem - 1) % 365; }
-  const gd = rem + 1;
-  const sal = [0, 31, ((gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  let gm = 1; let left = gd;
-  while (gm <= 12 && left > sal[gm]) { left -= sal[gm]; gm += 1; }
-  const tm = String(inputTime || '00:00:00').split(':').map(Number);
-  const d = new Date(0);
-  d.setFullYear(gy, gm - 1, left);
-  d.setHours(tm[0] || 0, tm[1] || 0, tm[2] || 0, 0);
-  return d;
-}
-
-/** میلادی → شمسی (برای پرکردنِ فرم از روی لیگِ ذخیره‌شده). */
-function gregorianToJalali(value) {
-  const d = value ? new Date(value) : null;
-  if (!d || Number.isNaN(d.getTime())) return { date: '', time: '' };
-  const gy = d.getFullYear(); const gm = d.getMonth() + 1; const gd = d.getDate();
-  const gdm = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
-  const gy2 = gm > 2 ? gy + 1 : gy;
-  let days = 355666 + 365 * gy + Math.floor((gy2 + 3) / 4)
-    - Math.floor((gy2 + 99) / 100) + Math.floor((gy2 + 399) / 400) + gd + gdm[gm - 1];
-  let jy = -1595 + 33 * Math.floor(days / 12053);
-  days %= 12053;
-  jy += 4 * Math.floor(days / 1461);
-  days %= 1461;
-  if (days > 365) { jy += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
-  const jm = days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
-  const jd = 1 + (days < 186 ? days % 31 : (days - 186) % 30);
-  return {
-    date: `${jy}/${pad2(jm)}/${pad2(jd)}`,
-    time: `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`,
-  };
-}
 
 /**
  * `datetime-local` قالب `YYYY-MM-DDTHH:mm:ss` و زمانِ **محلی** می‌خواهد.
@@ -379,16 +330,16 @@ export function LeaguePage({ request }) {
             </Select>
           </Field>
 
-          <Field label="تاریخ شروع لیگ (شمسی)" hint="مثال: ۱۴۰۵/۰۷/۰۲ — تقویم کاملاً شمسی است.">
-            <Input value={form.startsAt} placeholder="۱۴۰۵/۰۷/۰۲"
-              onChange={(e) => setField({ startsAt: e.target.value })} />
+          <Field label="تاریخ شروع لیگ (شمسی)" hint="از تقویم انتخاب کنید؛ نیازی به تایپ نیست.">
+            <JalaliDateInput value={form.startsAt} placeholder="انتخاب تاریخ شروع"
+              onChange={(v) => setField({ startsAt: v })} />
             <Input type="time" step="1" value={form.startTime}
               onChange={(e) => setField({ startTime: e.target.value })} />
           </Field>
 
-          <Field label="تاریخ پایان لیگ (شمسی)" hint="مثال: ۱۴۰۵/۰۸/۰۲ — ساعتِ پایان را دقیق وارد کنید.">
-            <Input value={form.endsAt} placeholder="۱۴۰۵/۰۸/۰۲"
-              onChange={(e) => setField({ endsAt: e.target.value })} />
+          <Field label="تاریخ پایان لیگ (شمسی)" hint="از تقویم انتخاب کنید؛ ساعتِ پایان را دقیق بگذارید.">
+            <JalaliDateInput value={form.endsAt} placeholder="انتخاب تاریخ پایان"
+              onChange={(v) => setField({ endsAt: v })} />
             <Input type="time" step="1" value={form.endTime}
               onChange={(e) => setField({ endTime: e.target.value })} />
           </Field>

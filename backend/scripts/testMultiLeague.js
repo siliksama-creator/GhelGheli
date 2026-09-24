@@ -117,13 +117,47 @@ console.log('\n══ ۵. مدیر می‌تواند لیگ بسازد و تار
     /admin\/league\/seasons/.test(adminRoutes) || /admin\/league'/.test(adminRoutes));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// کلاینت‌ها باید لیگِ دوم را واقعاً نشان دهند
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// این بخش بعد از یک باگِ واقعی اضافه شد: بک‌اند `activeLeagues` را
+// برمی‌گرداند و هر دو کلاینت `selectedLeagueId` / `_selectedLeagueId` را
+// تعریف کرده بودند، ولی هیچ‌کدام هرگز مقداردهی نمی‌شد. یعنی با دو لیگِ
+// هم‌زمان کاربر فقط لیگِ اول را می‌دید و دومی بی‌هیچ خطایی ناپدید بود —
+// تست‌های سمتِ سرور همه سبز بودند چون سرور درست کار می‌کرد.
+{
+  const web = read('userweb/src/screens/League.jsx');
+  const app = read('mobile/lib/screens/user/league_page.dart');
+
+  ck('وب: فیلدِ activeLeagues را می‌خواند',
+    /activeLeagues/.test(web),
+    'بدونِ آن فهرستِ لیگ‌های هم‌زمان به کلاینت نمی‌رسد');
+  ck('وب: انتخابِ لیگ واقعاً صدا زده می‌شود (نه کدِ مرده)',
+    /onSelect=\{setSelectedLeagueId\}/.test(web)
+    || /setSelectedLeagueId\(/.test(web),
+    'setSelectedLeagueId تعریف شده بود ولی هرگز فراخوانی نمی‌شد');
+  ck('وب: تغییرِ لیگ باعثِ واکشیِ دوباره با seasonId می‌شود',
+    /seasonId=\$\{selectedLeagueId\}/.test(web)
+    && /\[token, selectedLeagueId\]/.test(web),
+    'اگر selectedLeagueId در وابستگی‌ها نباشد جدول عوض نمی‌شود');
+
+  ck('اندروید: فیلدِ activeLeagues را می‌خواند',
+    /activeLeagues/.test(app));
+  ck('اندروید: انتخابِ لیگ واقعاً مقدار می‌گیرد (نه کدِ مرده)',
+    /_selectedLeagueId = /.test(app),
+    '_selectedLeagueId تعریف شده بود ولی هرگز مقدار نمی‌گرفت');
+  ck('اندروید: بعد از تعویضِ لیگ دوباره بارگذاری می‌کند',
+    /_selectedLeagueId = id[\s\S]{0,200}_load\(\)/.test(app));
+}
+
 console.log(`\n${failures.length ? '✗' : '✓'} ${pass} موفق، ${failures.length} ناموفق`);
 if (failures.length) {
   console.log('\nشکست‌ها:');
   failures.forEach(f => console.log('  ·', f));
   process.exit(1);
 }
-if (pass < 12) {
+if (pass < 18) {
   console.log(`\n✗ فقط ${pass} سنجه اجرا شد — کمتر از انتظار`);
   process.exit(1);
 }

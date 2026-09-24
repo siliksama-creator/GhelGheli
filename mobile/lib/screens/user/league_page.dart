@@ -180,6 +180,62 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
         ],
       );
 
+  /// جابه‌جایی بینِ لیگ‌های هم‌زمان.
+  ///
+  /// بک‌اند تا سه لیگِ هم‌زمان را پشتیبانی می‌کند و همه را در
+  /// `activeLeagues` برمی‌گرداند، ولی این صفحه هرگز آن را نمی‌خواند:
+  /// `_selectedLeagueId` تعریف شده بود و هیچ‌جا مقدار نمی‌گرفت. نتیجه اینکه
+  /// با دو لیگِ هم‌زمان، کاربر فقط لیگِ اول را می‌دید و دومی بی‌هیچ خطایی
+  /// ناپدید بود. آینهٔ `LeagueSwitcher` در `userweb/src/screens/League.jsx`.
+  Widget _leagueSwitcher(dynamic season) {
+    final raw = _data?['activeLeagues'];
+    if (raw is! List || raw.length < 2) return const SizedBox.shrink();
+    final currentId =
+        _selectedLeagueId ?? (season is Map ? season['id']?.toString() : null) ?? raw.first['id']?.toString();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Gaps.sm),
+      child: Wrap(
+        spacing: Gaps.xs,
+        runSpacing: Gaps.xs,
+        children: raw.map<Widget>((l) {
+          final map = Map<String, dynamic>.from(l as Map);
+          final id = map['id']?.toString();
+          final on = id == currentId;
+          final title = (map['title'] ?? map['month_year'] ?? 'لیگ').toString();
+          return ChoiceChip(
+            selected: on,
+            label: Text(
+              map['plus_only'] == true ? '$title (ویژه)' : title,
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 12.5,
+                color: on ? Colors.white : const Color(0xFF94A3B8),
+              ),
+            ),
+            selectedColor: const Color(0xFF16345F),
+            backgroundColor: Colors.white.withValues(alpha: 0.05),
+            shape: RoundedRectangleBorder(
+              borderRadius: Corners.rLg,
+              side: BorderSide(
+                color: on
+                    ? const Color(0xFF38BDF8)
+                    : Colors.white.withValues(alpha: 0.14),
+              ),
+            ),
+            onSelected: (_) {
+              if (id == null || on) return;
+              setState(() {
+                _selectedLeagueId = id;
+                _loading = true;
+              });
+              unawaited(_load().catchError((_) {}));
+            },
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_tab == 1) {
@@ -273,6 +329,7 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
               children: [
+                _leagueSwitcher(season),
                 // ── ترتیبِ عمدی: راهنمای سکه پیش از هر چیزِ دیگر ──
                 // خواستهٔ مالک این بود که «سکه چطور به دست می‌آید» بدونِ
                 // اسکرول دیده شود. بنرِ قبلی ۱۱۶px عکس + تیتر + پاراگراف +

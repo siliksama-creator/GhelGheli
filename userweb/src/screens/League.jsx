@@ -94,6 +94,51 @@ function PodiumCard({ rank, row, onTap }) {
  * «لیگ هست ولی کسی بازی نکرده». این دو حالت از نظرِ او زمین تا آسمان فرق
  * دارد: اولی یعنی صبر کن، دومی یعنی عجله کن.
  */
+/**
+ * جابه‌جایی بینِ لیگ‌های هم‌زمان.
+ *
+ * بک‌اند از ابتدا تا سه لیگِ هم‌زمان را پشتیبانی می‌کرد و همه را در
+ * `activeLeagues` برمی‌گرداند، ولی هیچ کلاینتی این فیلد را نمی‌خواند:
+ * `selectedLeagueId` تعریف شده بود و هرگز مقدار نمی‌گرفت. یعنی اگر مدیر
+ * دو لیگ می‌ساخت، کاربر فقط لیگِ اولِ فهرست را می‌دید و لیگِ دوم بی‌صدا
+ * ناپدید بود — بدونِ هیچ خطایی، که بدترین نوعِ باگ است.
+ *
+ * فقط وقتی نمایش داده می‌شود که واقعاً بیش از یک لیگ در جریان باشد؛ با
+ * یک لیگ، یک تبِ تکیِ بی‌معنا چیزی به صفحه اضافه نمی‌کند.
+ */
+function LeagueSwitcher({ leagues, selectedId, onSelect }) {
+  if (!Array.isArray(leagues) || leagues.length < 2) return null;
+  const currentId = selectedId || leagues[0].id;
+  return (
+    <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', margin:'0 0 10px' }}>
+      {leagues.map((l) => {
+        const on = l.id === currentId;
+        return (
+          <button
+            key={l.id}
+            type="button"
+            onClick={() => onSelect(l.id)}
+            aria-pressed={on}
+            style={{
+              flex:'1 1 auto', minWidth:0, padding:'8px 12px', borderRadius:'12px',
+              fontSize:'12.5px', fontWeight:900, cursor:'pointer',
+              border: on ? '1px solid #38BDF8' : '1px solid rgba(255,255,255,0.14)',
+              background: on
+                ? 'linear-gradient(135deg,#16345F,#0B2039)'
+                : 'rgba(255,255,255,0.05)',
+              color: on ? '#FFF' : '#94A3B8',
+              whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+            }}
+          >
+            {l.title || l.month_year || 'لیگ'}
+            {l.plus_only ? ' (ویژه)' : ''}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function NoLeagueYet() {
   return (
     <div style={{ padding:'28px 18px', textAlign:'center' }}>
@@ -299,6 +344,12 @@ export default function League({ token, openProfile }) {
               <button onClick={()=>setTab('clubs')} >باشگاه‌ها</button>
               <button onClick={()=>setTab('prev')} >برندگان قبل</button>
             </div>
+
+            <LeagueSwitcher
+              leagues={d.activeLeagues}
+              selectedId={selectedLeagueId || season.id}
+              onSelect={setSelectedLeagueId}
+            />
 
             {/* ── ترتیبِ عمدی: راهنمای سکه پیش از بنر ──
                 خواستهٔ مالک این بود که «سکه چطور به دست می‌آید» بدونِ
