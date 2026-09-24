@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CalendarClock, CheckCircle2, Save, Trophy, Wallet } from 'lucide-react';
+import { CheckCircle2, Save, Trophy, Wallet } from 'lucide-react';
 import { fmtDateTime, fmtNumber } from '../lib/api.js';
 import {
   Badge, Button, Card, EmptyState, Field, Input, Table,
@@ -33,14 +33,6 @@ function jalaliToGregorian(inputDate, inputTime = '00:00:00') {
  *
  * این تابع زمانِ **محلی** را در همان قالب می‌سازد.
  */
-function toLocalInput(value) {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-    + `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
 
 export function LeaguePage({ request }) {
   const notify = useToast();
@@ -83,12 +75,6 @@ export function LeaguePage({ request }) {
   const [closingId, setClosingId] = useState('');
 
   // شمارش شروع مستقیماً کنار همان لیگ‌هاست؛ صفحهٔ جداگانه‌ای لازم نیست.
-  const [countdown, setCountdown] = useState(null);
-  const [countdownForm, setCountdownForm] = useState({
-    enabled: false, startsAt: '', seasonId: '', title: '', subtitle: '', note: '', message: '', leagueAutostart: false,
-  });
-  const [savingCountdown, setSavingCountdown] = useState(false);
-  const [, setCountdownTick] = useState(0);
 
   const load = () =>
     request('/api/admin/league').then((x) => {
@@ -103,31 +89,12 @@ export function LeaguePage({ request }) {
       setPerks(Array.isArray(x.perkTable) ? x.perkTable : []);
       setShopItems(x.shopItems || []);
       setEditingTitle(x.editingSeasonTitle || '');
-      setStartsAt(toJalaliInput(x.season?.starts_at));
-      setEndsAt(toJalaliInput(x.season?.ends_at));
-      if (x.season?.starts_at) setSeasonStartTime(new Date(x.season.starts_at).toLocaleTimeString('en-GB', { timeZone: 'Asia/Tehran', hour12: false }));
-      if (x.season?.ends_at) setSeasonEndTime(new Date(x.season.ends_at).toLocaleTimeString('en-GB', { timeZone: 'Asia/Tehran', hour12: false }));
     });
 
   const loadSeasons = useCallback(() =>
     request('/api/admin/league/seasons')
       .then((x) => setSeasons(x.seasons || []))
       .catch(() => setSeasons([])), [request]);
-
-  const loadCountdown = useCallback(() =>
-    request('/api/admin/league-countdown')
-      .then((x) => {
-        const s = x?.settings || {};
-        setCountdown(x?.state || null);
-        setCountdownForm({
-          enabled: !!s.enabled,
-          startsAt: toLocalInput(s.startsAt),
-          seasonId: s.seasonId || '',
-          title: s.title || '', subtitle: s.subtitle || '', note: s.note || '', message: s.message || '',
-          leagueAutostart: !!s.leagueAutostart,
-        });
-      })
-      .catch(() => {}), [request]);
 
   const loadPayouts = useCallback(
     () => request('/api/admin/league/payouts').then(setPayouts).catch(() => {}),
@@ -147,14 +114,8 @@ export function LeaguePage({ request }) {
   //
   // پیچیدنِ فراخوانی در آکولاد یعنی effect همیشه undefined برمی‌گرداند
   // و ری‌اکت هیچ‌وقت چیزی را به‌عنوان cleanup صدا نمی‌زند.
-  useEffect(() => { load(); loadPayouts(); loadSeasons(); loadCountdown(); },
-    [request, loadPayouts, loadSeasons, loadCountdown]);
-
-  useEffect(() => {
-    if (!countdownForm.enabled) return undefined;
-    const timer = window.setInterval(() => setCountdownTick((v) => v + 1), 1000);
-    return () => window.clearInterval(timer);
-  }, [countdownForm.enabled]);
+  useEffect(() => { load(); loadPayouts(); loadSeasons(); },
+    [request, loadPayouts, loadSeasons]);
 
   async function createLeague() {
     const t = newLeague.title.trim();
@@ -180,26 +141,6 @@ export function LeaguePage({ request }) {
     } catch (e) {
       notify(e?.message || 'ساخت لیگ ناموفق بود', 'error');
     } finally { setCreating(false); }
-  }
-
-  async function saveCountdown() {
-    if (countdownForm.enabled && (!countdownForm.startsAt || !countdownForm.seasonId)) {
-      notify('برای شروع خودکار، زمان و لیگ انتخابی را کامل کنید', 'error');
-      return;
-    }
-    setSavingCountdown(true);
-    try {
-      const body = {
-        ...countdownForm,
-        startsAt: countdownForm.startsAt ? new Date(countdownForm.startsAt).toISOString() : null,
-        seasonId: countdownForm.seasonId || null,
-      };
-      const x = await request('/api/admin/league-countdown', { method: 'PUT', body });
-      setCountdown(x?.state || null);
-      notify(countdownForm.enabled ? 'شمارش این لیگ ذخیره شد' : 'شمارش لیگ خاموش شد');
-    } catch (e) {
-      notify(e?.message || 'ذخیره شمارش ناموفق بود', 'error');
-    } finally { setSavingCountdown(false); }
   }
 
   async function closeSeason(id) {
@@ -233,24 +174,6 @@ export function LeaguePage({ request }) {
       notify(e?.message || 'ذخیره جوایز ناموفق بود', 'error');
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function saveDates() {
-    const start = jalaliToGregorian(startsAt, seasonStartTime);
-    const end = jalaliToGregorian(endsAt, seasonEndTime);
-    if (!start || !end) { notify('تاریخ شمسی را به شکل ۱۴۰۵/۰۷/۰۲ وارد کنید', 'error'); return; }
-    if (end <= start) { notify('تاریخ پایان باید بعد از شروع باشد', 'error'); return; }
-    setSavingDates(true);
-    try {
-      await request('/api/admin/league/current/dates', {
-        method: 'PATCH',
-        body: { startsAt: start.toISOString(), endsAt: end.toISOString() },
-      });
-      notify('تاریخ لیگ ذخیره شد');
-      load();
-    } finally {
-      setSavingDates(false);
     }
   }
 
@@ -333,9 +256,7 @@ export function LeaguePage({ request }) {
           subtitle="تا لیگی نسازید، جدول و جوایز روی چیزی ذخیره نمی‌شوند">
           <p className="lgHint">
             امتیازِ بازی‌ها جایی جمع نمی‌شود و کاربر جدولِ خالی می‌بیند.
-            از کارتِ «لیگ‌های هم‌زمان» پایین‌تر یک لیگ بسازید؛ یا در صفحهٔ
-            «شماره معکوسِ لیگ» گزینهٔ «شروعِ خودکارِ لیگ» را روشن کنید تا
-            لیگِ ماهانه خودش ساخته شود.
+            از کارتِ «کانفیگ لیگ» پایین‌تر یک لیگ بسازید و در همان‌جا زمان شروع و شمارش معکوسش را تعیین کنید.
           </p>
         </Card>
       )}
@@ -369,76 +290,12 @@ export function LeaguePage({ request }) {
         </Card>
       )}
 
-      {/* ══ شمارش شروعِ همان لیگ، کنارِ تنظیماتِ خودِ لیگ ══ */}
-      <Card title="شروع زمان‌بندی‌شدهٔ لیگ"
-        subtitle="لیگ، زمان شروع و شمارش معکوس را همین‌جا یک‌جا تنظیم کنید؛ تنظیمات روی وب و اندروید اعمال می‌شود."
-        action={countdown?.active ? <Badge tone="success">شمارش فعال</Badge> : <Badge tone="neutral">خاموش</Badge>}>
-        <div className="lgDates">
-          <Field label="لیگ انتخابی" hint="فقط لیگ ساخته‌شده توسط ادمین در زمان تعیین‌شده شروع می‌شود.">
-            <select className="input" value={countdownForm.seasonId}
-              onChange={(e) => setCountdownForm({ ...countdownForm, seasonId: e.target.value })}>
-              <option value="">— انتخاب لیگ —</option>
-              {seasons.filter((x) => x.status !== 'closed').map((x) => (
-                <option key={x.id} value={x.id}>{x.title} · {fmtDateTime(x.starts_at)}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="زمان شروع (با ثانیه)" hint="در همین لحظه شمارش به صفر می‌رسد و لیگ انتخابی آزاد می‌شود.">
-            <Input type="datetime-local" step="1" value={countdownForm.startsAt}
-              onChange={(e) => setCountdownForm({ ...countdownForm, startsAt: e.target.value })} />
-          </Field>
-        </div>
-        <label className="lgCheck" style={{ margin: '8px 0 10px' }}>
-          <input type="checkbox" checked={countdownForm.enabled}
-            onChange={(e) => setCountdownForm({ ...countdownForm, enabled: e.target.checked })} />
-          <span>شمارش شروع و قفل موقت مسیرهای سکه‌ای فعال باشد</span>
-        </label>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Button icon={CalendarClock} onClick={saveCountdown} loading={savingCountdown}>ذخیره شمارش این لیگ</Button>
-          <span className="lgHint" style={{ margin: 0 }}>
-            {countdownForm.enabled && countdownForm.startsAt
-              ? (() => {
-                const left = Math.max(0, Math.ceil((new Date(countdownForm.startsAt).getTime() - Date.now()) / 1000));
-                return left > 0 ? `باقی‌مانده: ${fmtNumber(left)} ثانیه` : 'به صفر رسید؛ لیگ در حال آزاد شدن است';
-              })()
-              : 'بدون شمارش، لیگ خودکار شروع نمی‌شود.'}
-          </span>
-        </div>
-      </Card>
-
-      {/* ══ تاریخِ فصل ══ */}
-      <Card title="تاریخ شروع و پایان لیگ"
-        subtitle={data?.season?.manual_dates
-          ? 'تاریخ‌ها دستی تنظیم شده‌اند و خودکار تغییر نمی‌کنند'
-          : 'در حال حاضر خودکار از تقویم شمسی محاسبه می‌شود'}
-        action={data?.season?.manual_dates
-          ? <Badge tone="success">دستی</Badge>
-          : <Badge tone="neutral">خودکار</Badge>}>
-        <div className="lgDates">
-          <Field label="شروع فصل (شمسی)" hint="مثال: ۱۴۰۵/۰۷/۰۲">
-            <Input value={startsAt} placeholder="۱۴۰۵/۰۷/۰۲" onChange={(e) => setStartsAt(e.target.value)} />
-            <Input type="time" step="1" value={seasonStartTime} onChange={(e) => setSeasonStartTime(e.target.value)} />
-          </Field>
-          <Field label="پایان فصل (شمسی)" hint="مثال: ۱۴۰۵/۰۷/۰۹">
-            <Input value={endsAt} placeholder="۱۴۰۵/۰۷/۰۹" onChange={(e) => setEndsAt(e.target.value)} />
-            <Input type="time" step="1" value={seasonEndTime} onChange={(e) => setSeasonEndTime(e.target.value)} />
-          </Field>
-        </div>
-        <p className="lgHint">
-          پس از رسیدن به تاریخ پایان، با زدن «بستن فصل» رتبه‌ها نهایی
-          می‌شوند و جوایز در فهرست بالا برای تأیید شما قرار می‌گیرند.
-        </p>
-        <Button icon={CalendarClock} onClick={saveDates} loading={savingDates}>
-          ذخیره تاریخ‌ها
-        </Button>
-      </Card>
-
       {/* ══ چند لیگِ هم‌زمان ══
           خواستهٔ مالک: «ادمین بتونه ۲ لیگ رو هم زمان قرار بده».
           امتیازِ هر بازی به **همهٔ** لیگ‌های فعالی می‌رود که بازهٔ
           زمانی‌شان باز است و کاربر شرطِ ورودشان را دارد. */}
-      <Card title="لیگ‌های هم‌زمان"
-        subtitle="می‌توانید تا سه لیگ فعال داشته باشید؛ امتیاز هر بازی به همهٔ آن‌ها می‌رود"
+      <Card title="کانفیگ لیگ"
+        subtitle="عنوان، تاریخ شمسی شروع و پایان، شمارش معکوس و قوانین همین‌جا تنظیم می‌شوند"
         action={<Badge tone={seasons.filter(x => x.status === 'active').length > 1 ? 'success' : 'neutral'}>
           {fmtNumber(seasons.filter(x => x.status === 'active').length)} لیگ فعال
         </Badge>}>
@@ -528,7 +385,7 @@ export function LeaguePage({ request }) {
       <Card title="لیدربرد زنده" subtitle="به‌روزرسانی خودکار بر اساس امتیاز ماه جاری">
         {data ? <RankList entries={data.entries} /> : null}
       </Card>
-      <Card title="تعداد برندگان و جدول جوایز" subtitle="اعلان وب و اندروید دقیقاً همین مبالغ را می‌گوید. صفر یعنی برای آن رتبه جایزه‌ای اعلام نمی‌شود — عدد آزمایشی ذخیره نکن.">
+      <Card title="جوایز همین لیگ" subtitle="پس از انتخاب/ساخت لیگ، جدول جوایز نقدی و غیرنقدی همان لیگ را همین‌جا تنظیم کنید.">
         <Field label="تعداد برندگان نقدی (۱ تا ۳۰۰)"
               hint="کمتر از ۱ یا بیشتر از ۳۰۰ در سرور به همین بازه برمی‌گردد و اگر عددی خوانده نشود، طولِ جدولِ جوایز مصرف می‌شود؛ جدولِ جوایزِ بلندتر از این عدد، بی‌صدا نیمه‌کاره می‌ماند.">
           <Input type="number" min="1" max="300" value={winnerCount} onChange={(e) => changeWinnerCount(Number(e.target.value) || 0)} />

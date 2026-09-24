@@ -255,9 +255,10 @@ console.log('\n══ ۴) قراردادِ مشترک: سرور، وب، اند�
     /پیش‌نمایش/.test(adminPage) && /شماره معکوس|شمارش/.test(adminPage));
   const adminMain = read('admin/src/main.jsx');
   const combinedAdminPage = read('admin/src/pages/league.jsx');
-  ok('شمارش مستقیماً داخل صفحهٔ لیگ ادمین ترکیب شده است',
-    /شروع زمان‌بندی‌شدهٔ لیگ/.test(combinedAdminPage)
-    && /saveCountdown/.test(combinedAdminPage)
+  ok('شمارش مستقیماً داخل فرمِ کانفیگِ لیگ ادمین ترکیب شده است',
+    /کانفیگ لیگ/.test(combinedAdminPage)
+    && /countdownEnabled/.test(combinedAdminPage)
+    && /api\/admin\/league-countdown/.test(combinedAdminPage)
     && !/league-countdown.*LeagueCountdownPage/.test(adminMain));
   ok('صفحهٔ پنل فقط برای مدیرکل است (قفلِ اقتصادِ بازی)',
     /league-countdown/.test(read('admin/src/lib/roles.js')));
