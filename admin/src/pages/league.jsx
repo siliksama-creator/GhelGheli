@@ -68,7 +68,7 @@ export function LeaguePage({ request }) {
   // ولی هیچ رابطی برای ساختنشان نبود — لیگِ دوم دستی با SQL درج شده بود.
   const [seasons, setSeasons] = useState([]);
   const [newLeague, setNewLeague] = useState({
-    title: '', leagueType: 'weekly', startsAt: '', endsAt: '', startTime: '00:00:00', endTime: '23:59:59', countdownEnabled: false, countdownLead: 1, countdownUnit: 'hours',
+    title: '', leagueType: 'weekly', startsAt: '', endsAt: '', startTime: '00:00:00', endTime: '23:59:59', countdownEnabled: false,
     minPointsEntry: 0, plusOnly: false,
   });
   const [creating, setCreating] = useState(false);
@@ -128,15 +128,13 @@ export function LeaguePage({ request }) {
     try {
       const created = await request('/api/admin/league/seasons', { method: 'POST', body: {
         title: t, leagueType: newLeague.leagueType, startsAt: startAt.toISOString(), endsAt: endAt.toISOString(),
-        minPointsEntry: Number(newLeague.minPointsEntry) || 0, plusOnly: newLeague.plusOnly,
+        minPointsEntry: Number(newLeague.minPointsEntry) || 0, plusOnly: newLeague.plusOnly, prizeTable: prizes, perkTable: perks,
       } });
       if (newLeague.countdownEnabled) {
-        const lead = Math.max(1, Number(newLeague.countdownLead) || 1);
-        const ms = newLeague.countdownUnit === 'days' ? lead * 86400000 : newLeague.countdownUnit === 'minutes' ? lead * 60000 : lead * 3600000;
-        await request('/api/admin/league-countdown', { method: 'PUT', body: { enabled: true, startsAt: new Date(startAt.getTime() - ms).toISOString(), seasonId: created?.season?.id || null, leagueAutostart: false } });
+        await request('/api/admin/league-countdown', { method: 'PUT', body: { enabled: true, startsAt: startAt.toISOString(), seasonId: created?.season?.id || null, leagueAutostart: false } });
       }
       notify(newLeague.countdownEnabled ? 'لیگ ساخته شد و شمارش معکوسش تنظیم شد' : 'لیگ تازه ساخته شد');
-      setNewLeague({ title: '', leagueType: 'weekly', startsAt: '', endsAt: '', startTime: '00:00:00', endTime: '23:59:59', countdownEnabled: false, countdownLead: 1, countdownUnit: 'hours', minPointsEntry: 0, plusOnly: false });
+      setNewLeague({ title: '', leagueType: 'weekly', startsAt: '', endsAt: '', startTime: '00:00:00', endTime: '23:59:59', countdownEnabled: false, minPointsEntry: 0, plusOnly: false });
       loadSeasons(); load();
     } catch (e) {
       notify(e?.message || 'ساخت لیگ ناموفق بود', 'error');
@@ -355,12 +353,7 @@ export function LeaguePage({ request }) {
           </Field>
           <Field label="شمارش معکوس قبل از شروع" hint="مسیرهای دریافت سکه تا شروع لیگ بسته می‌شوند؛ وب و اندروید همان وضعیت را می‌خوانند.">
             <label className="lgCheck"><input type="checkbox" checked={newLeague.countdownEnabled} onChange={(e) => setNewLeague({ ...newLeague, countdownEnabled: e.target.checked })} /><span>فعال باشد</span></label>
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <Input type="number" min="1" value={newLeague.countdownLead} onChange={(e) => setNewLeague({ ...newLeague, countdownLead: e.target.value })} />
-              <select className="input" value={newLeague.countdownUnit} onChange={(e) => setNewLeague({ ...newLeague, countdownUnit: e.target.value })}>
-                <option value="minutes">دقیقه قبل</option><option value="hours">ساعت قبل</option><option value="days">روز قبل</option>
-              </select>
-            </div>
+            <p className="lgHint" style={{ marginTop: 8 }}>از لحظهٔ ذخیره تا تاریخ شروع، شمارش خودکار فعال است؛ نیازی به تعیین روز یا ساعت قبل نیست.</p>
           </Field>
           <Field label="حداقل امتیاز ورود"
               hint="با «امتیازِ کلِ عمر» سنجیده می‌شود (`lifetime_points`)، نه موجودیِ امروز؛ ۰ یعنی بدونِ شرط. کاربری که نرسد، در لیگ امتیاز نمی‌گیرد هرچقدر هم بازی کند.">
@@ -376,6 +369,17 @@ export function LeaguePage({ request }) {
             </label>
           </Field>
         </div>
+        <div style={{ marginTop: 12, padding: 12, borderRadius: 14, background: 'rgba(255,255,255,.045)', border: '1px solid rgba(255,255,255,.1)' }}>
+          <b>جوایز این لیگ</b>
+          <p className="lgHint" style={{ margin: '6px 0' }}>تعداد برندگان و مبالغ جدول زیر، همراه همین لیگ ذخیره می‌شود.</p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label>تعداد برندگان نقدی</label>
+            <Input type="number" min="1" max="300" value={winnerCount} onChange={(e) => changeWinnerCount(Number(e.target.value) || 1)} />
+            <span>{fmtNumber(prizes.filter((p) => Number(p.amount) > 0).length)} مبلغ وارد شده</span>
+            <span>{fmtNumber(perks.length)} جایزه غیرنقدی آماده</span>
+          </div>
+        </div>
+
         <Button icon={Trophy} onClick={createLeague} loading={creating}>
           ساخت لیگ تازه
         </Button>

@@ -363,14 +363,16 @@ router.post('/admin/league/seasons', adminAuth, requireRole(), asyncHandler(asyn
     monthYear = `${leagueType}-${stamp}-${attempt + 2}`;
   }
 
+  const prizeTable = Array.isArray(req.body.prizeTable) ? req.body.prizeTable.slice(0, 300) : defaultPrizeTable();
+  const perkTable = Array.isArray(req.body.perkTable) ? req.body.perkTable.slice(0, 300) : [];
   const { rows } = await pool.query(
     `INSERT INTO league_seasons
        (month_year, title, league_type, starts_at, ends_at, status,
-        prize_table, manual_dates, min_points_entry, plus_only)
-     VALUES ($1,$2,$3,$4,$5,'active',$6,TRUE,$7,$8)
+        prize_table, perk_table, manual_dates, min_points_entry, plus_only)
+     VALUES ($1,$2,$3,$4,$5,'active',$6,$7,TRUE,$8,$9)
      RETURNING *`,
     [monthYear, title, leagueType, startsAt, endsAt,
-      JSON.stringify(defaultPrizeTable()), minPoints, plusOnly]);
+      JSON.stringify(prizeTable), JSON.stringify(perkTable), minPoints, plusOnly]);
 
   await audit(req.admin.id, 'league_create', 'league_seasons', rows[0].id, null,
     { title, leagueType, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() });
