@@ -276,7 +276,7 @@ async function repairSeasonBounds(client, season) {
 }
 
 async function ensureActiveSeason(client = pool) {
-  const { rows } = await client.query("SELECT * FROM league_seasons WHERE status='active' ORDER BY starts_at DESC LIMIT 1");
+  const { rows } = await client.query("SELECT * FROM league_seasons WHERE status='active' AND starts_at <= NOW() AND ends_at > NOW() ORDER BY starts_at DESC LIMIT 1");
   if (rows[0]) return repairSeasonBounds(client, rows[0]);
   // ── «هیچ لیگی بدونِ ساختِ ادمین در جریان نباشد» ─────────────────────────
   //
@@ -393,7 +393,7 @@ async function addLeaguePoints(client, userId, points) {
 }
 async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
   const { rows: activeSeasons } = await pool.query(
-    "SELECT id, title, league_type, month_year, starts_at, ends_at, status, prize_table, min_points_entry, plus_only FROM league_seasons WHERE status='active' ORDER BY starts_at ASC"
+    "SELECT id, title, league_type, month_year, starts_at, ends_at, status, prize_table, min_points_entry, plus_only FROM league_seasons WHERE status='active' AND starts_at <= NOW() AND ends_at > NOW() ORDER BY starts_at ASC"
   );
   let season = null;
   if (seasonId) {
@@ -1038,7 +1038,7 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
     //
     // پس فقط وقتی صفر می‌کنیم که **هیچ لیگِ فعالِ دیگری نمانده باشد**.
     const { rows: stillActive } = await client.query(
-      "SELECT 1 FROM league_seasons WHERE status='active' AND id<>$1 LIMIT 1",
+      "SELECT 1 FROM league_seasons WHERE status='active' AND starts_at <= NOW() AND ends_at > NOW() AND id<>$1 LIMIT 1",
       [season.id]);
     if (!stillActive.length) {
       await client.query('UPDATE users SET monthly_league_points=0, updated_at=NOW()');
@@ -1276,7 +1276,7 @@ async function approvePayouts(payoutId, adminId) {
     //    دست‌نخورده می‌مانند — آن‌ها تاریخ‌اند و تاریخ پاک نمی‌شود.
     if (paid > 0 && affectedSeasons.size) {
       const { rows: stillActive } = await client.query(
-        "SELECT 1 FROM league_seasons WHERE status='active' LIMIT 1");
+        "SELECT 1 FROM league_seasons WHERE status='active' AND starts_at <= NOW() AND ends_at > NOW() LIMIT 1");
       const { rows: stillPending } = await client.query(
         `SELECT 1 FROM league_payouts
           WHERE paid_at IS NULL AND amount > 0 LIMIT 1`);

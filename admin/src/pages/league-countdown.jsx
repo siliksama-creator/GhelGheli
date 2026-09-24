@@ -43,7 +43,7 @@ const EMPTY = {
 };
 
 /**
- * `datetime-local` قالبِ `YYYY-MM-DDTHH:mm` و زمانِ **محلی** می‌خواهد.
+ * `datetime-local` قالبِ `YYYY-MM-DDTHH:mm:ss` و زمانِ **محلی** می‌خواهد؛ ثانیه هم قابل تنظیم است.
  * `toISOString()` مستقیم، ساعت را به UTC می‌برد و ادمین تاریخی می‌بیند که
  * خودش نگذاشته (همان درسی که در صفحهٔ «لیگ ماهانه» نوشته شده).
  */
@@ -53,7 +53,7 @@ function toLocalInput(value) {
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-    + `T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    + `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 /** «۲ روز و ۳ ساعت» — خوانا، به‌جای عددِ خامِ میلی‌ثانیه. */
@@ -184,10 +184,10 @@ export function LeagueCountdownPage({ request }) {
         </Field>
 
         <Field
-          label="زمانِ شروعِ لیگ"
-          hint="به ساعتِ همین کامپیوتر (زمانِ محلی) وارد کنید. رسیدن به این لحظه = آزادشدنِ خودکار؛ قفل دستیِ دوباره لازم نیست."
+          label="زمانِ شروعِ لیگ (با ثانیه)"
+          hint="زمان را با دقتِ ثانیه وارد کنید؛ دقیقاً در همین لحظه شمارش به صفر می‌رسد و لیگِ انتخابی آزاد می‌شود."
         >
-          <Input type="datetime-local" value={form.startsAt} onChange={set('startsAt')} />
+          <Input type="datetime-local" step="1" value={form.startsAt} onChange={set('startsAt')} />
         </Field>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           <Button variant="secondary" size="sm" onClick={bump(60)}>۱ ساعت بعد</Button>

@@ -356,7 +356,7 @@ router.get('/users/:id/public', auth, validateUuid('id'), asyncHandler(async (re
        SELECT user_id, coins,
               DENSE_RANK() OVER(ORDER BY coins DESC, points DESC) AS rank
          FROM league_leaderboard_entries
-        WHERE league_season_id = (SELECT id FROM league_seasons WHERE status='active' ORDER BY starts_at DESC LIMIT 1)
+        WHERE league_season_id = (SELECT id FROM league_seasons WHERE status='active' AND starts_at <= NOW() AND ends_at > NOW() ORDER BY starts_at DESC LIMIT 1)
      ) sub WHERE sub.user_id = $1`,
     [req.params.id]
   );
