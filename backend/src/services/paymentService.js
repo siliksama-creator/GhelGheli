@@ -59,6 +59,7 @@
 // همان مرحلهٔ ۱ ثبت می‌شود — و در مرحلهٔ ۳ فقط از روی سفارش خوانده
 // می‌شود، نه از کلاینت.
 const { pool } = require('../config/db');
+const opsConfig = require('./opsConfig');
 
 // ── نگاشت قیمت → شناسهٔ محصول کافه‌بازار ───────────────────────────────
 //
@@ -91,6 +92,20 @@ const PLUS_PRODUCTS = Object.freeze({
   monthly: { productId: 'ghelgheli_plus_monthly', price: 59000,  label: 'قلقلی پلاس ماهانه' },
   annual:  { productId: 'ghelgheli_plus_annual',  price: 499000, label: 'قلقلی پلاس سالانه' },
 });
+
+// مبلغ مؤثر از همان تنظیمات زنده‌ای می‌آید که شاپ و deliverPlus می‌خوانند.
+// شناسهٔ محصول بازار ثابت است، اما مبلغ سفارش زرین‌پال باید با پنل یکی باشد.
+function effectivePlusProducts() {
+  const raw = opsConfig.syncGet('shop_plus_plans') || {};
+  const numberOr = (value, fallback) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 ? Math.round(n) : fallback;
+  };
+  return {
+    monthly: { ...PLUS_PRODUCTS.monthly, price: numberOr(raw.monthly?.price, PLUS_PRODUCTS.monthly.price) },
+    annual: { ...PLUS_PRODUCTS.annual, price: numberOr(raw.annual?.price, PLUS_PRODUCTS.annual.price) },
+  };
+}
 
 // آدرسِ درگاه — اول env، بعد ops_limits (قابل تنظیم از پنل)، بعد پیش‌فرض.
 // env بالاتر است چون آدرس را معمولاً در لایهٔ دیپلوی می‌گذارند.
@@ -384,7 +399,7 @@ async function createPlusOrder(userId, billingCycle, { provider = 'cafebazaar' }
     : ['monthly', 'month'].includes(clean) ? 'monthly' : null;
   if (!cycle) throw fail('دوره اشتراک باید ماهانه یا سالانه باشد');
 
-  const plan = PLUS_PRODUCTS[cycle];
+  const plan = effectivePlusProducts()[cycle];
   // پلاس هم در زرین‌پال محصولِ بازار نمی‌خواهد؛ product_id فقط برای
   // سازگاری با verify بازار نگه داشته می‌شود.
   const productId = provider === 'zarinpal' ? null : plan.productId;
@@ -529,7 +544,7 @@ function catalog() {
     walletTopupEnabled: false,
     priceProducts: { ...PRICE_PRODUCTS },
     plusProducts: Object.fromEntries(
-      Object.entries(PLUS_PRODUCTS).map(([k, v]) => [k, { ...v }])),
+      Object.entries(effectivePlusProducts()).map(([k, v]) => [k, { ...v }])),
   };
 }
 
