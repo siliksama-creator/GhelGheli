@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 104" width="132" height="104">
+  <!--
+    دروازه‌بانِ قلقلی — نسخهٔ تختِ ۲بعدی، هم‌سبکِ خودِ بازی.
+    بازی هیچ گرادیانی ندارد (زمینِ تخت، تورِ خطی، توپِ تخت)، پس اینجا هم
+    فقط رنگِ تخت است. در ارتفاعِ واقعیِ بازی (~۹۳ پیکسل) فقط چهار چیز
+    خوانده می‌شود و همان چهار تا عمداً درشت نگه داشته شده‌اند:
+      ۱. تنهٔ گلابی‌شکلِ سبزِ لیمویی
+      ۲. زیرپوشِ کِرِم با بندهای قهوه‌ای
+      ۳. یک ابروی کلفتِ تیره روی چشمِ چپ (نگاهِ طلبکار)
+      ۴. پوزخندِ کجِ یک‌خطی
+  -->
+  <g id="gk-legs">
+    <rect x="52" y="76" width="11" height="18" rx="5" fill="#7E8C12"/>
+    <rect x="69" y="76" width="11" height="18" rx="5" fill="#8C9E16"/>
+    <ellipse cx="55" cy="96" rx="11" ry="6" fill="#52371A"/>
+    <ellipse cx="77" cy="96" rx="11" ry="6" fill="#52371A"/>
+  </g>
+
+  <g id="gk-arm-l">
+    <path d="M46 48 L16 36" stroke="#8C9E16" stroke-width="13" stroke-linecap="round" fill="none"/>
+    <circle id="gk-glove-l" cx="11" cy="34" r="10.5" fill="#F2EFD2" stroke="#5E6B0E" stroke-width="2"/>
+  </g>
+  <g id="gk-arm-r">
+    <path d="M86 48 L116 36" stroke="#8C9E16" stroke-width="13" stroke-linecap="round" fill="none"/>
+    <circle id="gk-glove-r" cx="121" cy="34" r="10.5" fill="#F2EFD2" stroke="#5E6B0E" stroke-width="2"/>
+  </g>
+
+  <!-- shorts sit under the shirt -->
+  <path id="gk-shorts" d="M48 68 h36 a4 4 0 0 1 4 4 v8 a4 4 0 0 1 -4 4 h-36 a4 4 0 0 1 -4 -4 v-8 a4 4 0 0 1 4 -4 z" fill="#5E6816"/>
+
+  <!-- one mass: head + belly, like the logo -->
+  <path id="gk-body"
+    d="M66 3
+       C81 3 92 12 96 25
+       C101 38 103 50 102 60
+       C101 72 92 79 79 81
+       C71 82 61 82 53 81
+       C40 79 31 72 30 60
+       C29 50 31 38 36 25
+       C40 12 51 3 66 3 Z"
+    fill="#BCCA21"/>
+
+  <!-- tank top -->
+  <path id="gk-shirt"
+    d="M40 58 C53 65 79 65 92 58 C94 69 90 77 79 80 C71 82 61 82 53 80 C42 77 38 69 40 58 Z"
+    fill="#F2EFD2"/>
+  <path d="M86 56 L81 79" stroke="#6B5423" stroke-width="3" stroke-linecap="round"/>
+  <path d="M49 60 L51 80" stroke="#6B5423" stroke-width="2.6" stroke-linecap="round"/>
+
+  <g id="gk-face">
+    <!-- eyes : small, high, diagonal -->
+    <circle cx="73" cy="26" r="7.6" fill="#F6F4E2"/>
+    <circle cx="56" cy="34" r="7" fill="#F1EFD6"/>
+    <circle cx="74.6" cy="27.6" r="3.7" fill="#141804"/>
+    <circle cx="57.6" cy="35.6" r="3.5" fill="#141804"/>
+    <!-- THE brow : only over the left eye -->
+    <path d="M44 25 C51 20 61 23 67 30 L63 35 C57 29 51 29 46 31 Z" fill="#33400A"/>
+    <path d="M67 16 C74 12 84 14 89 20 L86 24 C81 19 74 18 69 20 Z" fill="#3E4A08"/>
+    <!-- the crooked smirk : a straight-ish slash, never an arc -->
+    <path d="M51 50 L84 41" stroke="#2A1B06" stroke-width="4" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

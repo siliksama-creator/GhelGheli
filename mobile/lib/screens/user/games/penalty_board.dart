@@ -62,6 +62,7 @@ import 'package:flutter/services.dart';
 // برای چیزی که با یک منحنی درجه دو و یک شبکهٔ فنرِ ۱۳۵ گره‌ای قابل کشیدن
 // است. بعد از ممیزی حافظه که نشان داد هر مگابایت چقدر گران است، این
 // معامله نمی‌ارزید. جزئیاتِ بودجهٔ اجرا در سرصفحهٔ penalty_net.dart.
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -214,11 +215,24 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
     _netTicker = createTicker(_onNetTick);
     _kick.addListener(_onKickFrame);
     widget.session.addListener(_onState);
+    // ── تپشِ حالتِ آماده ──
+    // `_netTicker` وقتی تور آرام می‌گیرد عمداً **می‌ایستد**، پس نمی‌شود
+    // از آن برای نفس‌کشیدن استفاده کرد. ۸ فریم بر ثانیه برای یک
+    // بالا-پایینِ ۲٪ کافی است و باتری را نمی‌سوزاند. عددِ ۱۲۵ms دقیقاً
+    // همان چیزی است که وب دارد تا دو کلاینت هم‌ریتم بمانند.
+    _idleTimer = Timer.periodic(const Duration(milliseconds: 125), (_) {
+      if (!mounted || _kick.isAnimating) return;
+      setState(() => _idleTick = (_idleTick + 1) % 100000);
+    });
   }
+
+  Timer? _idleTimer;
+  int _idleTick = 0;
 
   @override
   void dispose() {
     widget.session.removeListener(_onState);
+    _idleTimer?.cancel();
     _kick.removeListener(_onKickFrame);
     _netTicker.dispose();
     _kick.dispose();
@@ -420,6 +434,7 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
                                 charging: _charging,
                                 net: _net,
                                 netEpoch: _net.peakDepth,
+                                idleTime: _idleTick * 0.125,
                                 
                               ),
                               child: _ZoneGrid(
@@ -839,6 +854,7 @@ class _PitchPainter extends CustomPainter {
     required this.charging,
     required this.net,
     required this.netEpoch,
+    required this.idleTime,
     
   });
 
@@ -856,6 +872,9 @@ class _PitchPainter extends CustomPainter {
   /// نقاشی می‌شد). بیشترین عمق یک خلاصهٔ ارزان است که هر وقت تور تکان
   /// بخورد عوض می‌شود.
   final double netEpoch;
+
+  /// ثانیهٔ آماده‌باش — فقط برای نفس‌کشیدنِ دروازه‌بان.
+  final double idleTime;
 
   // Paintهای مشترک، یک بار ساخته می‌شوند.
   //
@@ -959,14 +978,28 @@ class _PitchPainter extends CustomPainter {
     // انفجاری است، نه یکنواخت.
     Offset keeperPos = Offset(w / 2, gt + gh * 0.72);
     double keeperTilt = 0;
+    int diveDir = 0;
+    double diveT = 0;
     if (animating && diveZone != null) {
       final target = zoneCenter(diveZone);
       final t = Curves.easeOutCubic.transform(math.min(1, kick / 0.55));
       keeperPos = Offset.lerp(keeperPos, target, t)!;
       keeperTilt = (target.dx - w / 2) / (gw / 2) * 0.9 * t;
+      // جهت از خودِ ناحیه می‌آید نه از tilt: ناحیه‌های وسط tilt صفر
+      // دارند ولی باز هم شیرجه‌اند و دست‌ها باید حرکت کنند.
+      diveDir = (target.dx - w / 2).round().sign;
+      diveT = math.min(1, kick / 0.55);
     }
     final keeperInFront = animating && outcome == 'save' && kick > 0.38;
-    if (!keeperInFront) _drawKeeper(canvas, keeperPos, keeperTilt, gh * 0.30);
+    // ⚠️ اندازه از 0.30 به 0.37 رفت (خواستهٔ مالک: «یکم بزرگتر»).
+    void paintKeeper() => _drawKeeper(
+          canvas, keeperPos, keeperTilt, gh * 0.37,
+          dive: diveDir,
+          t: diveT,
+          time: idleTime,
+          caught: outcome == 'save',
+        );
+    if (!keeperInFront) paintKeeper();
 
     // ── توپ ──
     Offset ball = spot;
@@ -1018,7 +1051,7 @@ class _PitchPainter extends CustomPainter {
       }
     }
     if (drawBall) _drawBall(canvas, ball, ballR, animating ? kick * 14 : 0);
-    if (keeperInFront) _drawKeeper(canvas, keeperPos, keeperTilt, gh * 0.30);
+    if (keeperInFront) paintKeeper();
 
     // ── ذراتِ جشنِ گل ──
     if (isGoal && kick > 0.62) {
@@ -1172,35 +1205,201 @@ class _PitchPainter extends CustomPainter {
     canvas.restore();
   }
 
-  void _drawKeeper(Canvas canvas, Offset c, double tilt, double size) {
+  // ═══════════════════════════════════════════════════════════════════
+  // دروازه‌بان = خودِ قلقلی (شخصیتِ لوگو)، تختِ ۲بعدی
+  // ═══════════════════════════════════════════════════════════════════
+  //
+  // ⚠️ این هندسه مو‌به‌مو آینهٔ `drawKeeper` در
+  //    `userweb/src/penaltyGame.jsx` است. هر عددی اینجا عوض شود باید
+  //    آنجا هم عوض شود، وگرنه دو کلاینت دو دروازه‌بانِ متفاوت نشان
+  //    می‌دهند. همهٔ ضریب‌ها بر حسبِ `s` و مبدأ وسطِ تنه است.
+  static const _kBody = Color(0xFFBCCA21);
+  static const _kArm = Color(0xFF8C9E16);
+  static const _kLegA = Color(0xFF7E8C12);
+  static const _kLegB = Color(0xFF8C9E16);
+  static const _kBoot = Color(0xFF52371A);
+  static const _kShirt = Color(0xFFF2EFD2);
+  static const _kStrap = Color(0xFF6B5423);
+  static const _kShorts = Color(0xFF5E6816);
+  static const _kGloveEdge = Color(0xFF5E6B0E);
+  static const _kEyeA = Color(0xFFF6F4E2);
+  static const _kEyeB = Color(0xFFF1EFD6);
+  static const _kPupil = Color(0xFF141804);
+  static const _kBrowL = Color(0xFF33400A);
+  static const _kBrowR = Color(0xFF3E4A08);
+  static const _kMouth = Color(0xFF2A1B06);
+
+  Path _bodyPath(double s) {
+    Offset p(double a, double b) => Offset(a * s, b * s);
+    return Path()
+      ..moveTo(0, -0.709 * s)
+      ..cubicTo(0.173 * s, -0.709 * s, 0.300 * s, -0.606 * s, 0.346 * s, -0.456 * s)
+      ..cubicTo(0.404 * s, -0.306 * s, 0.427 * s, -0.167 * s, 0.415 * s, -0.052 * s)
+      ..cubicTo(0.404 * s, 0.087 * s, 0.300 * s, 0.168 * s, 0.150 * s, 0.191 * s)
+      ..cubicTo(0.058 * s, 0.202 * s, -0.058 * s, 0.202 * s, -0.150 * s, 0.191 * s)
+      ..cubicTo(-0.300 * s, 0.168 * s, -0.404 * s, 0.087 * s, -0.415 * s, -0.052 * s)
+      ..cubicTo(-0.427 * s, -0.167 * s, -0.404 * s, -0.306 * s, -0.346 * s, -0.456 * s)
+      ..cubicTo(-0.300 * s, -0.606 * s, -0.173 * s, -0.709 * s, 0, -0.709 * s)
+      ..close();
+  }
+
+  Path _shirtPath(double s) => Path()
+    ..moveTo(-0.300 * s, -0.075 * s)
+    ..cubicTo(-0.150 * s, 0.006 * s, 0.150 * s, 0.006 * s, 0.300 * s, -0.075 * s)
+    ..cubicTo(0.323 * s, 0.052 * s, 0.277 * s, 0.144 * s, 0.150 * s, 0.179 * s)
+    ..cubicTo(0.058 * s, 0.202 * s, -0.058 * s, 0.202 * s, -0.150 * s, 0.179 * s)
+    ..cubicTo(-0.277 * s, 0.144 * s, -0.323 * s, 0.052 * s, -0.300 * s, -0.075 * s)
+    ..close();
+
+  Path _browLPath(double s) => Path()
+    ..moveTo(-0.254 * s, -0.456 * s)
+    ..cubicTo(-0.173 * s, -0.513 * s, -0.058 * s, -0.479 * s, 0.012 * s, -0.398 * s)
+    ..lineTo(-0.035 * s, -0.340 * s)
+    ..cubicTo(-0.104 * s, -0.409 * s, -0.173 * s, -0.409 * s, -0.231 * s, -0.386 * s)
+    ..close();
+
+  Path _browRPath(double s) => Path()
+    ..moveTo(0.012 * s, -0.559 * s)
+    ..cubicTo(0.092 * s, -0.606 * s, 0.208 * s, -0.582 * s, 0.265 * s, -0.513 * s)
+    ..lineTo(0.231 * s, -0.467 * s)
+    ..cubicTo(0.173 * s, -0.525 * s, 0.092 * s, -0.536 * s, 0.023 * s, -0.513 * s)
+    ..close();
+
+  /// [dive] جهت (-۱ چپ، ۰ ساکن، +۱ راست)، [t] پیشرفتِ شیرجه،
+  /// [time] ثانیه برای نفس‌کشیدنِ حالتِ آماده، [caught] پاپِ دستکش.
+  void _drawKeeper(Canvas canvas, Offset c, double tilt, double size,
+      {int dive = 0, double t = 0, double time = 0, bool caught = false}) {
+    final s = size;
+    final moving = dive != 0 && t > 0;
+
+    // نفس کشیدنِ آماده‌باش — دامنهٔ ۲٪ تا حواسِ بازیکن پرت نشود.
+    final breath = moving ? 0.0 : math.sin(time * 2.1) * 0.02;
+    // آمادگی: کمی جمع شدن پیش از پرش.
+    final antic = moving ? math.max(0.0, 1 - t / 0.18) : 0.0;
+    final crouch = antic * 0.06;
+    final stretch =
+        moving ? math.sin(math.min(1.0, t / 0.7) * math.pi) * 0.14 : 0.0;
+
     canvas.save();
     canvas.translate(c.dx, c.dy);
-    canvas.rotate(tilt);
-    final body = Paint()..color = const Color(0xFFF59E0B);
-    // تنه
+    // شیبِ ترسیم نرم‌تر از شیبِ منطقی: چرخشِ کامل «افتادن» خوانده می‌شود.
+    final bodyTilt = tilt * 0.72;
+    canvas.rotate(bodyTilt);
+    canvas.scale(1 + stretch, 1 - stretch * 0.45 - crouch + breath);
+
+    // ── پاها ──
+    canvas.save();
+    canvas.translate(0, 0.13 * s);
+    canvas.rotate(-dive * t * 0.42);
+    canvas.translate(0, -0.13 * s);
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-          Rect.fromCenter(center: Offset.zero, width: size * 0.5, height: size),
-          Radius.circular(size * 0.18)),
-      body,
-    );
-    // سر
-    canvas.drawCircle(Offset(0, -size * 0.68), size * 0.22,
-        Paint()..color = const Color(0xFFFFDBAC));
-    // دست‌ها — هنگام شیرجه باز می‌شوند
-    final arm = Paint()
-      ..color = const Color(0xFFF59E0B)
-      ..strokeWidth = size * 0.16
-      ..strokeCap = StrokeCap.round;
-    final spread = size * (0.55 + tilt.abs() * 0.5);
-    canvas.drawLine(Offset(-size * 0.2, -size * 0.25),
-        Offset(-spread, -size * 0.55), arm);
-    canvas.drawLine(Offset(size * 0.2, -size * 0.25),
-        Offset(spread, -size * 0.55), arm);
-    // دستکش‌ها
-    final glove = Paint()..color = const Color(0xFF22D3EE);
-    canvas.drawCircle(Offset(-spread, -size * 0.55), size * 0.13, glove);
-    canvas.drawCircle(Offset(spread, -size * 0.55), size * 0.13, glove);
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(-0.162 * s, 0.133 * s, 0.127 * s, 0.208 * s),
+            Radius.circular(0.058 * s)),
+        Paint()..color = _kLegA);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(0.035 * s, 0.133 * s, 0.127 * s, 0.208 * s),
+            Radius.circular(0.058 * s)),
+        Paint()..color = _kLegB);
+    final boot = Paint()..color = _kBoot;
+    canvas.drawOval(
+        Rect.fromCenter(
+            center: Offset(-0.127 * s, 0.364 * s),
+            width: 0.254 * s,
+            height: 0.138 * s),
+        boot);
+    canvas.drawOval(
+        Rect.fromCenter(
+            center: Offset(0.127 * s, 0.364 * s),
+            width: 0.254 * s,
+            height: 0.138 * s),
+        boot);
+    canvas.restore();
+
+    // ── دست‌ها ──
+    //
+    // زاویه در «دنیای واقعی» حساب می‌شود نه نسبت به بدن: وقتی بدن
+    // می‌چرخد شانهٔ عقب به بالای تصویر می‌رود، و اگر بازوها را نسبت به
+    // بدن بچرخانیم دستِ سمتِ توپ پایین می‌ماند — برعکسِ شیرجه.
+    void arm(int sign) {
+      final lead = dive != 0 && sign == dive.sign;
+      final swing = lead
+          ? -bodyTilt + sign * 0.23 * t
+          : -bodyTilt * 0.2 - sign * 0.35 * t;
+      final reach = lead ? 1 + t * 0.55 : 1 - t * 0.20;
+      canvas.save();
+      canvas.translate(sign * 0.231 * s, -0.190 * s);
+      canvas.rotate(swing);
+      final hx = sign * 0.346 * reach * s, hy = -0.138 * reach * s;
+      canvas.drawLine(
+          Offset.zero,
+          Offset(hx, hy),
+          Paint()
+            ..color = _kArm
+            ..strokeWidth = 0.150 * s
+            ..strokeCap = StrokeCap.round);
+      final pop = caught
+          ? 1 + 0.35 * math.sin(math.min(1.0, math.max(0.0, (t - 0.55) / 0.45)) * math.pi)
+          : 1.0;
+      final gc = Offset(hx + sign * 0.058 * s, hy - 0.023 * s);
+      canvas.drawCircle(gc, 0.121 * s * pop, Paint()..color = _kShirt);
+      canvas.drawCircle(
+          gc,
+          0.121 * s * pop,
+          Paint()
+            ..color = _kGloveEdge
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 0.023 * s);
+      canvas.restore();
+    }
+
+    arm(-1);
+    arm(1);
+
+    // ── شورت ──
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(-0.231 * s, 0.041 * s, 0.462 * s, 0.185 * s),
+            Radius.circular(0.046 * s)),
+        Paint()..color = _kShorts);
+
+    // ── تنه ──
+    canvas.drawPath(_bodyPath(s), Paint()..color = _kBody);
+
+    // ── زیرپوش + بندها ──
+    canvas.drawPath(_shirtPath(s), Paint()..color = _kShirt);
+    final strap = Paint()
+      ..color = _kStrap
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 0.035 * s;
+    canvas.drawLine(
+        Offset(0.231 * s, -0.098 * s), Offset(0.173 * s, 0.168 * s), strap);
+    canvas.drawLine(Offset(-0.196 * s, -0.052 * s),
+        Offset(-0.173 * s, 0.179 * s), strap..strokeWidth = 0.030 * s);
+
+    // ── صورت ──
+    // مردمک‌ها به سمتِ شیرجه می‌چرخند: ارزان‌ترین حقه برای «زنده» بودن.
+    final look = dive * t * 0.030;
+    canvas.drawCircle(
+        Offset(0.081 * s, -0.444 * s), 0.088 * s, Paint()..color = _kEyeA);
+    canvas.drawCircle(
+        Offset(-0.115 * s, -0.352 * s), 0.081 * s, Paint()..color = _kEyeB);
+    final pupil = Paint()..color = _kPupil;
+    canvas.drawCircle(
+        Offset((0.099 + look) * s, -0.426 * s), 0.043 * s, pupil);
+    canvas.drawCircle(
+        Offset((-0.097 + look) * s, -0.333 * s), 0.040 * s, pupil);
+    canvas.drawPath(_browLPath(s), Paint()..color = _kBrowL);
+    canvas.drawPath(_browRPath(s), Paint()..color = _kBrowR);
+    canvas.drawLine(
+        Offset(-0.173 * s, -0.167 * s),
+        Offset(0.208 * s, -0.271 * s),
+        Paint()
+          ..color = _kMouth
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 0.046 * s);
+
     canvas.restore();
   }
 
@@ -1212,6 +1411,7 @@ class _PitchPainter extends CustomPainter {
       old.power != power ||
       old.charging != charging ||
       old.netEpoch != netEpoch ||
+      old.idleTime != idleTime ||
       old.lastKick != lastKick;
 }
 

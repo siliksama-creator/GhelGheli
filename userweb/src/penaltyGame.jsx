@@ -63,18 +63,200 @@ function drawBall(ctx, x, y, radius, spin) {
   ctx.restore();
 }
 
-function drawKeeper(ctx, x, y, tilt, size) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(tilt);
-  ctx.fillStyle = '#F59E0B';
-  ctx.beginPath(); ctx.roundRect(-size * .25, -size * .5, size * .5, size, size * .18); ctx.fill();
-  ctx.fillStyle = '#FFDBAC'; ctx.beginPath(); ctx.arc(0, -size * .68, size * .22, 0, Math.PI * 2); ctx.fill();
-  const spread = size * (.55 + Math.abs(tilt) * .5);
-  ctx.strokeStyle = '#F59E0B'; ctx.lineWidth = size * .16; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(-size * .2, -size * .25); ctx.lineTo(-spread, -size * .55);
-  ctx.moveTo(size * .2, -size * .25); ctx.lineTo(spread, -size * .55); ctx.stroke();
-  ctx.fillStyle = '#22D3EE';
-  ctx.beginPath(); ctx.arc(-spread, -size * .55, size * .13, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(spread, -size * .55, size * .13, 0, Math.PI * 2); ctx.fill();
+// ═══════════════════════════════════════════════════════════════════════
+// دروازه‌بان = خودِ قلقلی (شخصیتِ لوگو)، تختِ ۲بعدی و هم‌سبکِ بقیهٔ صحنه
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ── چرا پارامتریک و نه فایلِ تصویر ──
+//
+// اگر PNG/SVG بارگذاری می‌کردیم، انیمیشن فقط «جابه‌جاییِ یک عکسِ ثابت»
+// می‌شد. این‌طوری هر عضو مختصاتِ خودش را دارد، پس دست‌ها واقعاً به سمتِ
+// توپ دراز می‌شوند، پاها عقب می‌مانند و بدن کش می‌آید. ضمناً هیچ فایلی
+// لود نمی‌شود (نه تأخیر، نه کشِ مرورگر) و در هر رزولوشنی تیز است.
+//
+// ⚠️ همین هندسه مو‌به‌مو در `mobile/lib/screens/user/games/penalty_board.dart`
+//    هم هست. هر تغییری اینجا باید آنجا هم بیفتد وگرنه دو کلاینت دو
+//    دروازه‌بانِ متفاوت نشان می‌دهند. گاردِ `game-parity` همین را می‌سنجد.
+//
+// همهٔ اعداد ضریبِ `s` هستند (اندازهٔ پایه)، و مبدأ وسطِ تنه است.
+const K = {
+  body: '#BCCA21', arm: '#8C9E16', legA: '#7E8C12', legB: '#8C9E16',
+  boot: '#52371A', shirt: '#F2EFD2', strap: '#6B5423', shorts: '#5E6816',
+  gloveFill: '#F2EFD2', gloveEdge: '#5E6B0E',
+  eyeA: '#F6F4E2', eyeB: '#F1EFD6', pupil: '#141804',
+  browL: '#33400A', browR: '#3E4A08', mouth: '#2A1B06',
+};
+
+/** مسیرِ تنه (گلابی‌شکل) — نقطه‌ها ضریبِ s. */
+function keeperBodyPath(ctx, s) {
+  const P = (a, b) => [a * s, b * s];
+  ctx.beginPath();
+  ctx.moveTo(...P(0, -0.709));
+  ctx.bezierCurveTo(...P(0.173, -0.709), ...P(0.300, -0.606), ...P(0.346, -0.456));
+  ctx.bezierCurveTo(...P(0.404, -0.306), ...P(0.427, -0.167), ...P(0.415, -0.052));
+  ctx.bezierCurveTo(...P(0.404, 0.087), ...P(0.300, 0.168), ...P(0.150, 0.191));
+  ctx.bezierCurveTo(...P(0.058, 0.202), ...P(-0.058, 0.202), ...P(-0.150, 0.191));
+  ctx.bezierCurveTo(...P(-0.300, 0.168), ...P(-0.404, 0.087), ...P(-0.415, -0.052));
+  ctx.bezierCurveTo(...P(-0.427, -0.167), ...P(-0.404, -0.306), ...P(-0.346, -0.456));
+  ctx.bezierCurveTo(...P(-0.300, -0.606), ...P(-0.173, -0.709), ...P(0, -0.709));
+  ctx.closePath();
+}
+
+function keeperShirtPath(ctx, s) {
+  const P = (a, b) => [a * s, b * s];
+  ctx.beginPath();
+  ctx.moveTo(...P(-0.300, -0.075));
+  ctx.bezierCurveTo(...P(-0.150, 0.006), ...P(0.150, 0.006), ...P(0.300, -0.075));
+  ctx.bezierCurveTo(...P(0.323, 0.052), ...P(0.277, 0.144), ...P(0.150, 0.179));
+  ctx.bezierCurveTo(...P(0.058, 0.202), ...P(-0.058, 0.202), ...P(-0.150, 0.179));
+  ctx.bezierCurveTo(...P(-0.277, 0.144), ...P(-0.323, 0.052), ...P(-0.300, -0.075));
+  ctx.closePath();
+}
+
+/** ابرو/دهان — شکل‌های کوچکِ ثابت. */
+function keeperBrowL(ctx, s) {
+  const P = (a, b) => [a * s, b * s];
+  ctx.beginPath();
+  ctx.moveTo(...P(-0.254, -0.456));
+  ctx.bezierCurveTo(...P(-0.173, -0.513), ...P(-0.058, -0.479), ...P(0.012, -0.398));
+  ctx.lineTo(...P(-0.035, -0.340));
+  ctx.bezierCurveTo(...P(-0.104, -0.409), ...P(-0.173, -0.409), ...P(-0.231, -0.386));
+  ctx.closePath();
+}
+function keeperBrowR(ctx, s) {
+  const P = (a, b) => [a * s, b * s];
+  ctx.beginPath();
+  ctx.moveTo(...P(0.012, -0.559));
+  ctx.bezierCurveTo(...P(0.092, -0.606), ...P(0.208, -0.582), ...P(0.265, -0.513));
+  ctx.lineTo(...P(0.231, -0.467));
+  ctx.bezierCurveTo(...P(0.173, -0.525), ...P(0.092, -0.536), ...P(0.023, -0.513));
+  ctx.closePath();
+}
+
+/**
+ * ست انیمیشنِ دروازه‌بان.
+ *
+ * @param {object} o
+ *  o.size   اندازهٔ پایه
+ *  o.tilt   چرخشِ بدن (همان مقدارِ قبلی)
+ *  o.dive   جهتِ شیرجه: -1 چپ، 0 بی‌حرکت، +1 راست
+ *  o.t      پیشرفتِ شیرجه ۰..۱
+ *  o.time   ثانیهٔ جاری — فقط برای نفس‌کشیدنِ حالتِ آماده
+ *  o.caught توپ مهار شد؟ (برای پاپِ دستکش)
+ */
+function drawKeeper(ctx, x, y, o) {
+  const s = o.size;
+  const dive = o.dive || 0;
+  const t = clamp(o.t || 0);
+  const moving = dive !== 0 && t > 0;
+
+  // ── ۱) نفس کشیدنِ حالتِ آماده ──
+  // بدونِ این، دروازه‌بانِ منتظر مثل مجسمه است. دامنه عمداً کوچک است
+  // (۲٪) تا حواسِ بازیکن را از انتخابِ ناحیه پرت نکند.
+  const breath = moving ? 0 : Math.sin((o.time || 0) * 2.1) * 0.02;
+
+  // ── ۲) آمادگی (anticipation) ──
+  // تا ۱۸٪ اولِ حرکت کمی جمع می‌شود و خلافِ جهت تکیه می‌دهد؛ همان
+  // قاعدهٔ کلاسیکِ انیمیشن که پرش را باورپذیر می‌کند.
+  const antic = moving ? Math.max(0, 1 - t / 0.18) : 0;
+  const crouch = antic * 0.06;
+
+  // ── ۳) کشِ بدن در جهتِ حرکت ──
+  const stretch = moving ? Math.sin(Math.min(1, t / 0.7) * Math.PI) * 0.14 : 0;
+
+  ctx.save();
+  ctx.translate(x, y);
+  // شیبِ ترسیم عمداً نرم‌تر از شیبِ منطقی است: چرخشِ کاملِ ۵۰ درجه
+  // «افتادن» خوانده می‌شود نه «شیرجه».
+  const bodyTilt = (o.tilt || 0) * 0.72;
+  ctx.rotate(bodyTilt);
+  ctx.scale(1 + stretch, 1 - stretch * 0.45 - crouch + breath);
+
+  // ── پاها: هنگامِ شیرجه عقب می‌مانند ──
+  const legSwing = -dive * t * 0.42;
+  ctx.save();
+  ctx.translate(0, 0.13 * s);
+  ctx.rotate(legSwing);
+  ctx.translate(0, -0.13 * s);
+  const rr = (px, py, w, h, r) => {
+    ctx.beginPath(); ctx.roundRect(px * s, py * s, w * s, h * s, r * s); ctx.fill();
+  };
+  ctx.fillStyle = K.legA; rr(-0.162, 0.133, 0.127, 0.208, 0.058);
+  ctx.fillStyle = K.legB; rr(0.035, 0.133, 0.127, 0.208, 0.058);
+  ctx.fillStyle = K.boot;
+  ctx.beginPath(); ctx.ellipse(-0.127 * s, 0.364 * s, 0.127 * s, 0.069 * s, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0.127 * s, 0.364 * s, 0.127 * s, 0.069 * s, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // ── دست‌ها: به سمتِ توپ دراز می‌شوند ──
+  // بازوی سمتِ شیرجه بیشتر باز و بالا می‌رود، بازوی دیگر جمع می‌شود.
+  const arm = (sign) => {
+    const lead = sign === Math.sign(dive) && dive !== 0;
+    // ── چرا زاویه در «دنیای واقعی» حساب می‌شود، نه نسبت به بدن ──
+    //
+    // بدن که می‌چرخد، شانهٔ سمتِ مخالف به بالای تصویر می‌رود. اگر بازوها
+    // را نسبت به بدن بچرخانیم، همان بازوی عقب بالا می‌ایستد و دستِ سمتِ
+    // توپ پایین می‌ماند — یعنی دقیقاً برعکسِ شیرجه. پس اول `-bodyTilt`
+    // چرخشِ بدن را خنثی می‌کند و بعد زاویهٔ دلخواه اعمال می‌شود.
+    const swing = lead
+      ? -bodyTilt + sign * 0.23 * t
+      : -bodyTilt * 0.2 - sign * 0.35 * t;
+    // دستِ سمتِ توپ واقعاً دراز می‌شود — همین «رسیدن» است که شیرجه را
+    // باورپذیر می‌کند.
+    const reach = lead ? 1 + t * 0.55 : 1 - t * 0.20;
+    ctx.save();
+    ctx.translate(sign * 0.231 * s, -0.190 * s);
+    ctx.rotate(swing);
+    ctx.strokeStyle = K.arm;
+    ctx.lineWidth = 0.150 * s;
+    ctx.lineCap = 'round';
+    const hx = sign * 0.346 * reach * s, hy = -0.138 * reach * s;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(hx, hy); ctx.stroke();
+    // پاپِ دستکش موقعِ مهار — بازخوردِ لحظهٔ گرفتنِ توپ
+    const pop = o.caught ? 1 + 0.35 * Math.sin(clamp((t - 0.55) / 0.45) * Math.PI) : 1;
+    ctx.fillStyle = K.gloveFill;
+    ctx.strokeStyle = K.gloveEdge;
+    ctx.lineWidth = 0.023 * s;
+    ctx.beginPath();
+    ctx.arc(hx + sign * 0.058 * s, hy - 0.023 * s, 0.121 * s * pop, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  };
+  arm(-1); arm(1);
+
+  // ── شورت ──
+  ctx.fillStyle = K.shorts;
+  ctx.beginPath(); ctx.roundRect(-0.231 * s, 0.041 * s, 0.462 * s, 0.185 * s, 0.046 * s); ctx.fill();
+
+  // ── تنه ──
+  ctx.fillStyle = K.body; keeperBodyPath(ctx, s); ctx.fill();
+
+  // ── زیرپوش + بندها ──
+  ctx.fillStyle = K.shirt; keeperShirtPath(ctx, s); ctx.fill();
+  ctx.strokeStyle = K.strap; ctx.lineCap = 'round';
+  ctx.lineWidth = 0.035 * s;
+  ctx.beginPath(); ctx.moveTo(0.231 * s, -0.098 * s); ctx.lineTo(0.173 * s, 0.168 * s); ctx.stroke();
+  ctx.lineWidth = 0.030 * s;
+  ctx.beginPath(); ctx.moveTo(-0.196 * s, -0.052 * s); ctx.lineTo(-0.173 * s, 0.179 * s); ctx.stroke();
+
+  // ── صورت ──
+  // مردمک‌ها به سمتِ شیرجه می‌چرخند: نگاه کردن به توپ، ارزانْ‌ترین
+  // حقه‌ای است که شخصیت را «زنده» نشان می‌دهد.
+  const look = dive * t * 0.030;
+  ctx.fillStyle = K.eyeA;
+  ctx.beginPath(); ctx.arc(0.081 * s, -0.444 * s, 0.088 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = K.eyeB;
+  ctx.beginPath(); ctx.arc(-0.115 * s, -0.352 * s, 0.081 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = K.pupil;
+  ctx.beginPath(); ctx.arc((0.099 + look) * s, -0.426 * s, 0.043 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc((-0.097 + look) * s, -0.333 * s, 0.040 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = K.browL; keeperBrowL(ctx, s); ctx.fill();
+  ctx.fillStyle = K.browR; keeperBrowR(ctx, s); ctx.fill();
+  ctx.strokeStyle = K.mouth;
+  ctx.lineWidth = 0.046 * s;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-0.173 * s, -0.167 * s); ctx.lineTo(0.208 * s, -0.271 * s); ctx.stroke();
+
   ctx.restore();
 }
 
@@ -136,6 +318,22 @@ function PenaltyCanvas({ kick, animating, lastKick, selected, power, charging,
     return () => observer.disconnect();
   }, []);
 
+  // ── تپشِ حالتِ آماده ──
+  //
+  // بوم فقط وقتی state عوض شود دوباره کشیده می‌شود، پس نفس‌کشیدنِ
+  // دروازه‌بان بدونِ یک تیکِ آرام اصلاً دیده نمی‌شود.
+  //
+  // ⚠️ عمداً ۸ فریم بر ثانیه و **فقط وقتی حرکتی در جریان نیست**: یک
+  //    حلقهٔ rAF کاملِ ۶۰fps برای یک بالا-پایینِ ۲٪ باتریِ گوشی را
+  //    بی‌دلیل می‌سوزاند. وقتی شوت شروع شود، خودِ `kick` هر فریم
+  //    رندر را جلو می‌برد و این تیک خاموش می‌شود.
+  const [idleTick, setIdleTick] = useState(0);
+  useEffect(() => {
+    if (animating) return undefined;
+    const id = setInterval(() => setIdleTick(v => (v + 1) % 100000), 125);
+    return () => clearInterval(id);
+  }, [animating]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -185,14 +383,26 @@ function PenaltyCanvas({ kick, animating, lastKick, selected, power, charging,
 
     let keeper = { x: w / 2, y: top + goalH * .72 };
     let tilt = 0;
+    let diveDir = 0;
+    let diveT = 0;
     if (animating && dive != null) {
       const target = zoneCenter(dive, w, h);
       const t = easeOutCubic(clamp(kick / .55));
       keeper = { x: lerp(keeper.x, target.x, t), y: lerp(keeper.y, target.y, t) };
       tilt = (target.x - w / 2) / (goalW / 2) * .9 * t;
+      // جهت از خودِ ناحیه می‌آید نه از tilt: ناحیه‌های وسط tilt صفر دارند
+      // ولی باز هم شیرجهٔ بالا/پایین‌اند و باید دست‌ها حرکت کنند.
+      diveDir = Math.sign(Math.round(target.x - w / 2));
+      diveT = clamp(kick / .55);
     }
+    // ⚠️ اندازه از 0.30 به 0.37 رفت (خواستهٔ مالک: «یکم بزرگتر»).
+    const keeperOpts = {
+      size: goalH * .37, tilt, dive: diveDir, t: diveT,
+      time: idleTick * 0.125,
+      caught: outcome === 'save',
+    };
     const keeperFront = animating && outcome === 'save' && kick > .38;
-    if (!keeperFront) drawKeeper(ctx, keeper.x, keeper.y, tilt, goalH * .30);
+    if (!keeperFront) drawKeeper(ctx, keeper.x, keeper.y, keeperOpts);
 
     let ball = { ...spot };
     let radius = Math.min(w, h) * .033;
@@ -220,12 +430,12 @@ function PenaltyCanvas({ kick, animating, lastKick, selected, power, charging,
       }
     }
     if (visible) drawBall(ctx, ball.x, ball.y, radius, animating ? kick * 14 : 0);
-    if (keeperFront) drawKeeper(ctx, keeper.x, keeper.y, tilt, goalH * .30);
+    if (keeperFront) drawKeeper(ctx, keeper.x, keeper.y, keeperOpts);
     if (isGoal && kick > .62 && shot != null) {
       drawConfetti(ctx, zoneCenter(shot, w, h), clamp((kick - .62) / .38), Math.min(w, h));
     }
     if (charging) drawPower(ctx, power, w, h);
-  }, [kick, animating, lastKick, selected, power, charging, net, sizeEpoch]);
+  }, [kick, animating, lastKick, selected, power, charging, net, sizeEpoch, idleTick]);
 
   return <canvas ref={canvasRef} className="penCanvas" aria-hidden="true" />;
 }
