@@ -373,6 +373,39 @@ async function payCommission(client, userId, basePoints, source) {
  * بنابراین retry همان purchase هیچ‌وقت دوباره پول تولید نمی‌کند و rollback
  * هر کدام، خرید/کمیسیون/دفترکل را با هم برمی‌گرداند.
  */
+/**
+ * بسته‌بندیِ کمیسیون برای اعلانِ **بعد از COMMIT**.
+ *
+ * خواستهٔ مالک: «وقتی رفرال‌ها کمیسیون نقدی می‌گیرن براشون نوتیفیکیشن بره،
+ * چه اندروید و چه وب.» تا امروز پول بی‌صدا وارد کیف پول می‌شد و معرف فقط
+ * اگر اتفاقی کیف پولش را باز می‌کرد می‌فهمید — همان ایرادی که برای
+ * برندگانِ لیگ هم رفع شد.
+ *
+ * ── چرا «بعد از COMMIT» و نه همان‌جا ──
+ *
+ * `payPurchaseCommission` داخلِ تراکنشِ تحویلِ کالا اجرا می‌شود. اگر اعلان
+ * را همان‌جا می‌فرستادیم دو خطر داشت: (۱) اگر تراکنش بعداً ROLLBACK شود،
+ * معرف اعلانِ پولی را گرفته که هرگز واریز نشد؛ (۲) ارسالِ پوش یک I/Oِ
+ * شبکه‌ای است و تراکنشِ مالی را بی‌دلیل باز نگه می‌دارد. پس فقط «متنِ
+ * آمادهٔ اعلان» برگردانده می‌شود و فرستادنش با `verifyAndDeliver` است.
+ *
+ * برای کمیسیونِ تکراری یا صفر عمداً `null` برمی‌گردد — اعلانِ «۰ تومان»
+ * بدتر از نبودِ اعلان است.
+ */
+function commissionNotice(commission, productLabel = 'خرید دوست') {
+  if (!commission || commission.duplicate) return null;
+  const earned = Number(commission.earned || 0);
+  if (earned <= 0 || !commission.referrerId) return null;
+  return {
+    userId: commission.referrerId,
+    type: 'referral_commission',
+    title: 'کمیسیون معرفی به کیف پولت اضافه شد',
+    body: `${earned.toLocaleString('fa-IR')} تومان بابت ${productLabel} که دوستِ دعوت‌شده‌ات خرید. `
+      + 'این مبلغ قابل برداشت است.',
+    amount: earned,
+  };
+}
+
 async function payPurchaseCommission(
   client,
   { buyerId, purchaseType, purchaseReferenceId, purchaseAmount,
@@ -546,6 +579,7 @@ async function summary(userId) {
 
 module.exports = {
   ensureCode, attachReferrer, payCommission, payPurchaseCommission,
+  commissionNotice,
   purchaseCommissionAudit, summary,
   generateCode, normalizeDigits, dailySpinsFor, invitedCount,
   commissionPercent, purchaseCommissionPercent,

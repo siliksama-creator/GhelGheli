@@ -39,6 +39,7 @@ router.post('/shop/plus', auth, shopLimiter, asyncHandler(async (req, res) => {
     res.json(await shop.buyPlusSubscription(
       req.user.id,
       req.body?.billingCycle || req.body?.cycle || 'monthly',
+      { useWallet: req.body?.useWallet === true },
     ));
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message || 'خطا در خرید اشتراک' });

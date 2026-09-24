@@ -241,10 +241,16 @@ export default function Shop({ token, reloadProfile }) {
   };
 
   const buyPlan = (billingCycle) => act(`plus-${billingCycle}`, async () => {
+    // پلاس هم از همان تیکِ «پرداخت از کیف پول» پیروی می‌کند که آیتم‌های
+    // شاپ می‌کنند (خواستهٔ مالک). اگر موجودی کافی باشد سرور همان‌جا تسویه
+    // می‌کند و `settled` برمی‌گرداند — باز کردنِ پنجرهٔ بازار بعد از آن
+    // یعنی دوباره پول گرفتن.
     if (zarinpalEnabled) {
-      return startZarinpal({ kind: 'plus', billingCycle });
+      return startZarinpal({ kind: 'plus', billingCycle, useWallet });
     }
-    const order = await req('/api/shop/plus', 'POST', { billingCycle }, token);
+    const order = await req('/api/shop/plus', 'POST',
+      { billingCycle, useWallet }, token);
+    if (order?.settled) return order;
     return purchase(order);
   }, billingCycle === 'annual' ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد',
   // نامِ پلن از خودِ سرور می‌آید (همان چیزی که روی کارتِ پلن نوشته شده)،

@@ -48,7 +48,18 @@ module.exports = function zarinpalRoutes({
         message: 'خرید با موجودی کیف پول انجام شد',
       });
     } else if (kind === 'plus') {
-      order = await payments.createPlusOrder(req.user.id, String(req.body?.billingCycle || 'monthly'), { provider: 'zarinpal' });
+      // پلاس هم مثل آیتمِ شاپ می‌تواند از کیف پول تسویه شود؛ در آن حالت
+      // اصلاً نباید به درگاه برویم.
+      order = await shop.buyPlusSubscription(
+        req.user.id, String(req.body?.billingCycle || 'monthly'),
+        { useWallet: req.body?.useWallet === true, provider: 'zarinpal' },
+      );
+      if (order.settled === true) return res.json({
+        orderId: order.referenceId || null,
+        settled: true,
+        amount: order.amount || 0,
+        message: 'اشتراک با موجودی کیف پول فعال شد',
+      });
     } else if (kind === 'card_box') {
       order = await payments.createCardBoxOrder(req.user.id, { provider: 'zarinpal' });
     } else {

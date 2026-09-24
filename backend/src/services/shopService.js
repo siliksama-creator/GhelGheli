@@ -366,7 +366,7 @@ async function deliverCardBox(client, { userId, amount, orderId, gatewayProvider
   // کمیسیونِ نقدیِ ۱۰٪ به معرف. صندوق فروشِ نقدیِ درگاهی است، پس دقیقاً
   // مثل آیتمِ شاپ رفتار می‌کند. `walletPaid` ندارد چون صندوق با کیف پول
   // خریدنی نیست.
-  await referrals.payPurchaseCommission(client, {
+  const commission = await referrals.payPurchaseCommission(client, {
     buyerId: userId,
     purchaseType: 'card_box',
     purchaseReferenceId: box.boxId,
@@ -375,6 +375,7 @@ async function deliverCardBox(client, { userId, amount, orderId, gatewayProvider
   });
 
   return {
+    _commissionNotice: referrals.commissionNotice(commission, 'صندوق کارت'),
     kind: 'card_box',
     boxId: box.boxId,
     cards: box.cards,
@@ -491,6 +492,7 @@ async function deliverItem(client, { userId, itemId, amount, walletPaid = 0, gat
     : null;
 
   return {
+    _commissionNotice: referrals.commissionNotice(commission, item.name),
     referenceId: purchaseId,
     item: { ...item, price: Number(item.price), owned: true },
     boughtAt: purchase.rows[0].bought_at,
@@ -517,7 +519,7 @@ function normalizeBillingCycle(value) {
  * می‌خرد، ۵۰ روز می‌گیرد — نه ۳۰ روز با ۲۰ روز سوخته. این همان رفتاری
  * است که قبل از تغییرِ درگاه هم داشتیم و عمداً حفظ شده.
  */
-async function deliverPlus(client, { userId, billingCycle, amount, gatewayProvider = 'cafebazaar' }) {
+async function deliverPlus(client, { userId, billingCycle, amount, walletPaid = 0, gatewayProvider = 'cafebazaar' }) {
   const cycle = normalizeBillingCycle(billingCycle);
   const chosen = plusPlansConfig()[cycle] || plusPlansConfig().monthly;
   {
@@ -573,19 +575,47 @@ async function deliverPlus(client, { userId, billingCycle, amount, gatewayProvid
       );
     }
 
+    // ── سهمِ کیف پول ──
+    //
+    // همان نقطه‌ای که `deliverItem` پول را کم می‌کند: بعد از ثبتِ اشتراک و
+    // داخلِ همین تراکنش. اگر هر مرحلهٔ بعدی بشکند، کلِ تراکنش برمی‌گردد و
+    // ریالی کم نمی‌شود. مرجع، شناسهٔ همین اشتراک است تا دوباره‌کسر ممکن
+    // نباشد.
+    if (Number(walletPaid) > 0) {
+      await wallet.debit(client, {
+        userId,
+        amount: Number(walletPaid),
+        source: 'subscription',
+        referenceType: 'user_subscriptions',
+        referenceId: subscriptionId,
+        description: `سهم کیف پول اشتراک ${cycle === 'annual' ? 'سالانه' : 'ماهانه'} پلاس`,
+      });
+    }
+
     // کمیسیون ۵٪ نقدی به معرف، داخل همان تراکنش.
-    const commission = await referrals.payPurchaseCommission(client, {
-      buyerId: userId,
-      purchaseType: cycle === 'annual' ? 'plus_annual' : 'plus_monthly',
-      purchaseReferenceId: subscriptionId,
-      purchaseAmount: Number(amount) || chosen.price,
-      gatewayProvider,
-    });
+    //
+    // ⛔ سهمی که از کیف پول آمده کمیسیون‌پذیر نیست — همان قاعدهٔ
+    //    `deliverItem`. پولِ کیف پول قبلاً داخلِ سیستم بوده، پس خریدِ
+    //    تماماً-کیف‌پولی هیچ پولِ تازه‌ای نمی‌آورد که ۵٪ از آن سهمِ معرف شود.
+    const commissionable = Math.max(
+      0, (Number(amount) || chosen.price) - (Number(walletPaid) || 0),
+    );
+    const commission = commissionable > 0
+      ? await referrals.payPurchaseCommission(client, {
+        buyerId: userId,
+        purchaseType: cycle === 'annual' ? 'plus_annual' : 'plus_monthly',
+        purchaseReferenceId: subscriptionId,
+        purchaseAmount: commissionable,
+        gatewayProvider,
+      })
+      : null;
 
     // `plusStatus` روی همین client خوانده می‌شود نه pool: اگر از pool
     // بخوانیم، تراکنش هنوز commit نشده و وضعیتِ قبل از خرید برمی‌گردد —
     // کاربر پول داده ولی پاسخ می‌گوید پلاس ندارد.
     return {
+      _commissionNotice: referrals.commissionNotice(
+        commission, `اشتراک ${cycle === 'annual' ? 'سالانه' : 'ماهانه'} پلاس`),
       referenceId: subscriptionId,
       subscription: subscription.rows[0],
       billingCycle: cycle,
@@ -756,8 +786,75 @@ async function resolveShopItem(slug) {
 }
 
 /** مرحلهٔ ۱ برای پلاس. */
-async function buyPlusSubscription(userId, billingCycle = 'monthly') {
-  return payments.createPlusOrder(userId, billingCycle);
+/**
+ * خریدِ اشتراکِ پلاس — با کیف پول یا از درگاه.
+ *
+ * خواستهٔ مالک: «امکان خرید پلاس و تمامی آیتم‌های شاپ از روی موجودی کیف
+ * پول.» آیتم‌های شاپ از دورِ ۲۲ این را داشتند؛ پلاس جا مانده بود و
+ * کاربری که از لیگ پول برده بود نمی‌توانست با همان پول پلاس بگیرد.
+ *
+ * ساختار عمداً آینهٔ `buyShopItem` است: موجودیِ کافی → تسویهٔ کامل داخلِ
+ * یک تراکنش؛ موجودیِ ناکافی → همان مسیرِ درگاهِ همیشگی (بدونِ کسرِ جزئی).
+ *
+ * ⚠️ چرا پلاس «ترکیبی» ندارد ولی آیتمِ شاپ دارد:
+ *    خریدِ ترکیبی یعنی سهمِ کیف پول روی سفارش قفل شود و بعد از تأییدِ
+ *    درگاه کسر گردد. برای آیتمِ شاپ این مسیر از قبل ساخته و آزموده شده
+ *    است (`wallet_amount` روی `payment_orders` + کسر در `deliverItem`).
+ *    باز کردنش برای پلاس یعنی دست‌بردن در مسیرِ تمدید/انباشتِ اشتراک،
+ *    که ریسکش برای این خواسته لازم نبود: یا کلِ مبلغ از کیف پول، یا کلِ
+ *    مبلغ از درگاه.
+ */
+async function buyPlusSubscription(userId, billingCycle = 'monthly', {
+  useWallet = false, provider = 'cafebazaar',
+} = {}) {
+  if (!useWallet) return payments.createPlusOrder(userId, billingCycle, { provider });
+
+  const cycle = normalizeBillingCycle(billingCycle);
+  const chosen = plusPlansConfig()[cycle] || plusPlansConfig().monthly;
+  const price = Number(chosen.price);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // قفلِ کاربر پیش از خواندنِ موجودی — بدونِ آن دو خریدِ هم‌زمان هر دو
+    // موجودیِ قدیمی را می‌خوانند و کاربر دو اشتراک با پولِ یکی می‌گیرد.
+    const locked = await client.query(
+      'SELECT wallet_balance FROM users WHERE id=$1 FOR UPDATE', [userId]);
+    if (!locked.rows[0]) throw fail('کاربر پیدا نشد', 404);
+
+    const balance = Number(locked.rows[0].wallet_balance || 0);
+    if (balance < price) {
+      // موجودی کفاف نمی‌دهد → مسیرِ عادیِ درگاه. ROLLBACK لازم است چون
+      // قفلِ FOR UPDATE نباید تا ساختِ سفارش نگه داشته شود.
+      await client.query('ROLLBACK');
+      return {
+        ...await payments.createPlusOrder(userId, cycle, { provider }),
+        settled: false,
+        paidFromWallet: 0,
+        remainingToPay: price,
+        walletBalance: balance,
+      };
+    }
+
+    const delivered = await deliverPlus(client, {
+      userId, billingCycle: cycle, amount: price, walletPaid: price,
+    });
+    await client.query('COMMIT');
+    return {
+      settled: true,
+      paidFromWallet: price,
+      remainingToPay: 0,
+      walletBalance: balance - price,
+      amount: price,
+      ...delivered,
+    };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /**

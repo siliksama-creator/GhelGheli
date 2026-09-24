@@ -144,6 +144,11 @@ class _InventoryPageState extends State<InventoryPage> {
   InvSort _sort = InvSort.recent;
   String? _rarity;
 
+  /// اندازهٔ هر صفحهٔ کلکسیون — آینهٔ `PAGE_SIZE` در
+  /// `userweb/src/screens/Inventory.jsx`.
+  static const int _pageSize = 24;
+  int _page = 1;
+
   @override
   void dispose() {
     // بدون این، هر بار که کاربر صفحه را می‌بندد یک کنترلر نشت می‌کند.
@@ -160,6 +165,21 @@ class _InventoryPageState extends State<InventoryPage> {
       shown = shown.where((item) => cardRarityOf(item) == _rarity).toList();
     }
     final stats = collectionStats(widget.items);
+
+    // ── صفحه‌بندی ──
+    //
+    // خواستهٔ مالک: کلکسیون نباید بی‌انتها طولانی شود. `_page` با هر
+    // تغییرِ فیلتر ریست می‌شود؛ `clamp` از حالتِ «صفحهٔ ۷ از نتیجه‌ای که
+    // ۲ صفحه دارد» جلوگیری می‌کند که فهرستِ خالی نشان می‌داد.
+    final pageCount =
+        shown.isEmpty ? 1 : ((shown.length - 1) ~/ _pageSize) + 1;
+    final safePage = _page.clamp(1, pageCount);
+    final pageItems = shown.isEmpty
+        ? const <Map<String, dynamic>>[]
+        : shown.sublist(
+            (safePage - 1) * _pageSize,
+            ((safePage) * _pageSize).clamp(0, shown.length),
+          );
 
     final body = CustomScrollView(
       slivers: [
@@ -185,7 +205,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 if (widget.items.length >= 8) ...[
                   TextField(
                     controller: _search,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) => setState(() => _page = 1),
                     textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
                       hintText: 'جست‌وجو در کارت‌ها…',
@@ -195,7 +215,10 @@ class _InventoryPageState extends State<InventoryPage> {
                           ? null
                           : IconButton(
                               icon: const Icon(Icons.close_rounded, size: 18),
-                              onPressed: () => setState(_search.clear),
+                              onPressed: () => setState(() {
+                                _search.clear();
+                                _page = 1;
+                              }),
                             ),
                     ),
                   ),
@@ -211,7 +234,10 @@ class _InventoryPageState extends State<InventoryPage> {
                           ChoiceChip(
                             label: Text(_sortLabels[s]!),
                             selected: _sort == s,
-                            onSelected: (_) => setState(() => _sort = s),
+                            onSelected: (_) => setState(() {
+                              _sort = s;
+                              _page = 1;
+                            }),
                             visualDensity: VisualDensity.compact,
                             labelStyle: theme.textTheme.labelMedium,
                           ),
@@ -221,7 +247,10 @@ class _InventoryPageState extends State<InventoryPage> {
                         ChoiceChip(
                           label: const Text('همه کلاس‌ها'),
                           selected: _rarity == null,
-                          onSelected: (_) => setState(() => _rarity = null),
+                          onSelected: (_) => setState(() {
+                            _rarity = null;
+                            _page = 1;
+                          }),
                           visualDensity: VisualDensity.compact,
                         ),
                         Gaps.hXs,
@@ -229,7 +258,10 @@ class _InventoryPageState extends State<InventoryPage> {
                           ChoiceChip(
                             label: Text(rarityLabels[rarity]!),
                             selected: _rarity == rarity,
-                            onSelected: (_) => setState(() => _rarity = rarity),
+                            onSelected: (_) => setState(() {
+                              _rarity = rarity;
+                              _page = 1;
+                            }),
                             visualDensity: VisualDensity.compact,
                           ),
                           Gaps.hXs,
@@ -278,8 +310,21 @@ class _InventoryPageState extends State<InventoryPage> {
                 childAspectRatio: 0.62,
               ),
               delegate: SliverChildBuilderDelegate(
-                (_, i) => InventoryTile(item: shown[i]),
-                childCount: shown.length,
+                (_, i) => InventoryTile(item: pageItems[i]),
+                childCount: pageItems.length,
+              ),
+            ),
+          ),
+        if (pageCount > 1)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  Gaps.md, 0, Gaps.md, Gaps.xxl),
+              child: _InventoryPager(
+                page: safePage,
+                pageCount: pageCount,
+                total: shown.length,
+                onChange: (next) => setState(() => _page = next),
               ),
             ),
           ),
@@ -293,6 +338,57 @@ class _InventoryPageState extends State<InventoryPage> {
 }
 
 /// نوارِ آمارِ کلکسیون.
+/// صفحه‌بندیِ کلکسیون — آینهٔ `.invPager` در وب.
+class _InventoryPager extends StatelessWidget {
+  const _InventoryPager({
+    required this.page,
+    required this.pageCount,
+    required this.total,
+    required this.onChange,
+  });
+
+  final int page;
+  final int pageCount;
+  final int total;
+  final ValueChanged<int> onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        OutlinedButton(
+          onPressed: page <= 1 ? null : () => onChange(page - 1),
+          child: const Text('قبلی'),
+        ),
+        Gaps.hSm,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'صفحهٔ ${faNum(page)} از ${faNum(pageCount)}',
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF9FB6D0)),
+            ),
+            Text(
+              '${faNum(total)} کارت',
+              style: const TextStyle(
+                  fontSize: 11, color: Color(0xFF6F8399)),
+            ),
+          ],
+        ),
+        Gaps.hSm,
+        OutlinedButton(
+          onPressed: page >= pageCount ? null : () => onChange(page + 1),
+          child: const Text('بعدی'),
+        ),
+      ],
+    );
+  }
+}
+
 class _StatsStrip extends StatelessWidget {
   const _StatsStrip({required this.stats});
   final ({int kinds, int total, int points}) stats;

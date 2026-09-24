@@ -280,6 +280,11 @@ class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
   Future<void> _buyPlan(Map<String, dynamic> plan) async {
     final price = (plan['price'] as num?)?.toInt() ?? 0;
     final annual = plan['billingCycle'] == 'annual';
+    // پلاس هم از همان تیکِ «پرداخت از کیف پول» پیروی می‌کند که آیتم‌های
+    // شاپ می‌کنند (خواستهٔ مالک). سرور تصمیم می‌گیرد: موجودیِ کافی یعنی
+    // تسویهٔ کامل و درگاه اصلاً باز نمی‌شود.
+    final wantWallet = _useWallet && _walletBalance > 0;
+    final fullyFromWallet = wantWallet && _walletBalance >= price;
     // مدتِ پلن از خودِ پلن می‌آید (`days`)، با همان فول‌بک‌هایی
     // که وب در `Shop.jsx` می‌گذارد (۳۰/۳۶۵) — تا دو کلاینت در حالتِ
     // بی‌فیلد هم یک عدد ببینند.
@@ -292,7 +297,9 @@ class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${Money.withUnit(price)} از طریق $_gatewayName پرداخت می‌شود.'),
+            Text(fullyFromWallet
+                ? '${Money.withUnit(price)} کامل از موجودی کیف پولت کم می‌شود.'
+                : '${Money.withUnit(price)} از طریق $_gatewayName پرداخت می‌شود.'),
             Gaps.vXs,
             Text(annual
                 ? 'قاب سلطنتی و عنوان «ستاره سالانه» دائمی هستند؛ یک فرصت تغییر باشگاه هم می‌گیری.'
@@ -324,9 +331,13 @@ class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
     if (ok != true) return;
     await _run(
       () async => _zarinpalEnabled
-          ? _startZarinpal(kind: 'plus', billingCycle: '${plan['billingCycle']}')
+          ? _startZarinpal(
+              kind: 'plus',
+              billingCycle: '${plan['billingCycle']}',
+              useWallet: wantWallet)
           : _purchase(await widget.api.post('/api/shop/plus', {
               'billingCycle': plan['billingCycle'],
+              'useWallet': wantWallet,
             })),
       'plus-${plan['billingCycle']}',
       annual ? 'پلاس سالانه و هدیه‌های دائمی فعال شد' : 'پلاس ماهانه فعال شد',

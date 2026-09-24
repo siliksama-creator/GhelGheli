@@ -48,9 +48,29 @@ section('تفکیک کیف پول از خرید');
 ok('کسر از کیف پول فقط با useWallet صریح انجام می‌شود',
   /useWallet\s*=\s*false/.test(shopSvc)
   && /if\s*\(!useWallet\)\s*return\s+payments\.createShopOrder/.test(shopSvc));
-ok('هر debit کیف پولی در shopService با منبع shop و مرجع آیتم است',
-  !/wallet\.debit\s*\(/.test(shopSvc)
-  || /wallet\.debit\([\s\S]{0,200}?source:\s*'shop'[\s\S]{0,200}?referenceType:\s*'shop_item'/.test(shopSvc));
+// ⚠️ این بررسی قبلاً فقط می‌پرسید «آیا *یک* debit با منبع shop هست؟» —
+// یعنی افزودنِ یک debit با منبعِ دلخواه کنارش، همچنان سبز می‌ماند. حالا
+// **هر** فراخوانی جداگانه سنجیده می‌شود.
+{
+  // امضا `wallet.debit(client, { ... })` است — آرگومانِ اول را هم بپذیر.
+  const debits = [...shopSvc.matchAll(/wallet\.debit\(\s*\w+\s*,\s*\{([\s\S]*?)\n\s*\}\)/g)]
+    .map(m => m[1]);
+  // منبع → مرجعی که باید داشته باشد. مرجع باید به ردیفی اشاره کند که
+  // «همین خرید» است، وگرنه قیدِ یکتاییِ دفترکل نمی‌تواند کسرِ تکراری را
+  // بگیرد.
+  const allowed = {
+    shop: 'shop_item',
+    subscription: 'user_subscriptions',
+    card_box: 'payment_orders',
+  };
+  const bad = debits.filter((body) => {
+    const src = (body.match(/source:\s*'([a-z_]+)'/) || [])[1];
+    const ref = (body.match(/referenceType:\s*'([a-z_]+)'/) || [])[1];
+    return !src || !(src in allowed) || ref !== allowed[src];
+  });
+  ok(`هر debit کیف پولی در shopService منبع و مرجعِ درست دارد (${debits.length} مورد)`,
+    debits.length > 0 && bad.length === 0, bad.join(' | '));
+}
 ok('سهمِ پرداخت‌شده از کیف پول از پایهٔ کمیسیون کسر می‌شود',
   /-\s*\(Number\(walletPaid\)\s*\|\|\s*0\)/.test(shopSvc));
 // فهرست را یک‌بار پارس می‌کنیم. regexِ سرراست («'shop' جایی بعد از
@@ -58,13 +78,18 @@ ok('سهمِ پرداخت‌شده از کیف پول از پایهٔ کمیسی
 // نام‌ها را عمداً دارد و تست را همیشه سبز/قرمز نشان می‌داد.
 const jsSources = (walletSvc.match(/const VALID_SOURCES = new Set\(\[([\s\S]*?)\]\);/)[1]
   .match(/'([a-z_]+)'/g) || []).map(x => x.replace(/'/g, ''));
-// 'shop' از دور ۲۲ دوباره زنده است (خرید با موجودی کیف پول) و باید در
-// VALID_SOURCES باشد؛ بقیه همچنان مرده‌اند.
-for (const dead of ['subscription', 'topup', 'topup_refund']) {
+// 'shop' از دور ۲۲ و 'subscription' از ۱۴۰۵/۰۷/۰۲ دوباره زنده‌اند: هر دو
+// «خرید با موجودی کیف پول»اند (آیتمِ شاپ و اشتراکِ پلاس) و باید در
+// VALID_SOURCES باشند. شارژِ کیف پول همچنان مرده است — مالک آن مدل را رد
+// کرد و هیچ مسیری نباید دوباره بسازدش.
+for (const dead of ['topup', 'topup_refund']) {
   ok(`منبع ${dead} دیگر تولید نمی‌شود`, !jsSources.includes(dead));
 }
 ok("منبع shop برای خریدِ کیف‌پولیِ دور ۲۲ مجاز است",
   jsSources.includes('shop'));
+// خواستهٔ مالک: «امکان خرید پلاس ... از روی موجودی کیف پول».
+ok('منبع subscription برای خریدِ کیف‌پولیِ پلاس مجاز است',
+  jsSources.includes('subscription'));
 ok('منابع قدیمی در LEGACY_SOURCES مستند شده‌اند',
   /LEGACY_SOURCES/.test(walletSvc)
   && /LEGACY_SOURCES[\s\S]*?'shop'[\s\S]*?'subscription'/.test(walletSvc)

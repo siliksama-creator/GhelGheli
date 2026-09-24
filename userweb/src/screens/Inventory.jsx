@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { fa } from '../lib/api.js';
 import PlayerCard from '../components/PlayerCard.jsx';
 import { cardQtyOf } from '../lib/cards.js';
 import { SvgIcon } from '../components/IconAsset.jsx';
 import { GrantChestOpener } from '../components/CardBoxReveal.jsx';
+import ModalPortal from '../components/ModalPortal.jsx';
 
 const asInt = v => Number.parseInt(v || 0, 10) || 0;
 const dateOf = m => new Date(m.updated_at || m.created_at || 0).getTime();
@@ -47,7 +48,7 @@ function GrantChests({ token, grants, onOpened }) {
 
 function CardDetail({ item, close }) {
   return (
-    <div className="invModalShade" onClick={close}>
+    <ModalPortal label="جزئیات کارت" onClose={close} className="invModalShade">
       <section className="invModal card" onClick={e => e.stopPropagation()}>
         <button className="ghost invModalClose" onClick={close}>×</button>
         <PlayerCard item={item} showStats />
@@ -58,9 +59,12 @@ function CardDetail({ item, close }) {
           <span>ارزش کل <b>{fa(cardQtyOf(item) * asInt(item.point_value))}</b></span>
         </div>
       </section>
-    </div>
+    </ModalPortal>
   );
 }
+
+/** اندازهٔ هر صفحهٔ کلکسیون. */
+const PAGE_SIZE = 24;
 
 export default function Inventory({ items = [], grants = [], token, reload }) {
   const [query, setQuery] = useState('');
@@ -77,6 +81,22 @@ export default function Inventory({ items = [], grants = [], token, reload }) {
         : dateOf(b) - dateOf(a) || String(a.name).localeCompare(String(b.name), 'fa'));
     return out;
   }, [items, query, sort]);
+
+  // ── صفحه‌بندی ──
+  //
+  // خواستهٔ مالک: «باید امکان صفحه‌بندی اینونتوری هم باشه که انقدر طولانی
+  // نشه.» با چند صد کارت، رندرِ همهٔ قاب‌ها هم صفحه را بی‌انتها می‌کرد و
+  // هم روی گوشی کند بود (هر کارت یک قابِ تصویرِ سنگین است).
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  // هر تغییری در جست‌وجو/ترتیب یعنی فهرست عوض شده؛ ماندن روی صفحهٔ ۷ از
+  // نتیجه‌ای که فقط ۲ صفحه دارد، «هیچ کارتی نیست» نشان می‌داد.
+  useEffect(() => { setPage(1); }, [query, sort, items.length]);
+  const safePage = Math.min(page, pageCount);
+  const paged = useMemo(
+    () => shown.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [shown, safePage],
+  );
 
   return (
     <div className="inventoryPage">
@@ -110,14 +130,28 @@ export default function Inventory({ items = [], grants = [], token, reload }) {
           <p>{items.length ? 'نام دیگری را امتحان کن.' : 'یک کد کارت ثبت کن یا از کارتت عکس بگیر.'}</p>
         </div>
       ) : (
-        <div className="inventoryGrid">
-          {shown.map(item => <PlayerCard
-            key={item.id || item.card_type_id}
-            item={item}
-            badge={fresh(item) ? 'جدید' : ''}
-            onClick={() => setOpen(item)}
-          />)}
-        </div>
+        <>
+          <div className="inventoryGrid">
+            {paged.map(item => <PlayerCard
+              key={item.id || item.card_type_id}
+              item={item}
+              badge={fresh(item) ? 'جدید' : ''}
+              onClick={() => setOpen(item)}
+            />)}
+          </div>
+          {pageCount > 1 && (
+            <nav className="invPager" aria-label="صفحه‌بندی کلکسیون">
+              <button type="button" className="ghost" disabled={safePage <= 1}
+                onClick={() => setPage(safePage - 1)}>قبلی</button>
+              <span className="invPagerAt">
+                صفحهٔ <b>{fa(safePage)}</b> از <b>{fa(pageCount)}</b>
+                <i>{fa(shown.length)} کارت</i>
+              </span>
+              <button type="button" className="ghost" disabled={safePage >= pageCount}
+                onClick={() => setPage(safePage + 1)}>بعدی</button>
+            </nav>
+          )}
+        </>
       )}
       {open && <CardDetail item={open} close={() => setOpen(null)} />}
     </div>

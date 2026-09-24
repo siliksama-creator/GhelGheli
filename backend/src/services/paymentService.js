@@ -110,6 +110,9 @@ function effectivePlusProducts() {
 // آدرسِ درگاه — اول env، بعد ops_limits (قابل تنظیم از پنل)، بعد پیش‌فرض.
 // env بالاتر است چون آدرس را معمولاً در لایهٔ دیپلوی می‌گذارند.
 const opsLimits = require('./opsLimits');
+// فقط برای اعلانِ کمیسیونِ معرف بعد از COMMIT — هیچ منطقِ مالی‌ای اینجا
+// به آن وابسته نیست.
+const notifications = require('./notificationService');
 
 function bazaarApiBase() {
   return process.env.BAZAAR_API
@@ -520,11 +523,34 @@ async function verifyAndDeliver(userId, orderId, purchaseToken, deliver) {
       [orderId, delivered?.referenceId || null]);
 
     await client.query('COMMIT');
+
+    // ── اعلانِ کمیسیونِ معرف — بعد از COMMIT ───────────────────────────
+    //
+    // خواستهٔ مالک: معرف باید بفهمد پول گرفته. پیش از این واریز بی‌صدا
+    // بود. `createNotification` خودش هم FCM (اندروید) و هم Web Push را
+    // می‌فرستد، پس یک فراخوانی هر دو پلتفرم را پوشش می‌دهد.
+    //
+    // ⚠️ شکستِ اعلان نباید خریدِ تأییدشده را خراب کند: پول واریز شده و
+    //    کالا تحویل شده؛ نبودِ یک پوش دلیلِ خطا دادن به خریدار نیست.
+    const notice = delivered?._commissionNotice || null;
+    if (notice) {
+      try {
+        await notifications.createNotification(
+          notice.userId, notice.type, notice.title, notice.body);
+      } catch (e) {
+        console.warn('[referral] اعلانِ کمیسیون فرستاده نشد:', e.message);
+      }
+    }
+
+    // `_commissionNotice` داخلی است و شناسهٔ معرف را دارد؛ نباید به
+    // پاسخِ خریدار نشت کند.
+    const payload = { ...delivered };
+    delete payload._commissionNotice;
     return {
       alreadyProcessed: false,
       amount: Number(order.amount),
       kind: order.purchase_kind,
-      ...delivered,
+      ...payload,
     };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
