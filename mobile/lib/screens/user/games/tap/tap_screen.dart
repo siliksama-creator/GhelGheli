@@ -341,7 +341,9 @@ class _TapGameScreenState extends State<TapGameScreen>
         source: RewardSource.tap,
         points: pts,
         coins: coins,
-        note: 'لولِ ${faNum(_engine.level)}',
+        // فیلدِ مستقل، نه `note` — تا لول **کنارِ** امتیاز و سکه بنشیند
+        // نه به‌جای آن‌ها. آینهٔ `tapGame.jsx` در وب.
+        level: _engine.level,
       ),
     );
   }

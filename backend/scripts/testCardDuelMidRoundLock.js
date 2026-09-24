@@ -135,6 +135,11 @@ function ioHarness() {
   }
   ok(new Set(playedX).size === 5, 'اندروید در ۵ راند ۵ کارتِ متفاوت بازی کرد');
   ok(new Set(playedO).size === 5, 'وب در ۵ راند ۵ کارتِ متفاوت بازی کرد');
+  // نتیجه بلافاصله اعلام نمی‌شود: اول مکثِ نمایشِ راندِ آخر.
+  ok(!x.last('game:over'), 'نتیجه پیش از نمایشِ راندِ آخر اعلام نمی‌شود');
+  ok(x.last('game:update')?.finalReveal === true, 'به‌روزرسانیِ نمایشِ راندِ آخر صادر شد');
+  await new Promise(r => setTimeout(r, 3600));
+
   const over = x.last('game:over');
   ok(Boolean(over), 'پنج راند تمام شد و game:over صادر شد');
   ok(['X', 'O', 'DRAW'].includes(over.winner), 'برنده معتبر است', String(over.winner));

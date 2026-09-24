@@ -347,7 +347,6 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
     final taken = (st['taken'] as Map?) ?? const {'X': 0, 'O': 0};
     final history = (st['history'] as List?) ?? const [];
     final lastKick = st['lastKick'];
-    final suddenDeath = st['suddenDeath'] == true;
     final waiting = st['waitingForOpponent'] == true;
     final me = widget.session.mySymbol ?? 'X';
     final foe = me == 'X' ? 'O' : 'X';
@@ -364,7 +363,6 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
           foeScore: NumberParser.toInt(score[foe]),
           myTaken: NumberParser.toInt(taken[me]),
           foeTaken: NumberParser.toInt(taken[foe]),
-          suddenDeath: suddenDeath,
           history: history,
           me: me,
         ),
@@ -483,13 +481,11 @@ class _Scoreboard extends StatelessWidget {
     required this.foeScore,
     required this.myTaken,
     required this.foeTaken,
-    required this.suddenDeath,
     required this.history,
     required this.me,
   });
 
   final int myScore, foeScore, myTaken, foeTaken;
-  final bool suddenDeath;
   final List history;
   final String me;
 
@@ -544,24 +540,6 @@ class _Scoreboard extends StatelessWidget {
               _SideLabel(text: 'حریف', highlight: trailing),
             ],
           ),
-          if (suddenDeath)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                decoration: BoxDecoration(
-                  borderRadius: Corners.rPill,
-                  color: _gold.withValues(alpha: 0.22),
-                  border: Border.all(color: _gold),
-                ),
-                child: const Text('مرگ ناگهانی',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: _gold)),
-              ),
-            ),
           Gaps.vXs,
           // ردیف توپ‌ها: گل سبز، مهار/بیرون خاکستری. یک نگاه کافی است.
           Row(

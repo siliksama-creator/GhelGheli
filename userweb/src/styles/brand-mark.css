@@ -4705,7 +4705,28 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .momentChip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;
   background:#ffffff12;border:1px solid #ffffff26;font-size:12.5px;font-weight:900;color:#fff;
   font-variant-numeric:tabular-nums}
-.momentNote{font-size:12.5px;font-weight:900;color:#ffd166}
+/* `note` حالا سطرِ مستقلِ زیرِ چیپ‌هاست، نه جایگزینِ آن‌ها. */
+.momentNote{display:block;margin-top:6px;font-size:12.5px;font-weight:900;color:#ffd166}
+
+/* ── چیپ‌ها یکی‌یکی می‌آیند ──
+   وقتی کاربر هم‌زمان امتیاز و سکه و لول می‌گیرد، ورودِ پلکانی باعث
+   می‌شود هر سه *شمرده* شوند نه اینکه یک ردیفِ یک‌دست به نظر برسند. */
+.momentRow .momentChip{animation:momentChipIn .34s cubic-bezier(.2,1.3,.4,1) both}
+.momentRow .momentChip:nth-child(2){animation-delay:.07s}
+.momentRow .momentChip:nth-child(3){animation-delay:.14s}
+.momentRow .momentChip:nth-child(4){animation-delay:.21s}
+@keyframes momentChipIn{
+  from{opacity:0;transform:translateY(6px) scale(.86)}
+  to{opacity:1;transform:none}}
+
+/* چیپِ لول باید از امتیاز و سکه متمایز باشد — دستاورد است، نه موجودی. */
+.momentChip[data-kind='level']{
+  background:linear-gradient(135deg,#ffd16636,#f9731626);
+  border-color:#ffd16673;color:#ffe6a8}
+
+@media (prefers-reduced-motion:reduce){
+  .momentRow .momentChip{animation:none}
+}
 
 /* درخششِ کشیده روی سطحِ کارت — یک بار، سریع، بی‌تکرار. */
 .momentShine{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:inherit}

@@ -120,7 +120,8 @@ void main() {
     await settle(tester);
   });
 
-  testWidgets('برچسبِ گردونه جای چیپ‌های عددی می‌نشیند', (tester) async {
+  testWidgets('برچسبِ گردونه کنارِ چیپ‌های عددی می‌نشیند، نه به‌جای آن‌ها',
+      (tester) async {
     late BuildContext ctx;
     await tester.pumpWidget(MaterialApp(
       home: Builder(builder: (context) {
@@ -133,6 +134,7 @@ void main() {
       const RewardMomentData(
         source: RewardSource.wheel,
         note: '۵۰٬۰۰۰ تومان',
+        points: 100,
       ),
     );
     await tester.pump();
@@ -142,6 +144,35 @@ void main() {
     // قالب می‌کرد، دو روایتِ متفاوت برای یک جایزه ساخته می‌شد.
     expect(find.text('۵۰٬۰۰۰ تومان'), findsOneWidget);
     expect(find.text('جایزهٔ گردونه'), findsOneWidget);
+    // ⚠️ و مقدار هم باید دیده شود. قبلاً `note` چیپ‌ها را خاموش می‌کرد و
+    // کاربر می‌دید چه گرفته ولی نه چقدر — خواستهٔ صریحِ مالک.
+    expect(find.text('+۱۰۰ امتیاز'), findsOneWidget);
+    await settle(tester);
+  });
+
+  testWidgets('لول کنارِ امتیاز و سکه دیده می‌شود', (tester) async {
+    late BuildContext ctx;
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(builder: (context) {
+        ctx = context;
+        return const Scaffold(body: SizedBox());
+      }),
+    ));
+    RewardMoment.moment(
+      ctx,
+      const RewardMomentData(
+        source: RewardSource.tap,
+        points: 250,
+        coins: 3,
+        level: 7,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.text('+۲۵۰ امتیاز'), findsOneWidget);
+    expect(find.text('+۳ سکه'), findsOneWidget);
+    expect(find.text('لولِ ۷'), findsOneWidget);
     await settle(tester);
   });
 

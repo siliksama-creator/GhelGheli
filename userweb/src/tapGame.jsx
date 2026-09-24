@@ -291,7 +291,9 @@ function fireLevelMoment(res) {
   const coins = Number(res.coinsEarned) > 0 ? Number(res.coinsEarned) : 0;
   // هیچ نگرفته → جشنی هم نیست (صداقتِ همان گذرگاه: جشنِ دروغ بدتر است).
   if (points <= 0 && coins <= 0) return;
-  rewardMoment({ source: 'tap', points, coins, note: 'لولِ ' + fa(res.level) });
+  // لول به‌صورت فیلدِ مستقل می‌رود تا کنارِ امتیاز و سکه دیده شود، نه
+  // به‌جای آن‌ها (قبلاً داخلِ `note` بود و مقدارها را خاموش می‌کرد).
+  rewardMoment({ source: 'tap', points, coins, level: Number(res.level) || 0 });
 }
 
 export default function TapGame({ token, onBack, economy }) {

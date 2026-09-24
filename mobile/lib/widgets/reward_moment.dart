@@ -58,6 +58,7 @@ class RewardMomentData {
     this.points = 0,
     this.coins = 0,
     this.xp = 0,
+    this.level = 0,
     this.item,
     this.note,
   });
@@ -68,15 +69,21 @@ class RewardMomentData {
   final int coins;
   final int xp;
 
+  /// لولِ تازه‌ای که کاربر همین حالا گرفته (۰ یعنی لولی عوض نشده).
+  ///
+  /// قبلاً ضربه‌زن لول را داخلِ `note` می‌فرستاد و چون `note` جایگزینِ
+  /// چیپ‌ها می‌شد، امتیاز و سکهٔ همان لحظه دیده نمی‌شد. حالا لول فیلدِ
+  /// مستقل است و کنارِ بقیه می‌نشیند.
+  final int level;
+
   /// نامِ آیتمِ به‌دست‌آمده (آیتمِ فروشگاه، هدیهٔ گذر نبرد).
   final String? item;
 
-  /// متنِ آمادهٔ سرور (برچسبِ گردونه مثل «۱۰۰ امتیاز»، نامِ پلن، تعدادِ
-  /// «دریافت همه»). وقتی بیاید، جای چیپ‌های عددی می‌نشیند تا یک جایزه دو
-  /// روایتِ متفاوت نگیرد.
+  /// جملهٔ کوتاهِ توضیحیِ سرور (برچسبِ گردونه، نامِ پلن، تعدادِ «دریافت
+  /// همه»). سطرِ **اضافه** است، نه جایگزینِ مقدارها.
   final String? note;
 
-  bool get hasAmount => points > 0 || coins > 0 || xp > 0;
+  bool get hasAmount => points > 0 || coins > 0 || xp > 0 || level > 0;
 
   /// نتیجهٔ بازی (برد/باخت/تساوی) خودش پیام است و بی‌عدد هم نمایش داده
   /// می‌شود — همان قاعدهٔ `rewardMoment.js` در وب.
@@ -404,6 +411,13 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
       if (d.xp > 0)
         _chip('bolt', AppConfig.instance.text('reward.xp',
             '+${faNum(d.xp)} تجربه', vars: {'amount': d.xp})),
+      if (d.level > 0)
+        _chip(
+            'medal',
+            AppConfig.instance.text('reward.level', 'لولِ ${faNum(d.level)}',
+                vars: {'level': d.level}),
+            highlight: true),
+      if (d.item != null && d.item!.isNotEmpty) _chip('item', d.item!),
     ];
 
     final curve = CurvedAnimation(parent: _in, curve: Curves.easeOutBack);
@@ -533,6 +547,18 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                                               fontSize: 12,
                                               fontWeight: FontWeight.w800,
                                               color: _subColor)),
+                                      // مقدار همیشه دیده می‌شود؛ `note`
+                                      // فقط یک سطرِ توضیحیِ اضافه است.
+                                      // قبلاً این سه `else if` بودند و
+                                      // وجودِ note مقدارها را خاموش می‌کرد.
+                                      if (chips.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 6),
+                                          child: Wrap(
+                                              spacing: 6,
+                                              runSpacing: 6,
+                                              children: chips),
+                                        ),
                                       if (d.note != null && d.note!.isNotEmpty)
                                         Padding(
                                           padding: const EdgeInsets.only(top: 6),
@@ -541,16 +567,6 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                                                   fontSize: 12.5,
                                                   fontWeight: FontWeight.w900,
                                                   color: _subColor)),
-                                        )
-                                      else if (chips.isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 6),
-                                          child: Wrap(spacing: 6, runSpacing: 6, children: chips),
-                                        )
-                                      else if (d.item != null && d.item!.isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 6),
-                                          child: _chip('item', d.item!),
                                         ),
                                     ],
                                   ),
@@ -571,24 +587,31 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
     );
   }
 
-  Widget _chip(String icon, String label) => Container(
+  /// [highlight] برای دستاورد (لول) — باید از موجودی (امتیاز/سکه) متمایز
+  /// باشد. آینهٔ `.momentChip[data-kind='level']` در وب.
+  Widget _chip(String icon, String label, {bool highlight = false}) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0x12FFFFFF),
-          border: Border.all(color: const Color(0x26FFFFFF)),
+          color: highlight ? const Color(0x2EFFD166) : const Color(0x12FFFFFF),
+          border: Border.all(
+              color: highlight
+                  ? const Color(0x73FFD166)
+                  : const Color(0x26FFFFFF)),
           borderRadius: BorderRadius.circular(99),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            UiIcon(icon, size: 17, color: Colors.white),
+            UiIcon(icon,
+                size: 17,
+                color: highlight ? const Color(0xFFFFE6A8) : Colors.white),
             const SizedBox(width: 5),
             Text(label,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    fontFeatures: [FontFeature.tabularFigures()])),
+                    color: highlight ? const Color(0xFFFFE6A8) : Colors.white,
+                    fontFeatures: const [FontFeature.tabularFigures()])),
           ],
         ),
       );

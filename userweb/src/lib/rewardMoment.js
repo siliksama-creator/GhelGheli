@@ -77,6 +77,7 @@ export function onRewardMoment(fn) {
  * @param {number} [payload.points] امتیازِ واریزشده
  * @param {number} [payload.coins]  سکهٔ واریزشده
  * @param {number} [payload.xp]     تجربهٔ واریزشده
+ * @param {number} [payload.level]  لولِ تازه‌ای که کاربر گرفته (اگر گرفته)
  * @param {string} [payload.item]   نامِ آیتم (خریدِ فروشگاه/پاداشِ گذر)
  * @param {string} [payload.note]   جملهٔ کوتاهِ همین لحظه (مثل برچسبِ گردونه)
  */
@@ -84,7 +85,8 @@ export function rewardMoment(payload) {
   if (!payload || typeof payload !== 'object') return;
   const kind = REWARD_MOMENTS[String(payload.kind || '').toUpperCase()] || REWARD_MOMENTS.GAIN;
   const hasAmount =
-    Number(payload.points) > 0 || Number(payload.coins) > 0 || Number(payload.xp) > 0;
+    Number(payload.points) > 0 || Number(payload.coins) > 0
+    || Number(payload.xp) > 0 || Number(payload.level) > 0;
   const hasItem = Boolean(String(payload.item || '').trim());
   // لحظهٔ بی‌مقدار و بی‌آیتم بی‌معناست — همان قاعده‌ای که نسخهٔ قبلی داشت:
   // جشنِ دروغ بدتر از نبودِ جشن است. (مسیرهای بی‌جایزه مثل «درخواستِ دوستی
@@ -101,9 +103,11 @@ export function rewardMoment(payload) {
 }
 
 /** میان‌بُرِ خوانا برای نتیجهٔ مسابقه. */
-export function matchMoment({ won, draw, source = 'memory', points, coins, xp, note } = {}) {
+export function matchMoment({
+  won, draw, source = 'memory', points, coins, xp, level, note,
+} = {}) {
   rewardMoment({
     kind: won ? REWARD_MOMENTS.WIN : draw ? REWARD_MOMENTS.DRAW : REWARD_MOMENTS.LOSS,
-    source, points, coins, xp, note,
+    source, points, coins, xp, level, note,
   });
 }

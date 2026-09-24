@@ -112,9 +112,9 @@ function Particles() {
   );
 }
 
-function Chip({ icon, children }) {
+function Chip({ icon, kind, children }) {
   return (
-    <span className="momentChip">
+    <span className="momentChip" data-kind={kind}>
       <SvgIcon name={icon} size={17} />
       {children}
     </span>
@@ -169,7 +169,18 @@ function MomentCard({ item, leaving }) {
       {text('reward.xp', `+${fa(item.xp)} تجربه`, { amount: item.xp })}
     </Chip>);
   }
+  // ── «چه لولی گرفته» یک چیپِ درجه‌یک است، نه یک جملهٔ دست‌ساز ──
+  //
+  // قبلاً ضربه‌زن لول را داخلِ `note` می‌فرستاد («لولِ ۵»). چون `note`
+  // جایگزینِ چیپ‌ها می‌شد، کاربر لول را می‌دید ولی امتیاز و سکه‌ای که
+  // همان لحظه گرفته بود را **نمی‌دید** — دقیقاً شکایتِ مالک.
+  if (Number(item.level) > 0) {
+    amounts.push(<Chip key="l" icon="medal" kind="level">
+      {text('reward.level', `لولِ ${fa(item.level)}`, { level: item.level })}
+    </Chip>);
+  }
   const itemName = String(item.item || '').trim();
+  if (itemName) amounts.push(<Chip key="i" icon="item">{itemName}</Chip>);
 
   return (
     <div
@@ -188,13 +199,13 @@ function MomentCard({ item, leaving }) {
       <div className="momentBody">
         <b className="momentTitle">{title}</b>
         <span className="momentSub">{subtitle}</span>
-        <div className="momentRow">
-          {item.note
-            ? <span className="momentNote">{item.note}</span>
-            : itemName
-              ? <Chip icon="item">{itemName}</Chip>
-              : amounts}
-        </div>
+        {/* ── مقدار همیشه دیده می‌شود ──
+            این سه قبلاً `؟ :` زنجیره‌ای بودند، یعنی وجودِ `note` چیپ‌های
+            مقدار را خاموش می‌کرد. خواستهٔ مالک صریح است: «حتماً بنویسه
+            که اون ریوارد چقدر بوده». پس مقدارها همیشه می‌آیند و `note`
+            فقط یک سطرِ توضیحیِ اضافه است. */}
+        {amounts.length > 0 && <div className="momentRow">{amounts}</div>}
+        {item.note && <span className="momentNote">{item.note}</span>}
       </div>
       <span className="momentShine" aria-hidden="true" />
     </div>

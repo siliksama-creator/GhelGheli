@@ -146,10 +146,15 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         const previousRound = Number(prev.state?.roundIndex || 0);
         const currentRound = Number(nextState?.roundIndex || 0);
         const totalRounds = Number(nextState?.totalRounds || 0);
-        // راند پنجم را game:over صداگذاری می‌کند؛ ۱..۴ همین‌جا بازخورد
-        // برد/باخت و لرزش کوتاه می‌گیرند تا برخورد حسِ زنده داشته باشد.
+        // هر برخورد — از جمله راندِ آخر — همین‌جا بازخوردِ برد/باخت و
+        // لرزشِ کوتاه می‌گیرد.
+        //
+        // راندِ پنجم قبلاً مستثنا بود چون `game:over` در همان تیک می‌رسید و
+        // دو صدا روی هم می‌افتاد. حالا موتور پیش از اعلامِ نتیجه مکث
+        // می‌کند (`resultUntil`)، پس برخوردِ راندِ آخر لحظهٔ مستقلِ خودش
+        // را دارد و صدای نهایی جدا و بعد از آن می‌آید.
         if (gameId === 'card_duel' && currentRound > previousRound
-          && currentRound < totalRounds) {
+          && currentRound <= totalRounds) {
           const roundWinner = nextState?.lastRound?.winner;
           play(roundWinner === 'DRAW' ? 'duel_round_draw'
             : roundWinner === prev.me ? 'duel_round_win' : 'duel_round_lose', 0.86);

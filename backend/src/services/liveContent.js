@@ -181,6 +181,9 @@ const DEFAULT_COPY = Object.freeze({
     points: '+{amount} امتیاز',
     coins: '+{amount} سکه',
     xp: '+{amount} تجربه',
+    // «چه لولی گرفته» — خواستهٔ صریحِ مالک. چیپِ مستقل است و کنارِ امتیاز و
+    // سکه می‌نشیند، نه به‌جای آن‌ها.
+    level: 'لولِ {level}',
   },
   streak: {
     cycleDone: 'چرخه {days} روزه · امروز روز {day} تکمیل شد',
@@ -316,6 +319,7 @@ const COPY_CONTRACT = Object.freeze({
     received: [], mission: [], daily: [], custom: [], wheel: [], streak: [],
     pass: [], shop: [], tap: [], memory: [], league: [],
     passAll: ['count'],
+    level: ['level'],
     winTitle: [], winLine: [], drawTitle: [], drawLine: [], lossTitle: [], lossLine: [],
     // عدد از کلاینت با رقمِ فارسی می‌آید (قاعدهٔ «عددِ فهرستِ سفید»)، پس
     // تنها جای‌نگهدارِ مجاز این‌جا `amount` است.

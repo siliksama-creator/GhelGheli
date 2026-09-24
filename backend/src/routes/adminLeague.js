@@ -2,6 +2,7 @@
 const fieldCrypto = require('../lib/fieldCrypto');
 const express = require('express');
 const { parseFaNumber } = require('../lib/faNum');
+const { cacheDelPrefix } = require('../lib/cache');
 
 module.exports = function createAdminLeagueRoutes(deps) {
   const {
@@ -616,6 +617,79 @@ router.patch('/admin/league/seasons/:id', adminAuth, validateUuid('id'), require
       [season.id, ...keys.map(k => patch[k])]);
     await audit(req.admin.id, 'league_update', 'league_seasons', season.id, null, patch);
     res.json({ message: 'لیگ به‌روز شد', season: rows[0] });
+  }));
+
+/**
+ * حذفِ کاملِ یک لیگ — برای گرفتنِ تستِ لیگ.
+ *
+ * خواستهٔ مالک: «امکان حذف کردن لیگی که جاری باشه هم قرار بده در پنل
+ * ادمین که بتونم تست‌های لیگ رو بگیرم.»
+ *
+ * ── فرقش با «بستن» ──
+ *
+ * «بستن» لیگ را تمام‌شده اعلام می‌کند و برای برندگان ردیفِ جایزه
+ * می‌سازد — یعنی یک رویدادِ واقعی در تاریخِ اپ. برای لیگِ آزمایشی این
+ * دقیقاً چیزی است که نمی‌خواهیم: صفِ «جوایز منتظر تأیید» پر می‌شود از
+ * جوایزِ ساختگی. «حذف» لیگ را طوری برمی‌دارد که انگار هرگز نبوده.
+ *
+ * ── تنها خطِ قرمز: پولِ پرداخت‌شده ──
+ *
+ * جدول‌های وابسته `ON DELETE CASCADE` دارند، پس حذفِ لیگ جدولِ امتیازها و
+ * ردیف‌های جایزه‌اش را هم می‌برد. تا وقتی چیزی پرداخت نشده این بی‌خطر
+ * است. ولی اگر حتی یک جایزه واریز شده باشد، حذف یعنی پاک کردنِ سندِ
+ * پولی که واقعاً از حساب خارج شده — کاربر پول را گرفته و هیچ ردی نمانده.
+ * پس در آن حالت ۴۰۹ می‌دهیم و مدیر را به «بستن» ارجاع می‌دهیم.
+ *
+ * ⚠️ فقط `requireRole()` (super_admin). پشتیبانی نباید بتواند لیگ را از
+ *    بین ببرد.
+ */
+router.delete('/admin/league/seasons/:id', adminAuth, validateUuid('id'), requireRole(),
+  asyncHandler(async (req, res) => {
+    const { rows: found } = await pool.query(
+      'SELECT * FROM league_seasons WHERE id=$1', [req.params.id]);
+    const season = found[0];
+    if (!season) return res.status(404).json({ message: 'لیگ پیدا نشد' });
+
+    const { rows: paid } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM league_payouts
+        WHERE league_season_id=$1 AND paid_at IS NOT NULL`, [season.id]);
+    if (paid[0].n > 0) {
+      return res.status(409).json({
+        code: 'league_has_paid_payouts',
+        message: `این لیگ ${paid[0].n.toLocaleString('fa-IR')} جایزهٔ پرداخت‌شده دارد و حذف نمی‌شود. برای پایان دادن به آن از «بستن لیگ» استفاده کنید.`,
+      });
+    }
+
+    // شمارشِ پیش از حذف — بعدش دیگر چیزی برای شمردن نیست. این اعداد در
+    // گزارشِ ممیزی می‌نشینند تا معلوم باشد دقیقاً چه چیزی از بین رفت.
+    const { rows: counts } = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM league_leaderboard_entries WHERE league_season_id=$1) AS entries,
+         (SELECT COUNT(*)::int FROM league_payouts WHERE league_season_id=$1) AS payouts`,
+      [season.id]);
+
+    await pool.query('DELETE FROM league_seasons WHERE id=$1', [season.id]);
+
+    await audit(req.admin.id, 'league_delete', 'league_seasons', season.id, null, {
+      title: season.title,
+      status: season.status,
+      month_year: season.month_year,
+      removedEntries: counts[0].entries,
+      removedPayouts: counts[0].payouts,
+    });
+
+    // کشِ عمومیِ لیدربرد ۶۰ ثانیه است و شماره معکوس کشِ خودش را دارد.
+    // بدونِ این، مدیر لیگ را حذف می‌کند و کلاینت تا یک دقیقه هنوز همان
+    // لیگِ نابودشده را نشان می‌دهد — که دقیقاً وسطِ تست گرفتن گیج‌کننده
+    // است و آدم فکر می‌کند حذف کار نکرده.
+    try { await cacheDelPrefix('lb:league:'); } catch { /* کش اختیاری است */ }
+    try { await leagueCountdown.refresh(); } catch { /* کش اختیاری است */ }
+
+    res.json({
+      message: 'لیگ و همهٔ داده‌هایش حذف شد',
+      removedEntries: counts[0].entries,
+      removedPayouts: counts[0].payouts,
+    });
   }));
 
 /** بستنِ یک لیگِ مشخص — لیگ‌های دیگر دست‌نخورده می‌مانند. */

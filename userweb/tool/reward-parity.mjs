@@ -89,6 +89,7 @@ ok('سبکِ قدیمیِ وب (RewardBurst) حذف شده',
   !has(`${WEB}/components/RewardBurst.jsx`) && !has(`${WEB}/lib/rewards.js`),
   'مالک خواست «سبک‌های قبلی برداشته و یک سبکِ هماهنگ جایگزین شود»');
 ok('سبکِ قدیمیِ اندروید (reward_burst) حذف شده', !has(`${APP}/widgets/reward_burst.dart`));
+
 if (failures) {
   console.log(`\n✗ ${failures} بررسیِ لحظهٔ جایزه شکست خورد\n`);
   process.exit(1);
@@ -298,6 +299,42 @@ ok('اندروید: لحظه ایموجی ندارد', !EMOJI.test(code(appSrc))
     /_fireLevelMoment/.test(tapApp) && /levelAwardSerial/.test(tapApp));
   ok('اندروید: دیالوگِ بسته‌دارِ قدیمیِ لول‌آپ حذف شده',
     !/_showLevelUpDialog|_LevelUpDialogContent/.test(code(tapApp)));
+}
+
+// ── ۱۴) «چقدر بود؟» — مقدار هرگز پنهان نمی‌شود ──
+//
+// خواستهٔ مالک: «باید حتماً بنویسه که اون ریوارد چقدر بوده و یا مثلاً چه
+// لولی گرفته.» باگی که رفع شد: هر دو کلاینت `note`/`item`/چیپ‌ها را
+// **جایگزینِ هم** رندر می‌کردند (`note ? … : chips`). یعنی هر مسیری که
+// یک جملهٔ توضیحی می‌فرستاد، عددِ جایزه را خاموش می‌کرد — ضربه‌زن لول را
+// نشان می‌داد ولی امتیاز و سکه‌اش را نه، و گردونه برچسب را نشان می‌داد
+// ولی امتیازش را نه.
+{
+  const web = read(`${WEB}/components/RewardMoment.jsx`);
+  const app = read(`${APP}/widgets/reward_moment.dart`);
+  const tapWeb = read(`${WEB}/tapGame.jsx`);
+  const tapApp = read(`${APP}/screens/user/games/tap/tap_screen.dart`);
+
+  ok('وب: `note` جایگزینِ چیپ‌های مقدار نیست',
+    !/item\.note[\s\S]{0,40}\?[\s\S]{0,160}:\s*amounts/.test(web),
+    'مقدار باید همیشه دیده شود، نه به‌شرطِ نبودِ note');
+  ok('اندروید: `note` جایگزینِ چیپ‌های مقدار نیست',
+    !/d\.note != null[\s\S]{0,400}else if \(chips\.isNotEmpty\)/.test(app),
+    'مقدار باید همیشه دیده شود، نه به‌شرطِ نبودِ note');
+
+  ok('وب: لول چیپِ مستقل دارد', /item\.level/.test(web) && /reward\.level/.test(web));
+  ok('اندروید: لول چیپِ مستقل دارد', /d\.level/.test(app) && /reward\.level/.test(app));
+
+  ok('وب: ضربه‌زن لول را به‌جای note در فیلدِ level می‌فرستد',
+    /level:\s*Number\(res\.level\)/.test(tapWeb)
+    && !/note:\s*'لولِ/.test(tapWeb));
+  ok('اندروید: ضربه‌زن لول را به‌جای note در فیلدِ level می‌فرستد',
+    /level:\s*_engine\.level/.test(tapApp)
+    && !/note:\s*'لولِ/.test(tapApp));
+
+  ok('هر دو: لول جزوِ «مقدار» حساب می‌شود',
+    /level\) > 0/.test(read(`${WEB}/lib/rewardMoment.js`))
+    && /level > 0/.test(app));
 }
 
 if (failures) {

@@ -78,6 +78,7 @@ export function LeaguePage({ request }) {
   const [editingId, setEditingId] = useState('');
   const [saving, setSaving] = useState(false);
   const [closingId, setClosingId] = useState('');
+  const [deletingId, setDeletingId] = useState('');
   const [approving, setApproving] = useState('');
 
   const load = useCallback(() =>
@@ -215,6 +216,30 @@ export function LeaguePage({ request }) {
     } finally { setClosingId(''); }
   }
 
+  /**
+   * حذفِ کاملِ لیگ — برای گرفتنِ تستِ لیگ.
+   *
+   * جدا از «بستن» است: بستن لیگ را تمام‌شده اعلام می‌کند و صفِ جوایز را
+   * پر می‌کند، ولی حذف طوری برش می‌دارد که انگار هرگز نبوده. برای لیگِ
+   * آزمایشی همین لازم است. سرور اگر جایزه‌ای واقعاً پرداخت شده باشد
+   * جلویش را می‌گیرد؛ اینجا فقط از مدیر تأیید می‌گیریم چون برگشت ندارد.
+   */
+  async function deleteSeason(sn) {
+    if (!window.confirm(
+      `لیگ «${sn.title || sn.month_year}» و همهٔ داده‌هایش حذف شود؟\n\n`
+      + 'جدولِ امتیازها و جوایزِ تأییدنشدهٔ این لیگ هم پاک می‌شوند.\n'
+      + 'این کار برگشت‌ناپذیر است.')) return;
+    setDeletingId(sn.id);
+    try {
+      const r = await request(`/api/admin/league/seasons/${sn.id}`, { method: 'DELETE' });
+      notify(r?.message || 'لیگ حذف شد');
+      if (editingId === sn.id) startNew();
+      loadSeasons(); loadPayouts(); load();
+    } catch (e) {
+      notify(e?.message || 'حذف لیگ ناموفق بود', 'error');
+    } finally { setDeletingId(''); }
+  }
+
   async function approve(id) {
     const one = payouts.find((p) => p.id === id);
     if (one && !window.confirm(
@@ -295,6 +320,9 @@ export function LeaguePage({ request }) {
                         onClick={() => closeSeason(sn.id)}>بستن</Button>
                     </>
                   )}
+                  {/* حذف برای لیگِ جاری هم هست — خواستهٔ مالک برای تست. */}
+                  <Button variant="danger" size="sm" loading={deletingId === sn.id}
+                    onClick={() => deleteSeason(sn)}>حذف</Button>
                 </td>
               </tr>
             ))}

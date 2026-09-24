@@ -340,13 +340,18 @@ class GameSession extends ChangeNotifier {
       state = _asMap(m['state']);
       turn = m['turn'] as String?;
 
-      // برخوردهای ۱ تا ۴ بازخوردِ فوریِ متفاوت دارند. راند پنجم را
-      // game:over با صدای نتیجهٔ نهایی پوشش می‌دهد تا دو صدا روی هم نیفتند.
+      // هر برخورد بازخوردِ فوریِ خودش را دارد — از جمله راندِ آخر.
+      //
+      // قبلاً راندِ پنجم از این شرط بیرون بود چون `game:over` در همان تیک
+      // می‌رسید و دو صدا روی هم می‌افتاد. حالا موتور پیش از اعلامِ نتیجه
+      // به‌اندازهٔ `resultUntil` مکث می‌کند، پس برخوردِ راندِ آخر لحظهٔ
+      // مستقلِ خودش را دارد و باید صدا هم داشته باشد؛ صدای نهایی چند
+      // ثانیه بعد و جدا می‌آید.
       final currentRound = (state['roundIndex'] as num?)?.toInt() ?? 0;
       final totalRounds = (state['totalRounds'] as num?)?.toInt() ?? 0;
       if (gameId == 'card_duel' &&
           currentRound > previousRound &&
-          currentRound < totalRounds) {
+          currentRound <= totalRounds) {
         final last =
             state['lastRound'] is Map ? state['lastRound'] as Map : const {};
         final roundWinner = '${last['winner'] ?? ''}';

@@ -441,7 +441,7 @@ function armTurnClock(room) {
   room.deadline = Date.now() + waitMs;
   room.turnTimer = setTimeout(() => {
     try {
-    if (room.done) return;
+    if (room.done || room.finalizing) return;
     // در حالت هم‌زمان، هر بازیکن انسانی که هنوز انتخاب نکرده، خودکار
     // برایش انتخاب می‌شود — وگرنه یک نفر که گوشی‌اش را زمین گذاشته،
     // بازی را برای حریف قفل می‌کند.
@@ -497,6 +497,9 @@ function finish(room, winner, disconnectedSym = null) {
   clearTimeout(room.botTimer);
   clearTimeout(room.turnTimer);
   clearTimeout(room.missTimer);
+  // مکثِ راندِ آخر ممکن است هنوز در جریان باشد (مثلاً کاربر وسطش قطع
+  // شد). اگر پاک نشود، تایمر بعداً روی اتاقِ نابودشده finish صدا می‌زند.
+  clearTimeout(room.finalTimer);
   for (const symbol of ['X', 'O']) clearTimeout(room.reconnectTimers?.[symbol]);
 
   const resolvedWinner = winner === 'DISCONNECT'
@@ -806,11 +809,11 @@ function scheduleBot(room) {
   // دروازه‌بان. شرط `turn !== 'O'` آن را در نیمی از ضربه‌ها خاموش
   // می‌کرد و بازی مقابل کامپیوتر برای همیشه منتظر می‌ماند.
   const sim = !!room.rules.simultaneous;
-  if (!room.vsBot || room.done || (!sim && room.turn !== 'O')) return;
+  if (!room.vsBot || room.done || room.finalizing || (!sim && room.turn !== 'O')) return;
   clearTimeout(room.botTimer);
   room.botTimer = setTimeout(() => {
     try {
-      if (room.done || (!sim && room.turn !== 'O')) return;
+      if (room.done || room.finalizing || (!sim && room.turn !== 'O')) return;
       // دورِ ۳۳: اتاق به‌عنوان آرگومانِ سوم به botMove می‌رود تا هر بازی
       // بتواند رباتِ «تمرین» را از رباتِ جدی جدا کند (جفت‌یاب: تمرینِ
       // نرم‌تر). بازی‌های دیگر این آرگومان را نادیده می‌گیرند.
@@ -829,9 +832,77 @@ function scheduleBot(room) {
 
 // Shared post-move step: check for a result, hand over the turn (games like
 // Reversi may skip a blocked player), then let the bot reply.
+/**
+ * مکثِ راندِ **آخر** پیش از اعلامِ نتیجه.
+ *
+ * ── باگی که رفع می‌کند ──
+ *
+ * گزارشِ مالک دربارهٔ دوئلِ طوفان: «راند آخر بازی نمیشه و اگر هم بازی
+ * میشه به کاربر نشون داده نمیشه و فقط نتیجه نشون داده میشه.»
+ *
+ * راندِ آخر **واقعاً بازی می‌شد**؛ فقط هیچ‌وقت دیده نمی‌شد. برای راندهای
+ * ۱ تا ۴، `armTurnClock` مکثِ `resultHoldMs` را می‌گذاشت و کلاینت صحنهٔ
+ * برخورد را نشان می‌داد. ولی راندِ پنجم از مسیرِ دیگری می‌رفت:
+ *
+ *     advance() → result() حکم داد → finish() → emit('game:over')
+ *
+ * یعنی در همان تیک، بازی تمام‌شده اعلام می‌شد. کلاینت `phase` را به
+ * `over` می‌برد، صحنهٔ زنده unmount می‌شد و کاربر فقط کارتِ نتیجه را
+ * می‌دید — بدونِ برخورد، بدونِ اعداد، بدونِ روایت. در حالتِ طوفان
+ * آزاردهنده‌تر بود چون راندِ آخر می‌توانست دوامتیازی یا وقتِ اضافه باشد؛
+ * دقیقاً تعیین‌کننده‌ترین لحظهٔ نبرد، نادیده رد می‌شد.
+ *
+ * ── چرا اینجا و نه در کلاینت ──
+ *
+ * نگه‌داشتنِ `game:over` در کلاینت یعنی همین منطق باید دو بار نوشته شود
+ * (وب و اندروید) و می‌توانست از هم جدا بیفتد. سرور صاحبِ زمان‌بندیِ راند
+ * است، پس یک تغییر در موتور هر دو کلاینت را با هم درست می‌کند. هیچ‌کدام
+ * از دو کلاینت تغییری لازم ندارند: هر دو از قبل `resultUntil` را
+ * می‌فهمند و تا زنده بودنش صحنهٔ راند را نگه می‌دارند.
+ *
+ * ⚠️ فقط *اعلامِ* نتیجه به تعویق می‌افتد. حکم همین حالا و از روی همان
+ *    stateِ قطعی گرفته شده؛ تسویه، جایزه و پنجرهٔ رقابتِ دوباره همگی
+ *    داخلِ `finish` می‌مانند. اگر کسی وسطِ مکث قطع شود، `finish` از
+ *    مسیرِ قطعی خودش زودتر صدا می‌شود و این تایمر بی‌اثر می‌گردد.
+ */
+function finishAfterFinalReveal(room, decided) {
+  const holdBase = room.state && room.state.lastRound
+    ? Number(room.rules.resultHoldMs) || 0
+    : 0;
+  const holdMs = room.state && room.state.lastRound && room.state.lastRound.overtime
+    ? Math.max(holdBase, Number(room.rules.otHoldMs) || holdBase)
+    : holdBase;
+
+  if (!holdMs) return finish(room, decided);
+
+  // از این لحظه اتاق ورودی نمی‌پذیرد: حکم قطعی است و فقط نمایش مانده.
+  // بدونِ این پرچم، تایمرِ نوبت یا ربات می‌توانست وسطِ مکث حرکت بزند.
+  room.finalizing = true;
+  clearTimeout(room.turnTimer);
+  clearTimeout(room.botTimer);
+  room.deadline = null;
+  room.introUntil = null;
+  room.resultUntil = Date.now() + holdMs;
+
+  // همان قالبِ همیشگیِ راند — کلاینت چیزِ تازه‌ای یاد نمی‌گیرد.
+  emitState(room, 'game:update', { turn: null, finalReveal: true });
+
+  room.finalTimer = setTimeout(() => {
+    try {
+      if (room.done) return;
+      room.resultUntil = null;
+      finish(room, decided);
+    } catch (e) {
+      console.error(`[games:${room.gameId}] final reveal failed:`, e.message);
+      try { finish(room, decided); } catch { /* room already torn down */ }
+    }
+  }, holdMs);
+  return undefined;
+}
+
 function advance(room, lastMove, extra = {}) {
   const decided = room.rules.result(room.state);
-  if (decided) return finish(room, decided);
+  if (decided) return finishAfterFinalReveal(room, decided);
 
   const next = room.rules.nextTurn(room.state, room.turn);
   if (!next) {
@@ -1018,7 +1089,10 @@ async function startRoomOrError(io, rules, gameId, a, b, stake, matchMode = null
 }
 
 function suspendForReconnect(room, symbol) {
-  if (!room || room.done || room.vsBot && symbol === 'O' || room.reconnecting[symbol]) return;
+  // `finalizing` یعنی حکمِ نهایی صادر شده و فقط مکثِ نمایشِ راندِ آخر
+  // مانده — هیچ حرکتِ تازه‌ای نباید پذیرفته شود.
+  if (!room || room.done || room.finalizing
+    || room.vsBot && symbol === 'O' || room.reconnecting[symbol]) return;
   room.reconnecting[symbol] = true;
   clearTimeout(room.turnTimer);
   clearTimeout(room.botTimer);

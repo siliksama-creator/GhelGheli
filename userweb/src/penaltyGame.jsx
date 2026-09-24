@@ -238,7 +238,6 @@ function Scoreboard({ view }) {
       <div className={view.myScore > view.foeScore ? 'leading' : ''}>تو</div>
       <strong>{fa(view.myScore)} - {fa(view.foeScore)}</strong>
       <div className={view.foeScore > view.myScore ? 'leading' : ''}>حریف</div>
-      {view.suddenDeath && <b>مرگ ناگهانی</b>}
       <div className="penMarkers mine">
         {view.history.filter(h => h.shooter === view.me).map(marker)}
       </div>

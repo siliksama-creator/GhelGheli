@@ -123,8 +123,16 @@ for (const event of ['duel_intro', 'duel_lock', 'duel_round_win', 'duel_round_lo
 }
 assert(dartSession.includes('startDuelMusic()') && dartSession.includes('stopDuelMusic()'));
 assert(webSession.includes('startDuelMusic()') && webSession.includes('stopDuelMusic()'));
-assert(dartSession.includes('currentRound < totalRounds'), 'Android final round must not double-play outcome');
-assert(webSession.includes('currentRound < totalRounds'), 'Web final round must not double-play outcome');
+// ── چرا این شرط از `<` به `<=` تغییر کرد ───────────────────────────────
+//
+// قبلاً راندِ پنجم از صدای برخورد محروم بود چون `game:over` در همان تیک
+// می‌رسید و دو صدا روی هم می‌افتادند. حالا موتور پیش از اعلامِ نتیجه
+// به‌اندازهٔ `resultHoldMs` مکث می‌کند (`finishAfterFinalReveal` در
+// `engine.js`)، پس برخوردِ راندِ آخر لحظهٔ مستقلِ خودش را دارد و صدای
+// نهایی چند ثانیه بعد و جدا می‌آید. پوششِ راندِ آخر حالا **الزامی** است:
+// بدونِ آن، تعیین‌کننده‌ترین برخوردِ نبرد بی‌صدا رد می‌شود.
+assert(dartSession.includes('currentRound <= totalRounds'), 'Android final round must play its own outcome sound');
+assert(webSession.includes('currentRound <= totalRounds'), 'Web final round must play its own outcome sound');
 assert(engine.includes("payout: !result.duplicate && !draw"), 'payout animation must follow committed settlement');
 assert(engine.includes('winner: draw ? \'DRAW\' : winnerSym') && engine.includes('netPot: result.netPot'),
   'settlement event must carry authoritative winner and pot');

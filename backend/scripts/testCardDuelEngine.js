@@ -75,6 +75,18 @@ function ioHarness() {
     await wait(1200);
   }
 
+  // ── راندِ آخر پیش از اعلامِ نتیجه دیده می‌شود ──
+  //
+  // موتور بعد از حلِ راندِ پنجم بلافاصله `game:over` نمی‌دهد: اول
+  // `resultHoldMs` مکث می‌کند تا کلاینت برخوردِ راندِ آخر را نشان دهد
+  // (`finishAfterFinalReveal`). بدونِ این مکث، کاربر فقط کارتِ نتیجه را
+  // می‌دید و راندِ پنجم را هرگز نمی‌دید — گزارشِ مالک دربارهٔ دوئلِ طوفان.
+  assert(!player.last('game:over'), 'result must not be announced before the final reveal');
+  const reveal = player.last('game:update');
+  assert(reveal && reveal.finalReveal === true, 'final reveal update must be emitted');
+  assert.equal(reveal.state.history.length, 5, 'the fifth round is resolved before the hold');
+  await wait(3600);
+
   const over = player.last('game:over');
   assert(over, 'five live rounds must end the engine room');
   assert(['X', 'O', 'DRAW'].includes(over.winner));
