@@ -9,6 +9,7 @@ module.exports = function createAdminLeagueRoutes(deps) {
     getLeaderboard, getLeagueWinnerCount, ensureActiveSeason,
     closeActiveSeason, leagueApprove, walletService, createNotification,
     defaultPrizeTable, seedCarryoverFromLatestClosed,
+    leagueCountdown,
   } = deps;
   const router = express.Router();
 
@@ -32,6 +33,90 @@ module.exports = function createAdminLeagueRoutes(deps) {
     res.status(409).json({ code: NO_ACTIVE_LEAGUE_CODE, message: NO_ACTIVE_LEAGUE_MESSAGE });
     return null;
   }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // جدولِ یکپارچهٔ جوایز — «هر رتبه، یک نوع جایزه»
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // خواستهٔ مالک: «مشخص کردن جوایز نقدی و امتیازی دونه‌دونه رتبه‌ها تا نفر
+  // ۵۰ — ممکنه جایزه چند روز قلقلی پلاس یا نقدی یا امتیازی باشه.»
+  //
+  // ── چرا ذخیره‌سازی همان دو ستونِ قدیمی ماند ──
+  //
+  // `prize_table` (نقدی) و `perk_table` (غیرنقدی) در سراسرِ مسیرِ بستنِ
+  // فصل، صفِ تأییدِ واریز و گزارش‌ها مصرف می‌شوند. عوض‌کردنِ قالبِ ذخیره
+  // یعنی بازنویسیِ همهٔ آن‌ها — و هر باگِ بی‌صدایش مستقیماً روی پولِ مردم.
+  // پس پنل یک جدولِ واحد نشان می‌دهد و اینجا به همان دو ستون ترجمه
+  // می‌شود: تغییرِ بزرگ در تجربهٔ مدیر، بدونِ کوچک‌ترین تغییری در ریسک.
+  const PRIZE_ROW_KINDS = ['cash', 'points', 'plus_days', 'shop_item', 'card_box'];
+
+  const badInput = (message) => Object.assign(new Error(message), { status: 400 });
+
+  /** ردیف‌های یکپارچهٔ پنل → دو جدولِ ذخیره‌سازی. هر نقص، پیامِ فارسیِ خودش را دارد. */
+  function splitPrizeRows(rows) {
+    const prizeTable = [];
+    const perkTable = [];
+    const seen = new Set();
+    for (const row of rows || []) {
+      const rank = Number(row?.rank);
+      if (!Number.isInteger(rank) || rank < 1 || rank > 300) {
+        throw badInput(`رتبه باید عددی صحیح بین ۱ تا ۳۰۰ باشد (دریافت شد: ${row?.rank})`);
+      }
+      if (seen.has(rank)) throw badInput(`رتبهٔ ${rank} تکراری است`);
+      seen.add(rank);
+
+      const kind = String(row?.kind || 'cash');
+      if (!PRIZE_ROW_KINDS.includes(kind)) {
+        throw badInput(`نوع جایزهٔ رتبهٔ ${rank} معتبر نیست`);
+      }
+      const value = Number(row?.value ?? 0);
+      if (!Number.isInteger(value) || value < 0 || value > 100000000000) {
+        throw badInput(`مقدار جایزهٔ رتبهٔ ${rank} معتبر نیست`);
+      }
+
+      if (kind === 'cash') {
+        prizeTable.push({ rank, amount: value });
+        continue;
+      }
+      // جایزهٔ غیرنقدیِ صفر چیزی تحویل نمی‌دهد ولی پیامِ «برنده شدی»
+      // می‌فرستد — همان صفرِ توخالی که در بستنِ فصل هم رد می‌شود.
+      if (value <= 0) {
+        throw badInput(`مقدار جایزهٔ رتبهٔ ${rank} باید بزرگ‌تر از صفر باشد`);
+      }
+      if (kind === 'card_box' && value > 5) {
+        throw badInput(`تعداد صندوقِ رتبهٔ ${rank} حداکثر ۵ است`);
+      }
+      const itemSlug = row?.itemSlug ? String(row.itemSlug).slice(0, 64) : null;
+      if (kind === 'shop_item' && !itemSlug) {
+        throw badInput(`برای جایزهٔ آیتمِ رتبهٔ ${rank} باید آیتم فروشگاه انتخاب شود`);
+      }
+      perkTable.push({
+        rank,
+        kind,
+        value: kind === 'shop_item' ? 1 : (kind === 'card_box' ? Math.max(1, value) : value),
+        itemSlug,
+        label: row?.label ? String(row.label).slice(0, 160) : null,
+      });
+    }
+    return { prizeTable, perkTable };
+  }
+
+  /** دو جدولِ ذخیره‌شده → ردیف‌های یکپارچه برای پنل. */
+  function toPrizeRows(prizeTable, perkTable) {
+    const rows = [];
+    for (const p of prizeTable || []) {
+      rows.push({ rank: Number(p.rank), kind: 'cash',
+        value: Number(p.amount || 0), label: p.label || null });
+    }
+    for (const p of perkTable || []) {
+      rows.push({ rank: Number(p.rank), kind: p.kind,
+        value: Number(p.value || 0),
+        itemSlug: p.itemSlug || p.item_slug || null, label: p.label || null });
+    }
+    return rows.sort((a, b) => a.rank - b.rank);
+  }
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 router.get('/admin/league', adminAuth, asyncHandler(async (req, res) => {
   const data = await getLeaderboard(100);
@@ -66,6 +151,7 @@ router.get('/admin/league', adminAuth, asyncHandler(async (req, res) => {
     data.noActiveLeague = true;
     data.prizeTable = [];
     data.perkTable = [];
+    data.prizeRows = [];
     data.seasonId = null;
     data.editingSeasonTitle = '';
   } else {
@@ -74,6 +160,7 @@ router.get('/admin/league', adminAuth, asyncHandler(async (req, res) => {
       [season.id]);
     data.prizeTable = rows[0]?.prize_table || [];
     data.perkTable = rows[0]?.perk_table || [];
+    data.prizeRows = toPrizeRows(rows[0]?.prize_table, rows[0]?.perk_table);
     data.seasonId = season.id;
     data.editingSeasonTitle = rows[0]?.title || rows[0]?.month_year || '';
   }
@@ -88,7 +175,32 @@ router.get('/admin/league', adminAuth, asyncHandler(async (req, res) => {
   res.json(data);
 }));
 router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHandler(async (req, res) => {
-  const season = await ensureActiveSeason();
+  // جدولِ یکپارچهٔ پنل اگر رسیده باشد، پیش از اعتبارسنجی به دو جدولِ
+  // ذخیره‌سازی ترجمه می‌شود. پنلِ قدیمی که هنوز `prizeTable` می‌فرستد هم
+  // درست کار می‌کند — مسیر مهاجرت‌ناپذیر نیست.
+  if (Array.isArray(req.body.prizeRows)) {
+    const split = splitPrizeRows(req.body.prizeRows);
+    req.body.prizeTable = split.prizeTable;
+    req.body.perkTable = split.perkTable;
+  }
+
+  // ── ویرایشِ لیگِ انتخابی، نه فقط «لیگِ جاری» ──
+  //
+  // پنل حالا فهرستِ لیگ‌ها را نشان می‌دهد و مدیر یکی را انتخاب می‌کند.
+  // اگر `seasonId` نیامد، همان رفتارِ قبلی (لیگِ جاری) حفظ می‌شود.
+  const requestedId = req.body.seasonId && UUID_RE.test(String(req.body.seasonId))
+    ? String(req.body.seasonId) : null;
+  let season = null;
+  if (requestedId) {
+    const { rows: found } = await pool.query(
+      'SELECT * FROM league_seasons WHERE id=$1', [requestedId]);
+    season = found[0] || null;
+    if (season && season.status === 'closed') {
+      return res.status(409).json({ message: 'فصلِ بسته‌شده قابل ویرایش نیست' });
+    }
+  } else {
+    season = await ensureActiveSeason();
+  }
   if (!season) return noActiveLeague(res);
 
   // AUDIT FIX: prizeTable هرچه بود خام ذخیره می‌شد. یک مبلغ منفی (یا متنی
@@ -363,8 +475,31 @@ router.post('/admin/league/seasons', adminAuth, requireRole(), asyncHandler(asyn
     monthYear = `${leagueType}-${stamp}-${attempt + 2}`;
   }
 
-  const prizeTable = Array.isArray(req.body.prizeTable) ? req.body.prizeTable.slice(0, 300) : defaultPrizeTable();
-  const perkTable = Array.isArray(req.body.perkTable) ? req.body.perkTable.slice(0, 300) : [];
+  let prizeTable = defaultPrizeTable();
+  let perkTable = [];
+  if (Array.isArray(req.body.prizeRows)) {
+    const split = splitPrizeRows(req.body.prizeRows);
+    prizeTable = split.prizeTable;
+    perkTable = split.perkTable;
+  } else {
+    prizeTable = Array.isArray(req.body.prizeTable) ? req.body.prizeTable.slice(0, 300) : defaultPrizeTable();
+    perkTable = Array.isArray(req.body.perkTable) ? req.body.perkTable.slice(0, 300) : [];
+  }
+
+  // ── آیتمِ فروشگاهِ انتخابی باید واقعاً وجود داشته باشد ──
+  //
+  // یک slug اشتباه تا لحظهٔ بستنِ فصل زنده می‌ماند و بعد جایزه به ردیفی
+  // اشاره می‌کند که تحویل‌دادنی نیست.
+  const slugs = [...new Set(perkTable.filter((p) => p.itemSlug).map((p) => p.itemSlug))];
+  if (slugs.length) {
+    const { rows: found } = await pool.query(
+      'SELECT slug FROM shop_items WHERE slug = ANY($1::text[])', [slugs]);
+    const known = new Set(found.map((r) => r.slug));
+    const missing = slugs.filter((s) => !known.has(s));
+    if (missing.length) {
+      return res.status(400).json({ message: `آیتم فروشگاه پیدا نشد: ${missing.join('، ')}` });
+    }
+  }
   const { rows } = await pool.query(
     `INSERT INTO league_seasons
        (month_year, title, league_type, starts_at, ends_at, status,
@@ -391,7 +526,41 @@ router.post('/admin/league/seasons', adminAuth, requireRole(), asyncHandler(asyn
   } catch (e) {
     console.error('[league] انتقالِ سکه هنگامِ ساخت لیگ شکست خورد:', e.message);
   }
-  res.status(201).json({ message: 'لیگ تازه ساخته شد', season: rows[0], carryover });
+  // ── ثانیه‌شمارِ خودکار تا شروعِ لیگ ──
+  //
+  // خواستهٔ مالک: «اگه این تیک بخوره، مثلاً زده باشیم لیگ ۷ مهر شروع
+  // میشه — هر چقدر تا ۷ مهر مونده، اتوماتیک به عنوان ثانیه‌شمار قرار
+  // می‌گیره و تمامی قسمت‌هایی که سکه میدن بسته میشه.»
+  //
+  // پس زمانِ شمارش از **تاریخِ شروعِ خودِ لیگ** گرفته می‌شود، نه از یک
+  // فیلدِ جداگانه که مدیر باید دوباره واردش کند و ممکن است با تاریخِ لیگ
+  // ناهماهنگ بماند.
+  let countdown = null;
+  const wantCountdown = req.body.countdownEnabled === true
+    || req.body.countdownEnabled === 'true';
+  if (wantCountdown && leagueCountdown) {
+    try {
+      countdown = await leagueCountdown.saveSettings({
+        enabled: true,
+        startsAt: startsAt.toISOString(),
+        seasonId: rows[0].id,
+        leagueAutostart: false,
+      }, req.admin.id);
+      await audit(req.admin.id, 'league_countdown_enable', 'app_settings', null,
+        `ثانیه‌شمار تا شروعِ «${title}» روشن شد`, { startsAt: startsAt.toISOString() });
+    } catch (e) {
+      // ساختِ لیگ نباید به‌خاطرِ ثانیه‌شمار شکست بخورد؛ مدیر می‌تواند بعداً
+      // از همان صفحه دوباره امتحان کند.
+      console.error('[league] تنظیمِ ثانیه‌شمار هنگامِ ساخت شکست خورد:', e.message);
+    }
+  }
+
+  res.status(201).json({
+    message: countdown
+      ? 'لیگ ساخته شد و ثانیه‌شمار تا لحظهٔ شروع تنظیم شد'
+      : 'لیگ تازه ساخته شد',
+    season: rows[0], carryover, countdown,
+  });
 }));
 
 /** ویرایشِ یک لیگِ مشخص (نه فقط «لیگِ جاری»). */

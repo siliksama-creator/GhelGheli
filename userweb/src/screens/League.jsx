@@ -86,6 +86,31 @@ function PodiumCard({ rank, row, onTap }) {
   );
 }
 
+/**
+ * «هنوز لیگی ساخته نشده» — خواستهٔ مالک.
+ *
+ * تا پیش از این اگر ادمین لیگی نساخته بود، `season` فقط `null` بود و صفحه
+ * یک جدولِ خالی با پودیومِ بی‌معنا می‌کشید؛ کاربر نمی‌فهمید «لیگی نیست» یا
+ * «لیگ هست ولی کسی بازی نکرده». این دو حالت از نظرِ او زمین تا آسمان فرق
+ * دارد: اولی یعنی صبر کن، دومی یعنی عجله کن.
+ */
+function NoLeagueYet() {
+  return (
+    <div style={{ padding:'28px 18px', textAlign:'center' }}>
+      <div style={{ color:'#FFD700', display:'flex', justifyContent:'center' }}>
+        <SvgIcon name="trophy" size={46} />
+      </div>
+      <h3 style={{ color:'#FFF', fontWeight:'900', margin:'10px 0 6px' }}>
+        هنوز لیگی ساخته نشده
+      </h3>
+      <p style={{ color:'rgba(255,255,255,0.65)', fontSize:'12.5px', lineHeight:1.9, margin:0 }}>
+        به‌محض اینکه مدیر اولین لیگ را بسازد، جدول، جوایز و شمارشِ معکوسِ شروع
+        همین‌جا ظاهر می‌شوند.
+      </p>
+    </div>
+  );
+}
+
 function PreviousWinners({ data }) {
   const prev = data?.previousSeason;
   let winners = [];
@@ -247,6 +272,22 @@ export default function League({ token, openProfile }) {
                 <button className="on">برندگان قبل</button>
               </div>
               <PreviousWinners data={d} />
+            </section>
+          );
+        }
+
+        // ── هیچ لیگی ساخته نشده ──
+        // بعد از تبِ «برندگان قبل» می‌آید چون آن تب حتی بی‌لیگ هم معنا دارد:
+        // برندهٔ دورهٔ قبلی هنوز برنده است.
+        if (d.noLeague || !d.season) {
+          return (
+            <section className="card wide leaguePage" style={{ padding:'16px' }}>
+              <div className="leagueTabs">
+                <button className="on">جدول لیگ</button>
+                <button onClick={()=>setTab('clubs')} >باشگاه‌ها</button>
+                <button onClick={()=>setTab('prev')} >برندگان قبل</button>
+              </div>
+              <NoLeagueYet />
             </section>
           );
         }

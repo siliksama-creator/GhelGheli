@@ -239,6 +239,28 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
         : '${faNum(end.difference(DateTime.now()).inDays)} روز تا پایان این دوره لیگ';
     final top = entries.take(3).toList();
     final rest = entries.skip(3).toList();
+
+    // ── هیچ لیگی ساخته نشده ──
+    //
+    // خواستهٔ مالک: «اگه لیگی قرار نگرفته باید به کاربر وب و اندروید نشون
+    // داده بشه که هنوز لیگی ساخته نشده.»
+    //
+    // تا پیش از این `season` فقط `null` بود و صفحه یک پودیومِ بی‌معنا و یک
+    // جدولِ خالی می‌کشید. کاربر نمی‌فهمید «لیگی برگزار نمی‌شود» یا «لیگ
+    // هست ولی کسی بازی نکرده» — و این دو از نظرِ او زمین تا آسمان فرق
+    // دارد: اولی یعنی صبر کن، دومی یعنی عجله کن.
+    //
+    // آینهٔ `NoLeagueYet` در `userweb/src/screens/League.jsx`.
+    final noLeague = _data?['noLeague'] == true || season == null;
+    if (noLeague) {
+      return Column(
+        children: [
+          _tabs(),
+          const Expanded(child: _NoLeagueYetView()),
+        ],
+      );
+    }
+
     final brand = context.brand;
     final theme = Theme.of(context);
 
@@ -645,6 +667,40 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
 }
 
 /// نمایش برندگان دورهٔ قبلی لیگ (تا پایان لیگ بعدی در این تب نمایش داده می‌شوند).
+/// «هنوز لیگی ساخته نشده» — آینهٔ `NoLeagueYet` در وبِ کاربر.
+class _NoLeagueYetView extends StatelessWidget {
+  const _NoLeagueYetView();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(Gaps.lg),
+      children: [
+        const SizedBox(height: Gaps.lg),
+        Icon(Icons.emoji_events_outlined,
+            size: 46, color: theme.colorScheme.primary),
+        const SizedBox(height: Gaps.md),
+        Text(
+          'هنوز لیگی ساخته نشده',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: Gaps.sm),
+        Text(
+          'به\u200cمحض اینکه مدیر اولین لیگ را بسازد، جدول، جوایز و '
+          'شمارشِ معکوسِ شروع همین\u200cجا ظاهر می\u200cشوند.',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.65),
+            height: 1.9,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _PreviousWinnersView extends StatelessWidget {
   const _PreviousWinnersView({required this.data});
   final Map? data;

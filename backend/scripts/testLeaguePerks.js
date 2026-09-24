@@ -173,54 +173,47 @@ async function main() {
       'LIMIT باید max(winnerCount=2, maxPerkRank=4) باشد؛ با ۲ ردیفِ رتبهٔ ۳ و ۴ اصلاً خوانده نمی‌شد');
   });
 
-  // ── ۳. تحویلِ واقعی ──
-  check('پلاس به‌صورت اشتراکِ رایگان درج می‌شود', () => {
-    const subs = sqlOf(/INSERT INTO user_subscriptions/);
-    assert.strictEqual(subs.length, 1, 'یک اشتراک باید ساخته شود');
-    assert.ok(/VALUES\(\$1,'plus',0,/.test(subs[0].sql),
-      `قیمتِ پرداختی باید صفر باشد — جایزه است نه فروش: ${subs[0].sql}`);
+  // ── ۳. تحویل دیگر در لحظهٔ بستن نیست؛ باید در صفِ تأیید بنشیند ────────
+  //
+  // خواستهٔ مالک: «یه قسمت پایین‌ترش باید این باشه: جوایز منتظرِ تأیید —
+  // که افرادی که جوایز گرفتن به کیف پولشون واریز شه و یا امتیازشو بگیرن
+  // و یا پلاسشون فعال شه.»
+  //
+  // یعنی حتی جایزهٔ غیرنقدی هم دیگر بی‌صدا و بی‌نگهبان تحویل نمی‌شود:
+  // بستنِ فصل فقط «صف» می‌سازد، تحویل با تأییدِ مدیر است. این تصمیم
+  // برگشت‌ناپذیریِ اشتباه را کم می‌کند — اگر جدولِ رتبه‌بندی خراب باشد،
+  // پول و پلاس هر دو هنوز قابلِ توقف‌اند.
+  check('هیچ اشتراکی در لحظهٔ بستنِ فصل ساخته نمی‌شود', () => {
+    assert.strictEqual(sqlOf(/INSERT INTO user_subscriptions/).length, 0,
+      'پلاس باید منتظرِ تأییدِ مدیر بماند، نه اینکه همان لحظه فعال شود');
   });
 
-  check('طولِ پلاسِ جایزه دقیقاً همان روزهای تعیین‌شده است', () => {
-    const sub = sqlOf(/INSERT INTO user_subscriptions/)[0];
-    const [, startsAt, expiresAt] = sub.params;
-    const days = (new Date(expiresAt) - new Date(startsAt)) / 86400000;
-    assert.strictEqual(Math.round(days), 30, `به‌جای ۳۰ روز، ${days} روز`);
+  check('هیچ امتیازی در لحظهٔ بستنِ فصل واریز نمی‌شود', () => {
+    assert.strictEqual(pointCalls.length, 0,
+      'امتیازِ جایزه هم باید منتظرِ تأییدِ مدیر بماند');
   });
 
-  check('پلاسِ جایزه از انتهای اشتراکِ فعلی تمدید می‌شود', () => {
-    const q = db.calls.find(c => /MAX\(expires_at\)/.test(c.sql));
-    assert.ok(q, 'اشتراکِ فعلی خوانده نشد — روزهای باقی‌ماندهٔ خریداری‌شدهٔ کاربر می‌سوزد');
+  check('delivered_at در لحظهٔ بستن ست نمی‌شود', () => {
+    assert.strictEqual(sqlOf(/UPDATE league_perk_awards SET delivered_at/).length, 0,
+      'این ستون فقط بعد از تأییدِ مدیر پر می‌شود وگرنه مدیر نمی‌فهمد چه مانده');
   });
 
-  check('پلاسِ جایزه کمیسیونِ نقدی به معرف نمی‌دهد', () => {
-    assert.strictEqual(sqlOf(/purchase_referral_commissions/).length, 0,
-      'کمیسیونِ نقدی فقط از فروشِ شاپ — قاعدهٔ صریحِ مالک');
-  });
-
-  check('امتیازِ جایزه از دفترِ امتیاز می‌گذرد', () => {
-    assert.strictEqual(pointCalls.length, 1);
-    assert.strictEqual(pointCalls[0].points, 5000);
-    assert.strictEqual(pointCalls[0].source, 'league_perk');
-  });
-
-  check('امتیازِ جایزه به امتیازِ لیگ اضافه نمی‌شود', () => {
-    assert.strictEqual(pointCalls[0].league, false,
-      'وگرنه برندهٔ این ماه، ماهِ بعد را جلوتر شروع می‌کند و جایزه به خودش برمی‌گردد');
-  });
-
-  check('delivered_at بعد از تحویل ست می‌شود', () => {
-    assert.strictEqual(sqlOf(/UPDATE league_perk_awards SET delivered_at/).length, 2);
+  check('جوایزِ غیرنقدی هم در صفِ تأیید می‌نشینند', () => {
+    const payouts = sqlOf(/INSERT INTO league_payouts/);
+    assert.strictEqual(payouts.length, 4,
+      'هر چهار برنده — نقدی و غیرنقدی — باید ردیفِ منتظرِ تأیید داشته باشند');
+    const byUser = new Map(payouts.map((p) => [p.params[1], p]));
+    assert.strictEqual(Number(byUser.get('u1').params[3]), 500000);
+    assert.strictEqual(byUser.get('u1').params[4], null,
+      'برندهٔ نقدی بخشِ غیرنقدی ندارد');
+    assert.strictEqual(Number(byUser.get('u3').params[3]), 0, 'رتبهٔ ۳ نقدی ندارد');
+    assert.strictEqual(byUser.get('u3').params[4], 'plus_days');
+    assert.strictEqual(Number(byUser.get('u3').params[5]), 30);
+    assert.strictEqual(byUser.get('u4').params[4], 'points');
+    assert.strictEqual(Number(byUser.get('u4').params[5]), 5000);
   });
 
   // ── ۴. مرزِ نقدی/غیرنقدی ──
-  check('برای رتبهٔ غیرنقدی ردیفِ پرداختِ نقدی ساخته نمی‌شود', () => {
-    const payouts = sqlOf(/INSERT INTO league_payouts/);
-    assert.strictEqual(payouts.length, 2,
-      'فقط رتبهٔ ۱ و ۲ باید در صفِ تأییدِ مالی بنشینند');
-    assert.deepStrictEqual(payouts.map(p => p.params[1]), ['u1', 'u2']);
-  });
-
   check('برندهٔ غیرنقدی هم در بایگانیِ پروفایل ثبت می‌شود', () => {
     const hist = sqlOf(/INSERT INTO user_league_history/);
     const users = hist.map(h => h.params[0]);
@@ -253,8 +246,8 @@ async function main() {
   check('شمارندهٔ نقدی شاملِ ردهٔ غیرنقدی نمی‌شود', () => {
     assert.strictEqual(result.winners, 2,
       '`leaders` حالا رتبه‌های غیرنقدی را هم دارد؛ عددِ نقدی باید جدا شمرده شود');
-    assert.strictEqual(result.pendingApproval, 2,
-      'فقط جوایزِ نقدی منتظرِ تأییدِ مدیرند');
+    assert.strictEqual(result.pendingApproval, 4,
+      'حالا **همهٔ** جوایز — نقدی و غیرنقدی — منتظرِ تأییدِ مدیرند');
   });
 
   // ══ سناریوی دوم: ردیف‌های خراب کلِ بستنِ فصل را نمی‌خوابانند ══
@@ -311,6 +304,76 @@ async function main() {
       assert.strictEqual(
         db2.calls.filter(c => /SET delivered_at/.test(c.sql)).length, 0,
         'تحویل نشده پس نباید تحویل‌شده علامت بخورد — مدیر باید در پنل ببیند');
+    });
+  }
+
+  // ══ سناریوی سوم: تأییدِ مدیر، هر نوع جایزه را متناسب با خودش تحویل می‌دهد ══
+  //
+  // بستنِ فصل فقط صف می‌سازد؛ اینجا ثابت می‌شود که تأیید واقعاً «پلاس» را
+  // فعال می‌کند و «امتیاز» را به دفترِ امتیاز می‌برد. بدونِ این سناریو،
+  // یک اشتباه در `approvePayouts` می‌تواند ردیف را «پرداخت‌شده» علامت
+  // بزند در حالی که کاربر هیچ چیزی نگرفته — بدترین نوعِ باگ، چون در
+  // گزارشِ مدیر همه‌چیز سبز است.
+  console.log('\nتحویل پس از تأیید:');
+  {
+    const calls = [];
+    const notes3 = [];
+    const pts3 = [];
+    const payout = {
+      id: 'payout-1', user_id: 'u3', league_season_id: SEASON_ID,
+      rank: 3, amount: 0, perk_kind: 'plus_days', perk_value: 30,
+      perk_item_slug: null, perk_label: null, paid_at: null,
+      month_year: '1404-05',
+    };
+    const client = {
+      async query(sql, params = []) {
+        const q = String(sql).replace(/\s+/g, ' ').trim();
+        calls.push({ sql: q, params });
+        // ⚠️ کوئری‌های چندسطره را پیش از تطبیق یک‌خط می‌کنیم؛ وگرنه
+        //    «FROM league_payouts p\n  JOIN league_seasons» با الگوی
+        //    تک‌فاصله‌ای هیچ‌وقت جور نمی‌شود و تست به‌جای شکستِ واقعی،
+        //    ساکت می‌ماند.
+        if (/^(BEGIN|COMMIT|ROLLBACK)/i.test(q)) return { rows: [], rowCount: 0 };
+        if (/FROM league_payouts p JOIN league_seasons/i.test(q)) return { rows: [payout], rowCount: 1 };
+        if (/FROM league_perk_awards/i.test(q)) return { rows: [{ delivered_at: null }], rowCount: 1 };
+        if (/MAX\(expires_at\)/i.test(q)) return { rows: [{ expires_at: null }], rowCount: 1 };
+        if (/INSERT INTO user_subscriptions/i.test(q)) return { rows: [], rowCount: 1 };
+        return { rows: [], rowCount: 0 };
+      },
+      release() {},
+    };
+    const db3 = { client, calls, connect: async () => client, query: (...a) => client.query(...a) };
+
+    stub('src/config/db.js', { pool: db3 });
+    stub('src/services/walletService.js', { credit: async () => ({ balanceAfter: 0 }) });
+    stub('src/services/notificationService.js', {
+      createNotification: async (userId, kind, title, body) => notes3.push({ userId, body }),
+    });
+    stub('src/services/pointService.js', {
+      credit: async (c, o) => { pts3.push(o); return { delta: o.points }; }, SOURCES: [],
+    });
+    delete require.cache[require.resolve(svcPath)];
+    const league3 = require(svcPath);
+
+    const r3 = await league3.approvePayouts('payout-1', 'admin-1');
+
+    check('تأیید، اشتراکِ پلاس را واقعاً می‌سازد', () => {
+      assert.strictEqual(calls.filter((c) => /INSERT INTO user_subscriptions/.test(c.sql)).length, 1,
+        'بدونِ این، ردیف «پرداخت‌شده» می‌شود ولی کاربر پلاس نمی‌گیرد');
+    });
+
+    check('تأیید، delivered_at را ست می‌کند', () => {
+      assert.strictEqual(
+        calls.filter((c) => /UPDATE league_perk_awards SET delivered_at/.test(c.sql)).length, 1);
+    });
+
+    check('تأیید دقیقاً یک‌بار می‌پردازد', () => {
+      assert.strictEqual(r3.paid, 1);
+    });
+
+    check('برنده بعد از تأیید خبردار می‌شود', () => {
+      assert.strictEqual(notes3.length, 1);
+      assert.ok(/پلاس/.test(notes3[0].body), `متن باید بگوید چه تحویل شد: ${notes3[0].body}`);
     });
   }
 

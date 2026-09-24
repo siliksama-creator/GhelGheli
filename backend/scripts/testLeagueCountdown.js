@@ -255,10 +255,20 @@ console.log('\n══ ۴) قراردادِ مشترک: سرور، وب، اند�
     /پیش‌نمایش/.test(adminPage) && /شماره معکوس|شمارش/.test(adminPage));
   const adminMain = read('admin/src/main.jsx');
   const combinedAdminPage = read('admin/src/pages/league.jsx');
-  ok('شمارش مستقیماً داخل فرمِ کانفیگِ لیگ ادمین ترکیب شده است',
+  // ── ثانیه‌شمار دیگر یک مسیرِ جداگانه با فیلدِ زمانِ مستقل نیست ──
+  //
+  // خواستهٔ مالک: «اگه این تیک بخوره مثلاً زده باشیم لیگ ۷ مهر شروع میشه؛
+  // هر چقدر تا ۷ مهر مونده اتوماتیک به عنوان ثانیه‌شمار قرار می‌گیره.»
+  //
+  // پس شمارش باید از **تاریخِ شروعِ همان لیگ** مشتق شود، نه از فیلدی که
+  // مدیر جداگانه پر می‌کند و می‌تواند با تاریخِ لیگ ناهماهنگ بماند. رابط
+  // آن را با همان درخواستِ ساختِ لیگ می‌فرستد و سرور زمان را از `startsAt`
+  // برمی‌دارد.
+  ok('شمارش در همان فرمِ کانفیگ است و از تاریخِ شروعِ لیگ مشتق می‌شود',
     /کانفیگ لیگ/.test(combinedAdminPage)
     && /countdownEnabled/.test(combinedAdminPage)
-    && /api\/admin\/league-countdown/.test(combinedAdminPage)
+    && /countdownEnabled/.test(read('backend/src/routes/adminLeague.js'))
+    && /startsAt:\s*startsAt\.toISOString\(\)/.test(read('backend/src/routes/adminLeague.js'))
     && !/league-countdown.*LeagueCountdownPage/.test(adminMain));
   ok('صفحهٔ پنل فقط برای مدیرکل است (قفلِ اقتصادِ بازی)',
     /league-countdown/.test(read('admin/src/lib/roles.js')));

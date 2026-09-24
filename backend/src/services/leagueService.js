@@ -678,9 +678,12 @@ async function seedCarryoverFromLatestClosed({ leagueType = null, targetSeasonId
 function winnerNotifyBody(w) {
   if (w?.perk) {
     const extra = w.perk.kind === 'card_box'
-      ? 'برایت ثبت شد. از کلکسیون بازش کن.'
-      : 'برایت ثبت شد.';
-    return `تبریک! رتبهٔ ${w.rank} لیگ را گرفتی و ${describePerk(w.perk)} ${extra}`;
+      ? 'برایت ثبت شد؛ پس از تأیید نهایی از کلکسیون بازش کن.'
+      : 'برایت ثبت شد و پس از تأیید نهایی به حسابت می\u200cنشیند.';
+    const cashPart = Number(w?.amount) > 0
+      ? ' جایزهٔ نقدی\u200cات هم پس از تأیید به کیف پولت واریز می\u200cشود.'
+      : '';
+    return `تبریک! رتبهٔ ${w.rank} لیگ را گرفتی و ${describePerk(w.perk)} ${extra}${cashPart}`;
   }
   const amount = Number(w?.amount) || 0;
   if (amount > 0) {
@@ -831,71 +834,24 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
       const rank = Number(entry.rank);
       const perk = perkMap.get(rank) || null;
 
-      // ── ردهٔ غیرنقدی: ردیفِ پرداختِ نقدی ساخته نمی‌شود ──────────────
+      // ── یک ردیفِ پرداخت به‌ازای هر برنده، با هر دو بخشِ جایزه ──────────
       //
-      // نفرِ ۵۱ تا ۷۰ در `league_payouts` **هیچ ردیفی** نمی‌گیرد. یک ردیفِ
-      // صفرتومانی آنجا یعنی در صفحهٔ تأییدِ مالیِ مدیر بیست ردیفِ «۰ تومان»
-      // ظاهر شود که باید تک‌تک تأیید شوند و هیچ پولی هم جابه‌جا نکنند —
-      // یعنی صف تأیید را با نویز پر کند. جایزهٔ غیرنقدی سندِ خودش را دارد.
-      if (rank > winnerCount) {
-        if (perk) {
-          await client.query(
-            `INSERT INTO league_perk_awards
-               (league_season_id, user_id, rank, kind, value, item_slug, label)
-             VALUES ($1,$2,$3,$4,$5,$6,$7)
-             ON CONFLICT (league_season_id, user_id) DO UPDATE
-               SET rank = EXCLUDED.rank, kind = EXCLUDED.kind,
-                   value = EXCLUDED.value, item_slug = EXCLUDED.item_slug,
-                   label = EXCLUDED.label`,
-            [season.id, entry.user_id, rank, perk.kind, perk.value,
-              perk.itemSlug, perk.label]);
-          perksAwarded++;
+      // تا پیش از این دو شاخهٔ جدا بود: رتبه‌های نقدی می‌رفتند توی
+      // `league_payouts` (منتظرِ تأیید) و رتبه‌های غیرنقدی همان لحظهٔ بستنِ
+      // فصل تحویل می‌شدند. یعنی مدیر صفی برای «امتیاز» و «پلاس» نمی‌دید و
+      // اگر جدولِ رتبه‌بندی خراب بود، آن‌ها از قبل رفته بودند و برگشتی
+      // نداشتند.
+      //
+      // حالا **هر** جایزه — نقدی، امتیازی یا پلاس — یک ردیفِ منتظرِ تأیید
+      // می‌سازد و فقط با تأییدِ مدیر تحویل می‌شود. چون قیدِ یکتایی
+      // `(league_season_id, user_id)` است، بخشِ نقدی و غیرنقدیِ یک برنده
+      // در یک ردیف می‌نشینند و یک تأیید هر دو را آزاد می‌کند.
+      const amount = rank <= winnerCount ? (prizeMap.get(rank) || 0) : 0;
+      const hasCash = Number(amount) > 0;
+      const hasPerk = Boolean(perk);
+      if (!hasCash && !hasPerk) continue;
 
-          const delivered = await deliverPerk(client, {
-            userId: entry.user_id, perk, seasonId: season.id,
-            monthYear: season.month_year,
-          });
-          if (delivered) {
-            await client.query(
-              `UPDATE league_perk_awards SET delivered_at=NOW()
-                WHERE league_season_id=$1 AND user_id=$2`,
-              [season.id, entry.user_id]);
-          }
-
-          // رتبه و بایگانیِ پروفایل برای این‌ها هم لازم است، وگرنه
-          // کاربرِ رتبهٔ ۵۵ در پروفایلش هیچ ردی از این فصل نمی‌بیند.
-          await client.query(
-            'UPDATE league_leaderboard_entries SET rank=$1 WHERE league_season_id=$2 AND user_id=$3',
-            [rank, season.id, entry.user_id]);
-          await client.query(
-            `INSERT INTO user_league_history
-               (user_id, season_id, month_year, rank, points, coins, prize_amount)
-             VALUES ($1,$2,$3,$4,$5,$6,0)
-             ON CONFLICT (user_id, season_id) DO UPDATE
-               SET rank = EXCLUDED.rank, points = EXCLUDED.points,
-                   coins = EXCLUDED.coins`,
-            [entry.user_id, season.id, season.month_year,
-              rank, entry.points, Number(entry.coins || 0)]);
-
-          winnersToNotify.push({
-            userId: entry.user_id,
-            rank,
-            amount: 0,
-            perk,
-            monthYear: season.month_year,
-            pendingApproval: false,
-          });
-        }
-        continue;
-      }
-
-      const amount = prizeMap.get(rank) || 0;
-
-      // ⚠️ یک کاربر می‌تواند هم در ردهٔ نقدی باشد و هم مدیر برایش
-      //    غیرنقدی گذاشته باشد (مثلاً رتبهٔ ۱: پول + پلاس). قید
-      //    UNIQUE(season, user) اجازهٔ هر دو را می‌دهد چون در دو جدولِ
-      //    جدا می‌نشینند.
-      if (perk) {
+      if (hasPerk) {
         await client.query(
           `INSERT INTO league_perk_awards
              (league_season_id, user_id, rank, kind, value, item_slug, label)
@@ -903,45 +859,39 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
            ON CONFLICT (league_season_id, user_id) DO UPDATE
              SET rank = EXCLUDED.rank, kind = EXCLUDED.kind,
                  value = EXCLUDED.value, item_slug = EXCLUDED.item_slug,
-                 label = EXCLUDED.label`,
+                 label = EXCLUDED.label,
+                 delivered_at = NULL`,
           [season.id, entry.user_id, rank, perk.kind, perk.value,
             perk.itemSlug, perk.label]);
-        perksAwarded++;
-        const deliveredPerk = await deliverPerk(client, {
-          userId: entry.user_id, perk, seasonId: season.id,
-          monthYear: season.month_year,
-        });
-        if (deliveredPerk) {
-          await client.query(
-            `UPDATE league_perk_awards SET delivered_at=NOW()
-              WHERE league_season_id=$1 AND user_id=$2`,
-            [season.id, entry.user_id]);
-        }
+        perksAwarded += 1;
       }
-      // TIE HANDLING.
-      // DENSE_RANK gives tied players the same rank, which is correct. The
-      // conflict target used to be (season, rank), so on a tie for 3rd place
-      // the second player's insert hit ON CONFLICT DO NOTHING and their prize
-      // vanished with no error. The real invariant is one payout per USER per
-      // season — see migration 014.
-      const payout = await client.query(
-        `INSERT INTO league_payouts(league_season_id,user_id,rank,amount)
-         VALUES($1,$2,$3,$4)
-         ON CONFLICT(league_season_id, user_id) DO UPDATE
-           SET rank = EXCLUDED.rank, amount = EXCLUDED.amount
-         RETURNING id, paid_at`,
-        [season.id, entry.user_id, entry.rank, amount]
-      );
-      await client.query('UPDATE league_leaderboard_entries SET rank=$1 WHERE league_season_id=$2 AND user_id=$3', [entry.rank, season.id, entry.user_id]);
 
-      // PERMANENT PROFILE RECORD.
-      //
-      // monthly_league_points is wiped below, and the leaderboard belongs to
-      // a season nobody will look at again. Without this row the user has no
-      // way to see "I finished 3rd in Mordad and won 100,000" once the new
-      // month starts — which the product explicitly wants on the profile.
-      // سکه هم بایگانی می‌شود: بعد از ریستِ فصل، تنها جایی که «۲۴۰ سکه در
-      // مرداد گرفتم» باقی می‌ماند همین ردیف است.
+      await client.query(
+        `INSERT INTO league_payouts
+           (league_season_id, user_id, rank, amount,
+            perk_kind, perk_value, perk_item_slug, perk_label)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT(league_season_id, user_id) DO UPDATE
+           SET rank = EXCLUDED.rank,
+               amount = EXCLUDED.amount,
+               perk_kind = EXCLUDED.perk_kind,
+               perk_value = EXCLUDED.perk_value,
+               perk_item_slug = EXCLUDED.perk_item_slug,
+               perk_label = EXCLUDED.perk_label,
+               paid_at = NULL,
+               payment_status = 'pending',
+               approved_by = NULL,
+               approved_at = NULL`,
+        [season.id, entry.user_id, rank, amount,
+          perk ? perk.kind : null,
+          perk ? perk.value : null,
+          perk ? perk.itemSlug : null,
+          perk ? perk.label : null]);
+
+      await client.query(
+        'UPDATE league_leaderboard_entries SET rank=$1 WHERE league_season_id=$2 AND user_id=$3',
+        [rank, season.id, entry.user_id]);
+
       await client.query(
         `INSERT INTO user_league_history
            (user_id, season_id, month_year, rank, points, coins, prize_amount)
@@ -952,55 +902,18 @@ async function closeActiveSeason({ force = false, seasonId = null } = {}) {
                coins = EXCLUDED.coins,
                prize_amount = EXCLUDED.prize_amount`,
         [entry.user_id, season.id, season.month_year,
-         entry.rank, entry.points, Number(entry.coins || 0), amount]);
+          rank, entry.points, Number(entry.coins || 0), amount]);
 
-      // PAY THE WINNER.
-      //
-      // This step did not exist: closing a season wrote a league_payouts row
-      // and stopped there, so the prize was recorded but the money never
-      // reached anyone's wallet. Nobody had actually been paid.
-      //
-      // walletService.credit is idempotent on (source, reference_id), so a
-      // re-run of the close job — or a retry after a crash mid-transaction —
-      // cannot pay the same rank twice.
-      // ═══════════════════════════════════════════════════════════════
-      // ⚠️ واریزِ خودکار **حذف شد** — حالا تأییدِ مدیر لازم است
-      // ═══════════════════════════════════════════════════════════════
-      //
-      // ── خواستهٔ مالک ──
-      //
-      //   «جوایز لیگ بعد از تایید مدیریت به کیف پول ها داده میشه»
-      //
-      // ── چرا این تغییر درست است ──
-      //
-      // بستنِ فصل ممکن است با تقلب، باگ، یا دادهٔ خرابِ جدولِ رتبه‌بندی
-      // همراه باشد. تا امروز پول **در همان لحظه** به کیف پول می‌رفت و
-      // چون کاربر می‌توانست فوراً درخواستِ برداشت بدهد، عملاً
-      // برگشت‌ناپذیر بود.
-      //
-      // حالا فصل بسته می‌شود، رتبه‌ها و مبالغ ثبت می‌شوند، ولی پول
-      // منتظرِ تأییدِ مدیر می‌ماند. مدیر جدول را می‌بیند، اگر چیزی
-      // مشکوک بود اصلاحش می‌کند، و بعد آزاد می‌کند.
-      //
-      // مسیرِ تأیید: POST /api/admin/league/payouts/:id/approve
-      //              POST /api/admin/league/payouts/approve-all
-      //
-      // ⚠️ `winnersToNotify` هم اینجا پر **نمی‌شود**. اعلانِ «جایزه به
-      //    کیف پولت واریز شد» باید در لحظهٔ واریزِ واقعی برود، نه در
-      //    لحظهٔ بستنِ فصل — وگرنه کاربر کیف پولش را باز می‌کند و
-      //    چیزی نمی‌بیند.
-      //
-      //    به‌جایش یک اعلانِ متفاوت می‌رود: «رتبه‌ات مشخص شد».
-      if (amount > 0) {
-        winnersToNotify.push({
-          userId: entry.user_id,
-          rank: entry.rank,
-          amount,
-          monthYear: season.month_year,
-          pendingApproval: true,
-        });
-      }
+      winnersToNotify.push({
+        userId: entry.user_id,
+        rank,
+        amount,
+        perk,
+        monthYear: season.month_year,
+        pendingApproval: true,
+      });
     }
+
     await client.query(
       "UPDATE league_seasons SET status='closed', paid_at=NOW(), updated_at=NOW() WHERE id=$1",
       [season.id]);
@@ -1218,35 +1131,81 @@ async function approvePayouts(payoutId, adminId) {
       : await client.query(
         `SELECT p.*, s.month_year FROM league_payouts p
            JOIN league_seasons s ON s.id = p.league_season_id
-          WHERE p.paid_at IS NULL AND p.amount > 0
+          WHERE p.paid_at IS NULL
+            AND (p.amount > 0 OR p.perk_kind IS NOT NULL)
           ORDER BY p.created_at FOR UPDATE OF p`);
 
     for (const p of rows) {
       if (p.paid_at) { skipped += 1; continue; }
-      const amount = Number(p.amount || 0);
-      if (amount <= 0) { skipped += 1; continue; }
 
-      const res = await walletService.credit(client, {
-        userId: p.user_id,
-        amount,
-        source: 'league',
-        referenceType: 'league_payout',
-        referenceId: p.id,
-        description: `جایزهٔ لیگ ${p.month_year} — رتبهٔ ${p.rank}`,
-      });
+      const amount = Number(p.amount || 0);
+      const perk = p.perk_kind
+        ? { kind: p.perk_kind, value: Number(p.perk_value) || 0,
+            itemSlug: p.perk_item_slug || null, label: p.perk_label || null }
+        : null;
+      if (amount <= 0 && !perk) { skipped += 1; continue; }
+
+      const parts = [];
+      let duplicateCash = false;
+      let creditedAmount = 0;
+
+      // ── بخشِ نقدی → کیف پول ──────────────────────────────────────────
+      if (amount > 0) {
+        const res = await walletService.credit(client, {
+          userId: p.user_id,
+          amount,
+          source: 'league',
+          referenceType: 'league_payout',
+          referenceId: p.id,
+          description: `جایزهٔ لیگ ${p.month_year} — رتبهٔ ${p.rank}`,
+        });
+        if (res.duplicate) duplicateCash = true;
+        else { creditedAmount = amount; parts.push(`${amount.toLocaleString('fa-IR')} تومان به کیف پولت واریز شد`); }
+      }
+
+      // ── بخشِ غیرنقدی → امتیاز / پلاس / آیتم / صندوق ──────────────────
+      //
+      // ⚠️ محافظِ تکرار: `league_perk_awards.delivered_at`. بی‌آن، تأییدِ
+      //    دوبارهٔ یک ردیف (مثلاً بعد از شکستِ نیمه‌راه) امتیاز یا روزهای
+      //    پلاس را دوبار می‌داد و هیچ لاگی هم نمی‌گفت چرا.
+      let deliveredPerk = false;
+      if (perk) {
+        const award = await client.query(
+          `SELECT delivered_at FROM league_perk_awards
+            WHERE league_season_id=$1 AND user_id=$2`,
+          [p.league_season_id, p.user_id]);
+        if (award.rows[0]?.delivered_at) {
+          duplicateCash = duplicateCash && true;
+        } else {
+          deliveredPerk = await deliverPerk(client, {
+            userId: p.user_id, perk, seasonId: p.league_season_id,
+            monthYear: p.month_year,
+          });
+          if (deliveredPerk) {
+            await client.query(
+              `UPDATE league_perk_awards SET delivered_at=NOW()
+                WHERE league_season_id=$1 AND user_id=$2`,
+              [p.league_season_id, p.user_id]);
+            parts.push(`${describePerk(perk)} به حسابت نشست`);
+          }
+        }
+      }
+
+      // ردیف همیشه «تأییدشده» علامت می‌خورد اگر دست‌کم یک بخش تحویل رفته
+      // باشد؛ وگرنه تأییدِ توخالی است و مدیر فکر می‌کند کار انجام شده.
+      const deliveredSomething = creditedAmount > 0 || deliveredPerk;
+      if (!deliveredSomething) { skipped += 1; continue; }
+
       await client.query(
         `UPDATE league_payouts
             SET paid_at = NOW(), payment_status = 'paid',
                 approved_by = $2, approved_at = NOW()
           WHERE id = $1`, [p.id, adminId]);
-      if (!res.duplicate) {
-        paid += 1;
-        total += amount;
-        notify.push({ userId: p.user_id, amount, rank: p.rank,
-          monthYear: p.month_year });
-      } else {
-        skipped += 1;
-      }
+
+      paid += 1;
+      total += creditedAmount;
+      notify.push({ userId: p.user_id, amount: creditedAmount, rank: p.rank,
+        monthYear: p.month_year, parts });
       affectedSeasons.add(p.league_season_id);
     }
 
@@ -1279,7 +1238,8 @@ async function approvePayouts(payoutId, adminId) {
         "SELECT 1 FROM league_seasons WHERE status='active' AND starts_at <= NOW() AND ends_at > NOW() LIMIT 1");
       const { rows: stillPending } = await client.query(
         `SELECT 1 FROM league_payouts
-          WHERE paid_at IS NULL AND amount > 0 LIMIT 1`);
+          WHERE paid_at IS NULL
+            AND (amount > 0 OR perk_kind IS NOT NULL) LIMIT 1`);
       if (!stillActive.length && !stillPending.length) {
         // ── دفترِ سکه: «سکه‌هایم کجا رفت؟» ─────────────────────────────
         // این تنها جایی است که عددِ سکه بی‌واسطه صفر می‌شود. پیش از این
@@ -1315,11 +1275,13 @@ async function approvePayouts(payoutId, adminId) {
   // اعلان **بعد از** COMMIT: اگر تراکنش برگردد، کاربر نباید پیامِ
   // واریزی بگیرد که رخ نداده.
   for (const n of notify) {
+    const body = n.parts?.length
+      ? `جایزهٔ رتبهٔ ${n.rank} تأیید و تحویل شد: ${n.parts.join('، ')}.`
+      : `جایزهٔ رتبهٔ ${n.rank} تأیید شد.`;
     createNotification(
       n.userId, 'league',
-      `جایزهٔ لیگ ${n.monthYear} واریز شد`,
-      `جایزهٔ رتبهٔ ${n.rank} به مبلغ ${n.amount.toLocaleString('fa-IR')} `
-      + 'تومان به کیف پول شما واریز شد.',
+      `جایزهٔ لیگ ${n.monthYear} تأیید شد`,
+      body,
     ).catch((e) => console.error('[league] payout notify failed:', e.message));
   }
   // تأییدِ واریز ممکن است شمارندهٔ سکه را ریست کرده باشد (نگاه کنید به

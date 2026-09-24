@@ -763,6 +763,7 @@ app.use('/api', require('./routes/adminLeague')({
   getLeaderboard, getLeagueWinnerCount, ensureActiveSeason,
   closeActiveSeason, leagueApprove, walletService, createNotification,
   defaultPrizeTable, seedCarryoverFromLatestClosed,
+  leagueCountdown,
 }));
 
 // User administration and point-ledger inspection.
