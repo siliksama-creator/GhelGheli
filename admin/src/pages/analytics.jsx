@@ -3,6 +3,28 @@ import { Activity, CheckCircle2, RefreshCw, Share2, Repeat2, AlertTriangle } fro
 import { Card, Button, Badge } from '../components/ui.jsx';
 import { fmtNumber } from '../lib/api.js';
 import { useToast } from '../lib/toast.jsx';
+import { RARITY_LABELS, RARITY_KEYS, normalizeRarity } from '../lib/rarity.js';
+
+/**
+ * آمارِ «برد بر اساس کمیابی» از **دیتابیسِ نبردها** می‌آید، نه از کاتالوگ.
+ * پس نبردهای قبل از مایگریشن ۱۰۰ هم کلیدِ نسلِ قبل
+ * (normal/silver/gold/…) دارند و اگر خام چاپ شوند، مدیر «legendary» و
+ * «لجند» را دو ردیفِ جدا می‌بیند.
+ *
+ * این تابع کلیدها را با همان نگاشتِ کلاینت‌ها فرو می‌کاست (نقره‌ای و طلاییِ
+ * قدیمی هر دو → کمیاب)، جمعشان می‌کند، و خروجی را به ترتیب نردبان
+ * (معمولی → افسانه‌ای) برمی‌گرداند تا جدول با بقیهٔ پنل یک‌دست باشد.
+ */
+function foldRarityWins(wins) {
+  const folded = {};
+  for (const [key, value] of Object.entries(wins || {})) {
+    const klass = normalizeRarity(key);
+    folded[klass] = (folded[klass] || 0) + Number(value || 0);
+  }
+  const ladder = RARITY_KEYS.filter((k) => folded[k] != null);
+  const rest = Object.keys(folded).filter((k) => !RARITY_KEYS.includes(k));
+  return [...ladder, ...rest].map((key) => [key, RARITY_LABELS[key] || key, folded[key]]);
+}
 
 /**
  * تحلیل رشد + صندوق خطا + آمار گردونه و کمیسیون معرفی.
@@ -162,8 +184,8 @@ export function AnalyticsPage({ request }) {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:10 }}>
           <div>
             <b>برد بر اساس کمیابی</b>
-            {Object.entries(duel.rarityWins || {}).map(([k,v]) => (
-              <div key={k} className="topbar-sub">{k}: {fmtNumber(v)}</div>
+            {foldRarityWins(duel.rarityWins).map(([k,label,v]) => (
+              <div key={k} className="topbar-sub">{label}: {fmtNumber(v)}</div>
             ))}
           </div>
           <div>
