@@ -855,7 +855,12 @@ class _Finale extends StatelessWidget {
                   session.finishReason == 'disconnect'
                       ? session.resultText
                       : draw
-                          ? 'امتیاز تو: ۰ (ورودی کامل برگشت)'
+                          // تساوی: کمسیون کسر می‌شود (۳ مهر ۱۴۰۵)؛ عددها
+                          // از `game:settlement` می‌آیند نه از حسابِ UI.
+                          ? (session.drawRefund > 0
+                              ? '${faNum(session.drawRefund)} امتیاز برگشت '
+                                  '(کمسیون ${faNum(session.drawFee)})'
+                              : 'ورودی منهای کمسیون برگشت')
                           : won
                               // امتیازِ مثبت برای برنده — سودِ خالص:
                               // پاتِ دریافتی منهای ورودیِ خودش (خواستهٔ مالک).

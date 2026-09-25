@@ -132,12 +132,25 @@ function fakePoints() {
   {
     const c = new FakeClient({ match: { ...baseMatch } });
     const points = fakePoints();
-    await createGameStakeService(fakeDb(c), points)
+    const r = await createGameStakeService(fakeDb(c), points)
       .settleMatch({ matchId: 'm3', draw: true });
-    ok(points.calls.length === 2 && points.calls.every(x => x.points === 1000),
-      'در تساوی اصل stake دقیقاً به هر دو برمی‌گردد');
+    // ── تساوی (۳ مهر ۱۴۰۵): ورودی منهای کمسیون ──
+    // stake=1000 · پات=2000 · کمسیون=200 → هر نفر ۱۰۰ کمسیون می‌دهد و
+    // ۹۰۰ برمی‌گیرد. پیش از این اصلِ ۱۰۰۰ کامل برمی‌گشت.
+    ok(points.calls.length === 2 && points.calls.every(x => x.points === 900),
+      'در تساوی هر طرف ۹۰۰ (۱۰۰۰ منهای نصفِ کمسیون) برمی‌گرداند');
+    ok(r.drawFee === 200 && r.drawFeeByUser.u1 === 100 && r.drawFeeByUser.u2 === 100,
+      'کمسیونِ تساوی نصف‌نصف بین دو نفر تقسیم می‌شود');
+    ok(r.drawRefundByUser.u1 === 900 && r.drawRefundByUser.u2 === 900,
+      'عددِ برگشتیِ هر کاربر authoritative برمی‌گردد');
+    // ترازِ پول: هرچه از پات کم شد، جایی نشسته — نه یک امتیاز گم، نه
+    // یک امتیاز از هوا.
+    ok(r.drawRefundByUser.u1 + r.drawRefundByUser.u2 + r.drawFee === 2000,
+      'جمعِ برگشتی‌ها + کمسیون دقیقاً برابرِ پات است');
     ok(points.calls.every(x => x.lifetimeGain === 0),
       'refund تساوی lifetime تازه نمی‌سازد');
+    ok(points.calls.every(x => x.referenceType === 'game_stake_draw_refund'),
+      'نوعِ مرجعِ هر دو برگشت همان draw_refund است');
   }
   {
     const c = new FakeClient({ match: { ...baseMatch, status: 'settled', outcome: 'winner' } });

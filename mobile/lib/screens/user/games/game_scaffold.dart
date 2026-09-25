@@ -542,7 +542,11 @@ class _ResultStrip extends StatelessWidget {
     String? deltaText;
     if (showDelta) {
       if (draw) {
-        deltaText = 'امتیاز تو: ۰ (ورودی کامل برگشت)';
+        // تساویِ پنالتی: کمسیون کسر می‌شود، پس «ورودی کامل» دروغ بود.
+        deltaText = session.drawRefund > 0
+            ? '${faNum(session.drawRefund)} امتیاز برگشت '
+                '(کمسیون ${faNum(session.drawFee)})'
+            : 'ورودی منهای کمسیون برگشت';
       } else if (won) {
         final net = (session.netPot - stakeVal).clamp(0, 1 << 31);
         deltaText = '+${faNum(net)} امتیاز';

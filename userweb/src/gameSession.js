@@ -121,6 +121,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         vsBot: Boolean(d.vsBot), matchMode: d.matchMode || null,
         roomId: d.roomId, matchId: d.roomId, timedOut: null,
         settlementStatus: 'settled',
+        drawRefund: 0, drawFee: 0,
         stakePayoutAmount: 0, stakePayoutWinner: null, stakeWinnerBalanceAfter: null,
     stakePayoutSequence: 0,
         rematchAvailable: false, finishReason: null,
@@ -206,6 +207,14 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
           ...prev,
           settlementStatus: d?.status || prev.settlementStatus,
           netPot: Number(d?.netPot || prev.netPot || 0),
+          // ── تساویِ پنالتی (۳ مهر ۱۴۰۵) ──
+          // «ورودی کامل برگشت» دیگر درست نیست: کمسیون از هر دو طرف کم
+          // می‌شود. عددها را **سرور** می‌فرستد (`refund`/`fee` هر سوکت) و
+          // UI هیچ‌وقت خودش نصف نمی‌کند — وگرنه روزی که درصدِ کمسیون عوض
+          // شود، UI دروغ می‌گوید. صفر یعنی «سرور چیزی نفرستاده» و در آن
+          // حالت متنِ محافظه‌کارانه نشان داده می‌شود.
+          drawRefund: Number(d?.refund ?? prev.drawRefund ?? 0),
+          drawFee: Number(d?.fee ?? prev.drawFee ?? 0),
           coinsAwarded: coinsAwarded > 0 ? coinsAwarded : prev.coinsAwarded,
           coinsWinner: coinsAwarded > 0
             ? (d?.winner || null) : prev.coinsWinner,

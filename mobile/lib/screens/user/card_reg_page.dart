@@ -156,6 +156,62 @@ class CardRegPage extends StatelessWidget {
                   embedded: true,
                   onRegistered: () => onRefresh?.call(),
                 ),
+                // ── توضیحِ اثرِ کلاسِ کارت در دوئل — متنِ زنده ────────────
+                // همان کلیدِ وب، همان جمله، همان فول‌بکِ واژه‌به‌واژه.
+                // بدونِ این بلوک، جمله فقط در وب زنده می‌شد و ادمین فکر
+                // می‌کرد عوض کرده ولی روی گوشی چیزی تغییر نمی‌کرد — همان
+                // تفاوتِ دو پلتفرمی که فازِ «لایو» برای بستنش ساخته شد.
+                //
+                // ⚠️ `ListenableBuilder` عمدی است، نه `Text` خشک: بدنهٔ
+                //    builder یک closure است و شرطِ «متنِ خالی ⇒ هیچ چیز»
+                //    فقط همان‌جا نوشتنی است. متغیرِ `final` را نمی‌شود
+                //    مستقیم وسطِ لیستِ فرزندان تعریف کرد (خطای کامپایل) —
+                //    این‌جا همان تله رعایت شده.
+                ListenableBuilder(
+                  listenable: AppConfig.instance,
+                  builder: (context, _) {
+                    final note = liveText(
+                      'cardReg.duelEffectNote',
+                      'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده افکت اصلی کارتش ضعیف تر هستش با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه',
+                    );
+                    if (note.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsetsDirectional.only(top: 12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: Corners.rLg,
+                          color: BrandColors.info.withValues(alpha: 0.10),
+                          border: Border.all(
+                              color: BrandColors.info.withValues(alpha: 0.30)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsetsDirectional.only(top: 1),
+                              child: Icon(Icons.info_outline,
+                                  size: 16, color: BrandColors.info),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                note,
+                                style: const TextStyle(
+                                  color: Color(0xFFE2E8F0),
+                                  fontSize: 11.5,
+                                  height: 1.7,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),

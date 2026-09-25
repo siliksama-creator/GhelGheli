@@ -82,6 +82,12 @@ class GameSession extends ChangeNotifier {
   /// خراب است، در حالی که فقط سهمیه تمام شده یا لیگی فعال نبوده.
   int coinsAwarded = 0;
   String? coinsWinner;
+  /// ── تساویِ پنالتی (۳ مهر ۱۴۰۵) ──
+  /// ورودی منهای کمسیون برمی‌گردد؛ عددها را سرور در `game:settlement`
+  /// می‌فرستد تا اپ هیچ‌وقت خودش نصف نکند (اگر روزی درصدِ کمسیون عوض
+  /// شود، UI نباید دروغ بگوید). صفر = «سرور نفرستاده».
+  int drawRefund = 0;
+  int drawFee = 0;
 
   bool rematchAvailable = false;
   bool rematchWaiting = false;
@@ -428,6 +434,9 @@ class GameSession extends ChangeNotifier {
       }
       settlementStatus = '${m['status'] ?? settlementStatus}';
       netPot = (m['netPot'] as num?)?.toInt() ?? netPot;
+      // فقط در تساوی معنا دارند؛ سرور در برد صفر می‌فرستد.
+      drawRefund = (m['refund'] as num?)?.toInt() ?? drawRefund;
+      drawFee = (m['fee'] as num?)?.toInt() ?? drawFee;
       // فقط وقتی سکه‌ای واقعاً داده شده state را دست می‌زنیم؛ رویدادِ
       // بدونِ سکه نباید نشانِ قبلی را پاک کند یا نشانِ صفر بسازد.
       final coins = (m['coins'] as num?)?.toInt() ?? 0;

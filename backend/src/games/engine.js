@@ -613,6 +613,16 @@ function finish(room, winner, disconnectedSym = null) {
           // سرویس آن را بعد از اعمالِ سهمیه و وضعیتِ لیگ می‌سازد، پس
           // همیشه بر اعدادِ جدول ارجح است.
           const paidCoins = result.coinsByUser || {};
+          // عددهای کمسیونِ تساوی، کلیدخورده به کاربر — همان قاعدهٔ
+          // `coinsForSeat`: مقدارِ authoritative از سرویس، نه محاسبهٔ UI.
+          const feeForSeat = (sym) => {
+            const uid = room.players?.[sym]?.id;
+            return Number((result.drawFeeByUser || {})[uid] || 0);
+          };
+          const refundForSeat = (sym) => {
+            const uid = room.players?.[sym]?.id;
+            return Number((result.drawRefundByUser || {})[uid] || 0);
+          };
           const coinsForSeat = (sym) => {
             const uid = room.players?.[sym]?.id;
             // ⚠️ `??` نه `||` — صفرِ واقعی («سهمیه‌ات پر بود») باید صفر
@@ -639,6 +649,10 @@ function finish(room, winner, disconnectedSym = null) {
               commission: result.commission || room.commission || 0,
               payout: !result.duplicate && !draw,
               balanceAfter: sym === winnerSym ? result.winnerBalanceAfter : null,
+              // فقط در تساوی معنا دارند؛ در برد صفر می‌مانند تا کلاینت
+              // مجبور نباشد شرط بگذارد.
+              refund: draw ? refundForSeat(sym) : 0,
+              fee: draw ? feeForSeat(sym) : 0,
               // ── سکهٔ **همین** بازیکن ────────────────────────────────
               //
               // تا دورِ ۲۵ اینجا سکهٔ برنده به هر دو سوکت می‌رفت، چون
@@ -659,7 +673,12 @@ function finish(room, winner, disconnectedSym = null) {
               const sock = room.seats[sym];
               if (sock?.emit) safeEmit(sock, 'game:stake_refund', {
                 stake: room.stake,
-                message: 'مسابقه مساوی شد؛ ورودی کامل برگشت.',
+                // عددها از سرویسِ تسویه می‌آیند (نه محاسبهٔ این‌جا) تا اگر
+                // روزی درصدِ کمسیون عوض شد، متن و عدد با هم عوض شوند.
+                refund: refundForSeat(sym),
+                fee: feeForSeat(sym),
+                message: `مسابقه مساوی شد؛ ${refundForSeat(sym)} امتیاز `
+                  + 'برگشت (کمسیون کسر شد).',
                 coins: coinsForSeat(sym),
               }, room);
             }

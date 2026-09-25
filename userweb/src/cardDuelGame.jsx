@@ -1187,7 +1187,12 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
           <div className={`duelSettlement ${session.g.settlementStatus || 'settled'}`}>
             {session.g.finishReason === 'disconnect'
               ? finalVerdict.label
-              : winner === 'DRAW' ? 'امتیاز تو: ۰ (ورودی کامل برگشت)'
+              // تساوی (۳ مهر ۱۴۰۵): ورودی منهای کمسیون برمی‌گردد، پس
+              // «ورودی کامل» دروغ می‌شد. عددها از سرور می‌آیند.
+              : winner === 'DRAW'
+                ? (Number(session.g.drawRefund) > 0
+                  ? `${fa(session.g.drawRefund)} امتیاز برگشت · کمسیون ${fa(session.g.drawFee)}`
+                  : 'ورودی منهای کمسیون برگشت')
                 : iWon
                   // امتیازِ مثبت برای برنده — سودِ خالص: پاتِ دریافتی منهای
                   // ورودیِ خودش. (خواستهٔ مالک)

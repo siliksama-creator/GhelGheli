@@ -32,6 +32,18 @@ export default function CardReg({ items, grants, token, reload, setMsg }) {
           </div>
           <PhotoCardBox token={token} setMsg={setMsg} onDone={reload} />
         </div>
+        {/* ── توضیحِ اثرِ کلاسِ کارت در دوئل — متنِ زنده ─────────────────
+            خواستهٔ مالک: «زیرش یک متنِ زندهٔ قابلِ‌تغییر در پنلِ ادمین که
+            روی اندروید هم بدونِ آپدیت عوض شود.» پس:
+              • اینجا فقط `text()` است؛ هیچ واژه‌ای سفت نیست.
+              • فول‌بکِ ورودی **واژه‌به‌واژه** همان مقدارِ پیش‌فرضِ سرور
+                است (`liveContent.DEFAULT_COPY`)، وگرنه در قطعیِ شبکه
+                کاربر یک جمله و بعد از وصل‌شدن جملهٔ دیگری می‌دید.
+            گاردِ `live-copy-parity` همین برابری را می‌سنجد. */}
+        <div className="cardRegNote">
+          <span aria-hidden="true">ⓘ</span>
+          <p>{text('cardReg.duelEffectNote', 'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده افکت اصلی کارتش ضعیف تر هستش با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه')}</p>
+        </div>
       </div>
       <Inventory items={items} grants={grants} token={token} reload={reload} />
     </>

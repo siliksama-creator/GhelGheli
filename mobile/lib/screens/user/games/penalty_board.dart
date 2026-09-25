@@ -557,22 +557,32 @@ class _Scoreboard extends StatelessWidget {
           ),
           Gaps.vXs,
           // ردیف توپ‌ها: گل سبز، مهار/بیرون خاکستری. یک نگاه کافی است.
+          //
+          // ⚠️ با ۱۰ ضربه برای هر بازیکن (۳ مهر ۱۴۰۵) این ردیف دو برابر
+          //    شد. اندازه‌های قبلی (۱۴px + ۴px فاصله ⇒ ۱۸۰px برای هر سمت)
+          //    روی گوشیِ باریک سرریز می‌کرد و نوارِ زرد-مشکی می‌داد. حالا
+          //    هر سمت داخل `Flexible` + `FittedBox` است: روی گوشیِ پهن
+          //    همان اندازهٔ قبل، روی گوشیِ باریک خودش را کوچک می‌کند —
+          //    بدونِ بُرش و بدونِ سرریز.
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               for (final sym in [me, me == 'X' ? 'O' : 'X'])
-                Padding(
+                Flexible(
+                  child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 7),
-                  child: Row(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
                     children: [
                       for (final h in history
                           .whereType<Map>()
                           .where((h) => h['shooter'] == sym))
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 1.5),
                           child: Container(
-                            width: 14,
-                            height: 14,
+                            width: 12,
+                            height: 12,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: h['outcome'] == 'goal'
@@ -585,7 +595,9 @@ class _Scoreboard extends StatelessWidget {
                           ),
                         ),
                     ],
+                    ),
                   ),
+                ),
                 ),
             ],
           ),

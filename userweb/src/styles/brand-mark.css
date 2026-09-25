@@ -2267,9 +2267,13 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .penScore>div:first-child{text-align:left}.penScore>div:nth-of-type(2){text-align:right}.penScore>div.leading{color:#84cc16}
 .penScore>strong{padding:4px 18px;border-radius:14px;background:rgba(0,0,0,.48);border:1.5px solid rgba(56,189,248,.72);font-size:30px;font-weight:800;line-height:1.15;color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 2px 7px #000}
 .penScore>b{grid-column:1/-1;justify-self:center;padding:2px 10px;border-radius:999px;background:rgba(255,211,107,.22);border:1px solid #ffd36b;color:#ffd36b;font-size:12px;font-weight:800}
-.penMarkers{min-height:16px;display:flex!important;justify-content:center;gap:4px;direction:ltr;text-align:center!important}
+/* ⚠️ ۱۰ ضربه برای هر بازیکن (۳ مهر ۱۴۰۵): ردیفِ قبلی برای ۵ توپ جا
+   طراحی شده بود. با ۱۰ توپِ ۱۴ پیکسلی، دو ردیف روی گوشیِ باریک سرریز
+   می‌کرد (نوارِ زرد-مشکی). حالا توپ‌ها کمی کوچک‌ترند و در صورتِ نیاز
+   می‌شکنند — نه اینکه از قاب بزنند بیرون. */
+.penMarkers{min-height:16px;display:flex!important;flex-wrap:wrap;justify-content:center;gap:3px;direction:ltr;text-align:center!important}
 .penMarkers.mine{grid-column:1/2}.penMarkers.foe{grid-column:3/4}
-.penMarkers i{display:block;width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.3)}
+.penMarkers i{display:block;width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.3)}
 .penMarkers i.goal{background:#84cc16}
 .penPitch{position:relative;width:min(100%,calc(58vh * 1.3));max-width:560px;aspect-ratio:1.3;margin:0 auto;border-radius:22px;overflow:hidden;border:2px solid rgba(255,255,255,.2);box-shadow:inset 0 0 42px rgba(0,0,0,.58),0 12px 34px rgba(0,0,0,.4);touch-action:none}
 .penCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -4929,3 +4933,16 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .vaultSoonBadge{flex:0 0 auto;padding:3px 11px;border-radius:99px;font-size:11px;
   font-weight:900;background:#ffd16622;border:1px solid #ffd16655;color:#ffd166}
 .vaultSoon p{margin:0;font-size:11.5px;font-weight:600;color:#8ea6bd;line-height:1.6}
+
+/* ── توضیحِ اثرِ کلاسِ کارت در دوئل (تبِ ثبت کارت) ────────────────────────
+   متنِ این نوار از پنلِ ادمین می‌آید (`live_copy.cardReg.duelEffectNote`)،
+   پس استایل باید فقط «قاب» باشد: بدونِ عرضِ ثابت، بدونِ ارتفاعِ ثابت و
+   بدونِ تک‌خطی‌کردن — جمله چهار خط می‌شود و اگر ارتفاع قفل بود متن
+   بریده می‌شد. لحنِ رنگی هم خنثی است (آبیِ اطلاعاتی، نه قرمزِ هشدار)
+   چون جمله خبرِ خوب است، نه تهدید. */
+.cardRegNote{display:flex;gap:8px;align-items:flex-start;margin-top:12px;
+  padding:10px 12px;border-radius:16px;background:#4ea1ff1a;
+  border:1px solid #4ea1ff4d}
+.cardRegNote span{flex:0 0 auto;font-size:14px;line-height:1.5;color:#7cc0ff}
+.cardRegNote p{margin:0;font-size:11.5px;font-weight:600;color:#dce9f7;
+  line-height:1.9}

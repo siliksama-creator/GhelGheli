@@ -227,6 +227,13 @@ function createCoinService(db = pool) {
     const limit = cfg?.dailyCoinQuota
       ? Number(cfg.dailyCoinQuota[Number(stake)] ?? quotaLimit(stake))
       : quotaLimit(stake);
+    // ── «سهمیهٔ صفر» یعنی خاموش، نه «یک بازیِ رایگان» ──────────────────
+    // ادمین می‌تواند در پنل سهمیه را صفر کند تا پرداختِ سکه را بخواباند
+    // (بازهٔ مجاز از ۰ شروع می‌شود). بدونِ این خط، اولین مسابقهٔ هر کاربر
+    // هنوز از مسیرِ INSERT بی‌قید رد می‌شد — چون شرطِ `< limit` فقط روی
+    // شاخهٔ ON CONFLICT است و ردیفِ تازه هیچ شرطی ندارد. یعنی «سهمیه ۰»
+    // عملاً «سهمیه ۱» بود و پنل دروغ می‌گفت.
+    if (!(limit > 0)) return false;
     const date = tehranDate(now);
     const other = col === 'used_100' ? 'used_1000' : 'used_100';
 

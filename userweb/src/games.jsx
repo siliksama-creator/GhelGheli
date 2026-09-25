@@ -802,7 +802,15 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
             }}>
               {g.winner === 'DRAW' ? (
                 <span style={{ color: '#94A3B8', background: 'rgba(148,163,184,0.12)', padding: '5px 14px', borderRadius: 99 }}>
-                  امتیاز تو: {fa(0)} (ورودی کامل برگشت)
+                  {/* ── تساویِ پنالتی (۳ مهر ۱۴۰۵) ─────────────────────
+                      پیش از این «امتیاز تو: ۰ (ورودی کامل برگشت)» بود.
+                      حالا در تساوی هم کمسیون کسر می‌شود، پس همان جمله
+                      تبدیل به دروغ می‌شد. عددها از سرور می‌آیند
+                      (`g.drawRefund`/`g.drawFee`) و اگر نرسیده باشند،
+                      جملهٔ کلی نشان می‌دهیم — هرگز عددِ حدسی نمی‌سازیم. */}
+                  {Number(g.drawRefund) > 0
+                    ? `${fa(g.drawRefund)} امتیاز برگشت · کمسیون ${fa(g.drawFee)}`
+                    : 'ورودی منهای کمسیون برگشت'}
                 </span>
               ) : g.winner === g.me ? (
                 <span style={{ color: '#22E7A6', background: 'rgba(34,231,166,0.14)', padding: '5px 14px', borderRadius: 99 }}>

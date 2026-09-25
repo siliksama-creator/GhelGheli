@@ -254,6 +254,11 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
       let outcome;
       let winnerBalanceAfter = null;
       let coinsAwarded = 0;
+      // تساوی: کمسیون از هر دو طرف کسر می‌شود (خواستهٔ مالک، ۳ مهر ۱۴۰۵).
+      // پیش‌فرض صفر؛ فقط شاخهٔ draw پرشان می‌کند.
+      let drawFee = 0;
+      let drawFeeByUser = null;
+      let drawRefundByUser = null;
       // سکهٔ بازنده جدا نگه داشته می‌شود تا engine بتواند به هر سوکت عددِ
       // خودش را بفرستد. در تساوی بی‌معناست و صفر می‌ماند.
       let loserCoins = 0;
@@ -311,15 +316,42 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
       };
 
       if (draw) {
-        for (const userId of players) {
+        // ── کمسیونِ تساوی ──────────────────────────────────────────────
+        //
+        // خواستهٔ مالک (۳ مهر ۱۴۰۵): «اگر ۱۰-۱۰ شد نتیجه مساوی است و
+        // امتیازهای کاربر برمی‌گردد — البته کمسیون از امتیازش کسر
+        // می‌شود.» پس ورودیِ کامل برنمی‌گردد؛ همان کمسیونی که در بردِ
+        // معمولی از پات کسر می‌شد، اینجا **نصف‌نصف** بین دو نفر
+        // تقسیم می‌شود. عددها با همان فرمولِ رزرو ساخته می‌شوند
+        // (`commission_points` روی سندِ رزرو)، نه با فرمولِ تازه — وگرنه
+        // دو منبعِ حقیقت می‌شد.
+        //
+        // ⚠️ باقی‌ماندهٔ تقسیم عمداً به بازیکنِ X می‌رود (`feeO` متممِ
+        //    `feeX` است) تا جمعِ کسرها **دقیقاً** برابرِ کمسیون باشد.
+        //    اگر هر دو `Math.ceil(commission/2)` می‌گرفتند، با کمسیونِ
+        //    فرد یک امتیاز از هوا ساخته یا گم می‌شد.
+        const commission = Number(match.commission_points || 0);
+        const feeX = Math.ceil(commission / 2);
+        const feeO = commission - feeX;
+        drawFee = commission;
+        drawFeeByUser = {};
+        drawRefundByUser = {};
+        for (const [userId, fee] of [
+          [match.player_x_id, feeX], [match.player_o_id, feeO],
+        ]) {
+          const back = stake - fee;
+          drawFeeByUser[userId] = fee;
+          drawRefundByUser[userId] = back;
           await points.credit(client, {
             userId,
-            points: stake,
+            points: back,
             source: 'game',
             referenceType: 'game_stake_draw_refund',
             referenceId: matchId,
-            description: `بازگشت ورودی مسابقه مساوی (${faAmount(stake)} امتیاز)`,
+            description: `بازگشت ورودی مسابقه مساوی منهای کمسیون `
+              + `(${faAmount(back)} از ${faAmount(stake)} امتیاز)`,
             league: false,
+            // برگشتِ ورودی «کسب» نیست؛ کمسیون هم باخت نیست.
             lifetimeGain: 0,
           });
         }
@@ -413,6 +445,13 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
         winnerBalanceAfter: draw ? null : winnerBalanceAfter,
         coinsAwarded,
         loserCoins,
+        // تساوی: کمسیونِ کل و سهمِ هر کاربر (کسر‌شده و برگشت‌داده‌شده).
+        // کلاینت‌ها همین‌ها را نشان می‌دهند و **حساب نمی‌کنند** — اگر
+        // کلاینت خودش نصف می‌کرد، یک روز فرمولِ سرور عوض می‌شد و UI
+        // دروغ می‌گفت.
+        drawFee,
+        drawFeeByUser,
+        drawRefundByUser,
         // در تساوی هر دو یک مقدار گرفته‌اند؛ engine برای نمایش لازمش دارد.
         drawCoins: draw ? Number(match.coin_reward_draw ?? 0) : 0,
         // سکهٔ واقعاً پرداخت‌شده به هر کاربر. engine باید این را ترجیح
