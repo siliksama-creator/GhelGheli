@@ -168,81 +168,6 @@ class CardRegPage extends StatelessWidget {
                   embedded: true,
                   onRegistered: () => onRefresh?.call(),
                 ),
-                // ── توضیحِ اثرِ کلاسِ کارت در دوئل — متنِ زنده ────────────
-                // همان کلیدِ وب، همان جمله، همان فول‌بکِ واژه‌به‌واژه.
-                // بدونِ این بلوک، جمله فقط در وب زنده می‌شد و ادمین فکر
-                // می‌کرد عوض کرده ولی روی گوشی چیزی تغییر نمی‌کرد — همان
-                // تفاوتِ دو پلتفرمی که فازِ «لایو» برای بستنش ساخته شد.
-                //
-                // ⚠️ `ListenableBuilder` عمدی است، نه `Text` خشک: بدنهٔ
-                //    builder یک closure است و شرطِ «متنِ خالی ⇒ هیچ چیز»
-                //    فقط همان‌جا نوشتنی است. متغیرِ `final` را نمی‌شود
-                //    مستقیم وسطِ لیستِ فرزندان تعریف کرد (خطای کامپایل) —
-                //    این‌جا همان تله رعایت شده.
-                ListenableBuilder(
-                  listenable: AppConfig.instance,
-                  builder: (context, _) {
-                    final note = liveText(
-                      'cardReg.duelEffectNote',
-                      'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده و افکت اصلی کارتش ضعیف تر هستش دست رو ببازه با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه.',
-                    );
-                    // جملهٔ دومِ همان کادر (خواستهٔ مالک، ۳ مهر ۱۴۰۵):
-                    // کارت‌های خاص را پشتیبانیِ روبیکا ثبت می‌کند.
-                    // کلیدِ جدا + فول‌بکِ واژه‌به‌واژه — مثل بالا.
-                    final special = liveText(
-                      'cardReg.specialCardsNote',
-                      'کارت های خاص نقره ای طلایی پلاتینیوم و غیره فعلا در اپلیکیشن ثبت نمیشن و پشتیبانی روبیکا این کارت هارو ثبت میکنه',
-                    );
-                    if (note.isEmpty && special.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return Padding(
-                      padding: const EdgeInsetsDirectional.only(top: 12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          borderRadius: Corners.rLg,
-                          color: BrandColors.info.withValues(alpha: 0.10),
-                          border: Border.all(
-                              color: BrandColors.info.withValues(alpha: 0.30)),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Padding(
-                              padding: EdgeInsetsDirectional.only(top: 1),
-                              child: Icon(Icons.info_outline,
-                                  size: 16, color: BrandColors.info),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (note.isNotEmpty)
-                                    Text(note, style: _cardRegNoteStyle),
-                                  if (note.isNotEmpty && special.isNotEmpty)
-                                    const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                          vertical: 8),
-                                      child: Divider(
-                                        height: 1,
-                                        thickness: 1,
-                                        color: Color(0x384EA1FF),
-                                      ),
-                                    ),
-                                  if (special.isNotEmpty)
-                                    Text(special, style: _cardRegNoteStyle),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
               ],
             ),
           ),
@@ -254,9 +179,95 @@ class CardRegPage extends StatelessWidget {
             grants: grants,
             api: api,
             onRefresh: onRefresh,
+            // کادرِ راهنمای ثبتِ کارت (دو جملهٔ زندهٔ پنل) **سرصفحهٔ فهرست**
+            // است، نه فرزندِ ثابتِ این Column — دلیلش کامنتِ `header` در
+            // `inventory_page.dart`: متنِ زنده هر لحظه می‌تواند بلندتر شود و
+            // سرصفحهٔ ثابت روی صفحهٔ کوتاه سرریز می‌کرد (گاردِ CI همین را
+            // گرفت: overflow 7px در home_shell_test).
+            header: const _CardRegNotes(),
           ),
         ),
       ],
+    );
+  }
+}
+
+
+/// کادرِ راهنمای ثبتِ کارت — دو جملهٔ **زندهٔ** سرور.
+///
+/// ── چرا ویجتِ جدا ─────────────────────────────────────────────────────
+///
+/// این کادر سرصفحهٔ `InventoryPage` است (پارامترِ `header`)، یعنی داخلِ
+/// همان `CustomScrollView`ی که کلکسیون را نشان می‌دهد. اگر فرزندِ ثابتِ
+/// `Column`ِ بیرونی می‌ماند، با بلندتر شدنِ متن از پنل ارتفاعش از فضای
+/// صفحه بیشتر می‌شد و `RenderFlex` سرریز می‌کرد — اتفاقی که همان روزِ
+/// افزودنِ جملهٔ دوم در CI افتاد (۷ پیکسل، دو تست).
+///
+/// `ListenableBuilder` عمدی است: با هر تغییرِ `/api/config` متن بی‌نیاز به
+/// رفرشِ صفحه عوض می‌شود، و شرطِ «هر دو خالی ⇒ هیچ چیز» فقط همین‌جا
+/// نوشتنی است (اپراتورِ `final` را وسطِ لیستِ فرزندان نمی‌شود گذاشت).
+class _CardRegNotes extends StatelessWidget {
+  const _CardRegNotes();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppConfig.instance,
+      builder: (context, _) {
+        final note = liveText(
+          'cardReg.duelEffectNote',
+          'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده و افکت اصلی کارتش ضعیف تر هستش دست رو ببازه با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه.',
+        );
+        final special = liveText(
+          'cardReg.specialCardsNote',
+          'کارت های خاص نقره ای طلایی پلاتینیوم و غیره فعلا در اپلیکیشن ثبت نمیشن و پشتیبانی روبیکا این کارت هارو ثبت میکنه',
+        );
+        if (note.isEmpty && special.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          // هم‌تراز با بقیهٔ صفحه: فهرست با `Gaps.md` حاشیه دارد، این کادر
+          // هم باید همان حاشیه را داشته باشد (قبلاً چسبیده به لبه بود).
+          padding: const EdgeInsetsDirectional.fromSTEB(Gaps.md, 12, Gaps.md, 0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: Corners.rLg,
+              color: BrandColors.info.withValues(alpha: 0.10),
+              border: Border.all(color: BrandColors.info.withValues(alpha: 0.30)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsetsDirectional.only(top: 1),
+                  child: Icon(Icons.info_outline,
+                      size: 16, color: BrandColors.info),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (note.isNotEmpty)
+                        Text(note, style: _cardRegNoteStyle),
+                      if (note.isNotEmpty && special.isNotEmpty)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: Color(0x384EA1FF),
+                          ),
+                        ),
+                      if (special.isNotEmpty)
+                        Text(special, style: _cardRegNoteStyle),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

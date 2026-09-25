@@ -128,12 +128,26 @@ class InventoryPage extends StatefulWidget {
     this.grants = const [],
     this.api,
     this.onRefresh,
+    this.header,
   });
 
   final List<Map<String, dynamic>> items;
   final List<Map<String, dynamic>> grants;
   final ApiClient? api;
   final Future<void> Function()? onRefresh;
+
+  /// سرصفحهٔ اختیاریِ بالای فهرست، **داخلِ همین اسکرول**.
+  ///
+  /// ── چرا این پارامتر وجود دارد ────────────────────────────────────────
+  ///
+  /// تبِ «ثبت کارت» زیرِ فرمش یک کادرِ راهنما دارد که متنش زنده است و
+  /// ادمین هر لحظه می‌تواند بلندترش کند. نسخهٔ اولِ آن کادر فرزندِ ثابتِ
+  /// `Column`ِ بیرونی بود؛ با جملهٔ دوم ارتفاعِ بخشِ ثابت از فضای صفحه
+  /// بیشتر شد و روی صفحهٔ کوتاه `RenderFlex` سرریز کرد (`home_shell_test`
+  /// و `navigation_test`: overflow ۷ پیکسل). کوتاه‌کردنِ متن تعمیرِ شکننده
+  /// بود (فردا ادمین دوباره بلندش می‌کند)؛ پس کادر داخلِ همین اسکرول
+  /// نشست: هر طولی امن است و کاربر با اسکرولِ همان فهرست می‌بیندش.
+  final Widget? header;
 
   @override
   State<InventoryPage> createState() => _InventoryPageState();
@@ -183,10 +197,13 @@ class _InventoryPageState extends State<InventoryPage> {
 
     final body = CustomScrollView(
       slivers: [
+        if (widget.header != null) SliverToBoxAdapter(child: widget.header!),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-                Gaps.md, Gaps.md, Gaps.md, Gaps.xs),
+            // با سرصفحه، فاصلهٔ بالای نوارِ آمار کم می‌شود؛ وگرنه دو فاصلهٔ
+            // ۱۶ پیکسلی روی هم می‌افتاد و کادر شلخته می‌شد.
+            padding: EdgeInsets.fromLTRB(Gaps.md,
+                widget.header == null ? Gaps.md : Gaps.xs, Gaps.md, Gaps.xs),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
