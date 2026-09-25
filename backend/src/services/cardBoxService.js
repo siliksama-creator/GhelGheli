@@ -350,7 +350,11 @@ function createCardBoxService(db = pool) {
 
     const byRarity = new Map();
     for (const c of catalogue) {
-      const r = c.duel_rarity || 'normal';
+      // `rarityInput` و نه یک فالبکِ ثابت: اگر روزی ردیفی با کلیدِ نسلِ
+      // قبل (یا NULL) خوانده شود، سبدِ درستش را می‌گیرد. با 'normal'ِ
+      // قبلی آن کارت **بی‌صدا** از سبدها بیرون می‌افتاد (چون کلیدِ
+      // 'normal' در `weights` نیست) و صندوق کم‌کارت تحویل می‌داد.
+      const r = cardRarity.rarityInput(c.duel_rarity);
       if (!byRarity.has(r)) byRarity.set(r, []);
       byRarity.get(r).push(c);
     }
@@ -439,7 +443,7 @@ function createCardBoxService(db = pool) {
       await client.query(
         `INSERT INTO card_box_cards (box_id, slot, card_type_id, rarity, point_value)
          VALUES ($1,$2,$3,$4,$5)`,
-        [boxId, i + 1, c.id, c.duel_rarity || 'normal', Number(c.point_value || 0)]);
+        [boxId, i + 1, c.id, cardRarity.rarityInput(c.duel_rarity), Number(c.point_value || 0)]);
 
       // ── اینونتوری ──
       //
@@ -470,7 +474,7 @@ function createCardBoxService(db = pool) {
         id: c.id,
         name: c.name,
         imageUrl: c.image_url,
-        rarity: c.duel_rarity || 'normal',
+        rarity: cardRarity.rarityInput(c.duel_rarity),
         pointValue: Number(c.point_value || 0),
       })),
     };
@@ -571,7 +575,7 @@ function createCardBoxService(db = pool) {
       odds(),
       price(),
       db.query(
-        `SELECT COALESCE(duel_rarity, 'normal') AS rarity, COUNT(*)::int AS n
+        `SELECT COALESCE(duel_rarity, 'common') AS rarity, COUNT(*)::int AS n
            FROM card_types
           WHERE is_active = true AND is_collectible = false
           GROUP BY 1`,
