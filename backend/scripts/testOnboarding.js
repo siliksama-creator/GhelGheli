@@ -118,6 +118,13 @@ check('لایهٔ تار و هاله در موتور هست',
 check('پرچم روی سرور ثبت می‌شود', engine.includes('/api/onboarding/seen'));
 // تورِ خودکار نباید وسطِ بازیِ زنده بیفتد: کسی که با لینکِ اتاقِ مشترک
 // وارد می‌شود تبش «چت و بازی» است و تور نباید او را به خانه بکشد.
+// مسیرِ صدا باید زیرِ `/api/` باشد: nginx روی vhostِ وب فقط `/api/` و
+// چند مسیرِ دیگر را پروکسی می‌کند و `/public/...` به ریشهٔ استاتیکِ وب
+// می‌خورد و ۴۰۴ می‌دهد — همان باگی که یک بار صدا را در وب خفه کرد.
+check('صدا از مسیرِ پروکسی‌شدهٔ /api سرو می‌شود',
+  svc.includes("AUDIO_URL_BASE = '/api/onboarding/audio'")
+  && route.includes("router.get('/onboarding/audio/:file'")
+  && svc.includes('AUDIO_FILES'));
 check('تورِ خودکار فقط از خانه شروع می‌شود',
   engine.includes("tabRef.current !== 'home'") && engine.includes('blockedRef')
   && engine.includes('bootKey'));

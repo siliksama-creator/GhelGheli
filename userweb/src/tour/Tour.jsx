@@ -59,7 +59,7 @@ export default function Tour({ token, tab, goTab }) {
   const [open, setOpen] = useState(false);
   const [idx, setIdx] = useState(0);
   const [rect, setRect] = useState(null);
-  const [phase, setPhase] = useState('offer'); // offer | playing | waiting | manual
+  const [phase, setPhase] = useState('offer'); // offer | playing | waiting | manual | error
   const [muted, setMuted] = useState(false);   // «بعداً» بدونِ صدا؟ (تنها برای قطعِ صدا)
   const [bootKey, setBootKey] = useState(0);   // تلاشِ دوبارهٔ تورِ خودکار پسِ برگشت به خانه
 
@@ -143,12 +143,19 @@ export default function Tour({ token, tab, goTab }) {
     if (!stepObj) return;
     const audio = audioRef.current;
     if (!audio || stepObj.audioReady === false) { setPhase('manual'); return; }
-    audio.src = API + (stepObj.audioUrl || '');
-    audio.currentTime = 0;
+    // نشانی نسبی می‌ماند و هر بار `load()` می‌شود؛ همین سه خط جای اصلیِ
+    // باگِ «صدا پخش نمی‌شود» بود (نشانیِ قدیمی به مسیرِ پروکسی‌نشده می‌رفت).
+    const url = API + (stepObj.audioUrl || '');
+    try {
+      if (audio.getAttribute('src') !== url) { audio.src = url; audio.load(); }
+      audio.currentTime = 0;
+    } catch { audio.src = url; }
     const p = audio.play();
     if (p && typeof p.then === 'function') {
+      // «پخشِ خودکار رد شد» با «فایل خراب/۴۰۴» یکی نیست: اولی با یک لمسِ
+      // کاربر حل می‌شود، دومی نه. برای همین دو حالتِ جدا نشان داده می‌شود.
       p.then(() => setPhase('playing'))
-        .catch(() => setPhase('offer')); // پخشِ خودکار رد شد → کارتِ شروع
+        .catch(() => setPhase('waiting')); // پخشِ خودکار رد شد → دکمهٔ «پخش صدا»
     } else {
       setPhase('playing');
     }
@@ -228,6 +235,18 @@ export default function Tour({ token, tab, goTab }) {
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, bootKey]);
+
+  // ── پیش‌بارگذاریِ بخشِ بعد ─────────────────────────────────────────
+  // هر فایل ~۴۰ کیلوبایت است؛ کشیدنش روی روایتِ قبلی یعنی سرِ بخشِ بعد،
+  // پخش بدونِ مکث شروع می‌شود و ریتمِ تور یکدست می‌ماند.
+  useEffect(() => {
+    const nx = data?.steps?.[idx + 1];
+    if (!nx?.audioUrl) return undefined;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = API + nx.audioUrl;
+    return () => { try { a.removeAttribute('src'); a.load(); } catch { /* بی‌اهمیت */ } };
+  }, [data, idx]);
 
   // ── عقب‌افتاده بود؟ با برگشت به خانه شروع کن ────────────────────────
   useEffect(() => {
@@ -316,13 +335,21 @@ export default function Tour({ token, tab, goTab }) {
         {phase === 'offer' && (
           <p className="tourHint">برای شروعِ پخشِ صدا یک‌بار بزن؛ بعدش خودش جلو می‌رود.</p>
         )}
+        {phase === 'waiting' && (
+          <p className="tourHint">مرورگر پخشِ خودکار را بست؛ یک‌بار روی «پخش صدا» بزن تا شروع شود.</p>
+        )}
         {phase === 'manual' && (
           <p className="tourHint">صدای این بخش در دسترس نیست؛ متن را بخوان و «بعدی» را بزن.</p>
         )}
+        {phase === 'error' && (
+          <p className="tourHint">صدا بارگیری نشد. اینترنت را چک کن و «پخش دوباره» را بزن.</p>
+        )}
 
         <div className="tourActions">
-          {phase === 'offer' ? (
-            <button type="button" className="tourPrimary" onClick={() => playCurrent(step)}>شروع آموزش</button>
+          {(phase === 'offer' || phase === 'waiting') ? (
+            <button type="button" className="tourPrimary" onClick={() => playCurrent(step)}>
+              {phase === 'offer' ? 'شروع آموزش' : 'پخش صدا'}
+            </button>
           ) : (
             <button type="button" className="tourPrimary" onClick={next}>
               {idx + 1 >= total ? 'پایان' : 'بعدی'}
@@ -332,7 +359,7 @@ export default function Tour({ token, tab, goTab }) {
             onClick={() => { setMuted(m => !m); if (audioRef.current) audioRef.current.muted = !muted; }}>
             {muted ? 'صدا خاموش' : 'صدا روشن'}
           </button>
-          {phase !== 'offer' && (
+          {phase !== 'offer' && phase !== 'waiting' && (
             <button type="button" className="tourSecondary" onClick={() => { audioRef.current?.pause(); playCurrent(step); }}>
               پخش دوباره
             </button>
@@ -344,8 +371,9 @@ export default function Tour({ token, tab, goTab }) {
       <audio
         ref={audioRef}
         preload="auto"
+        playsInline
         onEnded={() => { if (phase === 'playing') setTimeout(() => { next(); }, ADVANCE_MS); }}
-        onError={() => { if (phase === 'playing') setPhase('manual'); }}
+        onError={() => { if (phase !== 'offer') setPhase('error'); }}
       />
     </div>
   );

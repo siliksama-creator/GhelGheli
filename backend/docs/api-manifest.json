@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 289,
+ "count": 290,
  "endpoints": [
   {
    "method": "GET",
@@ -1165,6 +1165,11 @@
   {
    "method": "GET",
    "path": "/api/onboarding",
+   "source": "routes/onboarding.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/onboarding/audio/:file",
    "source": "routes/onboarding.js"
   },
   {

@@ -33,7 +33,14 @@ const TOUR_VERSION = 1;
 // مسیرِ فایل‌های صدا: استاتیکِ بک‌اند (`app.use('/public', ...)` در server.js)
 // پس آدرسِ عمومی می‌شود `/public/onboarding/<file>`.
 const AUDIO_DIR = path.join(__dirname, '..', '..', 'public', 'onboarding');
-const AUDIO_URL_BASE = '/public/onboarding';
+// ── چرا /api و نه /public ───────────────────────────────────────────────
+// نسخهٔ اول اینجا `/public/onboarding` بود و صدا در وب هیچ‌وقت پخش نشد:
+// nginx روی vhostِ کاربر فقط `/api/`، `/uploads/`، `/socket.io/`، `/assets/`
+// و `/ml/` را پروکسی می‌کند و درخواستِ `/public/...` به ریشهٔ استاتیکِ خودِ
+// وب می‌خورد → ۴۰۴ → عنصرِ صدا `error` می‌داد و تور بی‌صدا جلو می‌رفت.
+// `/api/` روی **همهٔ** میزبان‌ها (وب، پنل، دامنهٔ api و اپِ موبایل) پروکسی
+// است؛ پس صدا هم از همان‌جا سرو می‌شود و مسیرِ دومِ شکننده نمی‌سازیم.
+const AUDIO_URL_BASE = '/api/onboarding/audio';
 
 /**
  * ۱۸ بخشِ منتخبِ مالک (نسخهٔ کوتاه، بدونِ اسمِ تب‌ها).
@@ -249,9 +256,14 @@ async function reset(userId) {
   return { ok: true, seen: false };
 }
 
+// فهرستِ سفیدِ نامِ فایل‌ها برای مسیرِ پخشِ صدا: نام از همین فهرست می‌آید،
+// نه از ورودیِ کاربر — پس پیمایشِ مسیر (`../`) اصلاً ممکن نیست.
+const AUDIO_FILES = Object.freeze(STEPS.map(s => s.audio));
+
 module.exports = {
   TOUR_VERSION,
   STEPS,
+  AUDIO_FILES,
   AUDIO_DIR,
   AUDIO_URL_BASE,
   state,
