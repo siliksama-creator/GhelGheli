@@ -116,6 +116,11 @@ check('موتورِ تور روی هدف کلیک نمی‌کند (فقط نشا
 check('لایهٔ تار و هاله در موتور هست',
   engine.includes('tourShade') && engine.includes('tourRing') && engine.includes('tourFinger'));
 check('پرچم روی سرور ثبت می‌شود', engine.includes('/api/onboarding/seen'));
+// تورِ خودکار نباید وسطِ بازیِ زنده بیفتد: کسی که با لینکِ اتاقِ مشترک
+// وارد می‌شود تبش «چت و بازی» است و تور نباید او را به خانه بکشد.
+check('تورِ خودکار فقط از خانه شروع می‌شود',
+  engine.includes("tabRef.current !== 'home'") && engine.includes('blockedRef')
+  && engine.includes('bootKey'));
 
 // ── ۷) کلمه‌های ممنوعهٔ مالک در متنِ صداها ──────────────────────────────
 const texts = [...svc.matchAll(/^\s{4}text: '([^']*)',$/gm)].map(m => m[1]);
