@@ -28,7 +28,7 @@
 //    رویداد `gg:tour-replay` می‌فرستد و همین موتور دوباره اجرا می‌شود.
 // ══════════════════════════════════════════════════════════════════════
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { API, req } from '../lib/api.js';
 import { TOUR_UI } from './steps.js';
 import './tour.css';
