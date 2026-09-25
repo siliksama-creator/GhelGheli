@@ -33,6 +33,18 @@ import '../../widgets/app_card.dart';
 import '../../widgets/photo_card_box.dart';
 import 'inventory_page.dart';
 
+/// استایلِ مشترکِ دو جملهٔ کادرِ راهنمای ثبتِ کارت.
+///
+/// یک ثابت و نه دو `TextStyle` تکراری: دو جمله از یک کادرِ واحدند و
+/// اگر روزی اندازهٔ فونت عوض شود، سطرِ دوم نباید جا بماند — همان
+/// اشتباهی که در وب با دو کلاسِ جداگانه رخ می‌دهد.
+const TextStyle _cardRegNoteStyle = TextStyle(
+  color: Color(0xFFE2E8F0),
+  fontSize: 11.5,
+  height: 1.7,
+  fontWeight: FontWeight.w600,
+);
+
 class CardRegPage extends StatelessWidget {
   const CardRegPage({
     super.key,
@@ -174,7 +186,16 @@ class CardRegPage extends StatelessWidget {
                       'cardReg.duelEffectNote',
                       'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده و افکت اصلی کارتش ضعیف تر هستش دست رو ببازه با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه.',
                     );
-                    if (note.isEmpty) return const SizedBox.shrink();
+                    // جملهٔ دومِ همان کادر (خواستهٔ مالک، ۳ مهر ۱۴۰۵):
+                    // کارت‌های خاص را پشتیبانیِ روبیکا ثبت می‌کند.
+                    // کلیدِ جدا + فول‌بکِ واژه‌به‌واژه — مثل بالا.
+                    final special = liveText(
+                      'cardReg.specialCardsNote',
+                      'کارت های خاص نقره ای طلایی پلاتینیوم و غیره فعلا در اپلیکیشن ثبت نمیشن و پشتیبانی روبیکا این کارت هارو ثبت میکنه',
+                    );
+                    if (note.isEmpty && special.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
                     return Padding(
                       padding: const EdgeInsetsDirectional.only(top: 12),
                       child: Container(
@@ -196,14 +217,24 @@ class CardRegPage extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
-                                note,
-                                style: const TextStyle(
-                                  color: Color(0xFFE2E8F0),
-                                  fontSize: 11.5,
-                                  height: 1.7,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (note.isNotEmpty)
+                                    Text(note, style: _cardRegNoteStyle),
+                                  if (note.isNotEmpty && special.isNotEmpty)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                          vertical: 8),
+                                      child: Divider(
+                                        height: 1,
+                                        thickness: 1,
+                                        color: Color(0x384EA1FF),
+                                      ),
+                                    ),
+                                  if (special.isNotEmpty)
+                                    Text(special, style: _cardRegNoteStyle),
+                                ],
                               ),
                             ),
                           ],

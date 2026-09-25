@@ -4946,3 +4946,8 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .cardRegNote span{flex:0 0 auto;font-size:14px;line-height:1.5;color:#7cc0ff}
 .cardRegNote p{margin:0;font-size:11.5px;font-weight:600;color:#dce9f7;
   line-height:1.9}
+/* دو جملهٔ کادر: آیکون کنار، جمله‌ها زیرِ هم (قبلاً فقط یکی بود و
+   کادر یک ردیفِ flex با یک <p> بود؛ با جملهٔ دوم، ردیف باید
+   ستونی شود وگرنه دو متن کنارِ هم می‌چسبند). */
+.cardRegNoteBody{display:flex;flex-direction:column;flex:1 1 auto;min-width:0}
+.cardRegNoteAlt{padding-top:8px;border-top:1px solid #4ea1ff33}

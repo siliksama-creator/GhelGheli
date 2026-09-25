@@ -13,6 +13,11 @@ export default function CardReg({ items, grants, token, reload, setMsg }) {
   // متنِ راهنما از پنل می‌آید؛ بدونِ این، عوض‌کردن در «متن‌های زنده»
   // تا رفرشِ کاملِ صفحه دیده نمی‌شد.
   useLive();
+  // جملهٔ دومِ کادر (خواستهٔ مالک، ۳ مهر ۱۴۰۵). دلیلِ متغیرِ جدا و
+  // نه نوشتنِ داخلِ JSX: اگر کلید خالی شود، همان یک متغیر خالی
+  // می‌ماند و سطر (با خطِ جداکننده‌اش) کلاً رندر نمی‌شود؛ وگرنه یک
+  // `<p>` خالی با خطِ جداکننده روی صفحه می‌ماند.
+  const specialCardsNote = text('cardReg.specialCardsNote', 'کارت های خاص نقره ای طلایی پلاتینیوم و غیره فعلا در اپلیکیشن ثبت نمیشن و پشتیبانی روبیکا این کارت هارو ثبت میکنه');
   return (
     <>
       <div style={{ padding:'12px 12px 0', marginBottom:'12px' }}>
@@ -42,7 +47,12 @@ export default function CardReg({ items, grants, token, reload, setMsg }) {
             گاردِ `live-copy-parity` همین برابری را می‌سنجد. */}
         <div className="cardRegNote">
           <span aria-hidden="true">ⓘ</span>
-          <p>{text('cardReg.duelEffectNote', 'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده و افکت اصلی کارتش ضعیف تر هستش دست رو ببازه با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه.')}</p>
+          <div className="cardRegNoteBody">
+            <p>{text('cardReg.duelEffectNote', 'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده و افکت اصلی کارتش ضعیف تر هستش دست رو ببازه با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه.')}</p>
+            {specialCardsNote
+              ? <p className="cardRegNoteAlt">{specialCardsNote}</p>
+              : null}
+          </div>
         </div>
       </div>
       <Inventory items={items} grants={grants} token={token} reload={reload} />
