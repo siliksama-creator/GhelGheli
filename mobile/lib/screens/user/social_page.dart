@@ -53,6 +53,30 @@ class _SocialPageState extends State<SocialPage> {
   int _growthGeneration = 0;
   GameExternalLaunch? _externalLaunch;
 
+  /// زیرتب‌هایی که تا حالا باز شده‌اند.
+  ///
+  /// ── چرا لازم شد ─────────────────────────────────────────────────────────
+  ///
+  /// `IndexedStack` همهٔ فرزندانش را **هم‌زمان** می‌سازد. پس بازکردنِ تبِ
+  /// «چت و بازی» هر چهار زیرتب را بیدار می‌کرد: چت (سوکت + بارگذاری +
+  /// polling)، بازی‌ها (زنجیرهٔ bootstrap→config→level)، ماموریت (سوکت) و
+  /// گذر نبرد. کاربر زیرتبِ چت را می‌دید ولی صفِ شبکه را با سه صفحهٔ
+  /// نامرئی تقسیم می‌کرد — روی اینترنتِ کند، همان «چرا این تب انقدر دیر
+  /// لود می‌شود».
+  ///
+  /// حالا هر زیرتب **بارِ اولی که انتخاب شود** ساخته می‌شود؛ بعد از آن هم
+  /// مثل قبل زنده می‌ماند (سوکت و timer از دست نمی‌روند و برگشت به چت جای
+  /// کاربر را از دست نمی‌دهد) — همان دلیلی که از اول `IndexedStack` بود.
+  final Set<int> _visited = <int>{0};
+
+  /// رفتن به یک زیرتب + ثبتِ بازدیدش (تنها راهِ عوض‌کردنِ `_tab`).
+  void _goTo(int index) {
+    setState(() {
+      _tab = index;
+      _visited.add(index);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +84,7 @@ class _SocialPageState extends State<SocialPage> {
     // «بازی‌ها» باز می‌شویم (کاشیِ ضربه‌زن در خانه).
     if (widget.externalGameId != null && widget.externalGameNonce > 0) {
       _tab = 1;
+      _visited.add(1);
     }
   }
 
@@ -68,9 +93,13 @@ class _SocialPageState extends State<SocialPage> {
     super.didUpdateWidget(old);
     if (widget.externalGameId != null &&
         widget.externalGameNonce != old.externalGameNonce) {
-      setState(() => _tab = 1);
+      _goTo(1);
     }
   }
+
+  /// فرزندِ زیرتبِ [index]: اگر تا حالا باز نشده، جای خالیِ ارزان.
+  Widget _lazyTab(int index, Widget Function() build) =>
+      _visited.contains(index) ? build() : const SizedBox.shrink();
 
   @override
   Widget build(BuildContext context) {
@@ -80,24 +109,25 @@ class _SocialPageState extends State<SocialPage> {
           padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.xs, Gaps.md, Gaps.xs),
           child: _Switcher(
             index: _tab,
-            onChanged: (i) => setState(() => _tab = i),
+            onChanged: _goTo,
             passClaimable: widget.passClaimable,
           ),
         ),
         Expanded(
           // IndexedStack (not a swap) so the chat's polling timer and the
-          // game's socket survive switching tabs.
+          // game's socket survive switching tabs — ولی ساختنِ هر فرزند تا
+          // بارِ اولی که باز شود عقب می‌افتد (_lazyTab).
           child: IndexedStack(
             index: _tab,
             children: [
-              ChatPage(api: widget.api),
-              GamesHubPage(
+              _lazyTab(0, () => ChatPage(api: widget.api)),
+              _lazyTab(1, () => GamesHubPage(
                 api: widget.api,
                 externalLaunch: _externalLaunch,
                 externalGameId: widget.externalGameId,
                 externalGameNonce: widget.externalGameNonce,
-              ),
-              SingleChildScrollView(
+              )),
+              _lazyTab(2, () => SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.xs, Gaps.md, Gaps.xxl),
                 child: GrowthPanel(
                   key: ValueKey(_growthGeneration),
@@ -111,14 +141,15 @@ class _SocialPageState extends State<SocialPage> {
                         nonce: DateTime.now().microsecondsSinceEpoch,
                       );
                       _tab = 1;
+                      _visited.add(1);
                     });
                   },
                 ),
-              ),
-              PassPage(
+              )),
+              _lazyTab(3, () => PassPage(
                 api: widget.api,
                 onOpenShop: widget.onOpenShop ?? () {},
-              ),
+              )),
             ],
           ),
         ),
