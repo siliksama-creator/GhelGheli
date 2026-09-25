@@ -728,6 +728,29 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   // پس هیچ رفت‌وبرگشت اضافه‌ای ندارد.
   const [passBrief, setPassBrief] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  // ── پلِ شیتِ «بیشتر» برای تورِ آموزشِ صوتی (۵ مهر ۱۴۰۵) ──────────────
+  // پنج بخشِ تور (فروشگاه، کیف پول، دعوت، پشتیبانی، پروفایل) از همین شیت
+  // باز می‌شوند. تور در ریشهٔ اپ است و به state این شیت دسترسی ندارد، پس
+  // دو رویدادِ کوچک همان کارِ خودِ کاربر را انجام می‌دهند:
+  //   gg:tour-more → شیت باز/بسته شود تا تور بتواند آیتمِ مقصد را نشان دهد
+  //   gg:tour-goto → همان دو کارِ کلیکِ آیتمِ شیت: تب عوض شود و شیت بسته
+  //                  شود. عمداً فقط تبِ معتبر از MORE_TABS پذیرفته می‌شود.
+  useEffect(() => {
+    const onMore = (e) => setMoreOpen(e.detail?.open !== false);
+    const onGoto = (e) => {
+      const id = e.detail?.tab;
+      if (!id || !MORE_TABS.some(([t]) => t === id)) return;
+      setTab(id);
+      setMoreOpen(false);
+    };
+    window.addEventListener('gg:tour-more', onMore);
+    window.addEventListener('gg:tour-goto', onGoto);
+    return () => {
+      window.removeEventListener('gg:tour-more', onMore);
+      window.removeEventListener('gg:tour-goto', onGoto);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // ── عوض‌کردنِ تب = برگشت به بالای تب ────────────────────────────────────
   //
   // بدونِ این، جای اسکرول از تبِ قبلی می‌ماند: کاربر تبی را باز می‌کند و
@@ -1019,6 +1042,9 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
           </button>
         ))}
         <button
+          /* «درِ ورودیِ» شیتِ بیشتر: تور اول این‌جا انگشت می‌گذارد و تاچ
+             می‌کند، بعد شیت باز می‌شود و آیتمِ مقصد نشان داده می‌شود. */
+          data-tour="nav:more"
           className={MORE_TABS.some(([id]) => id === tab) ? 'on' : ''}
           aria-haspopup="true"
           aria-expanded={moreOpen}
@@ -1064,6 +1090,10 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
             >
               {visibleMore.map(([id, label, icon]) => (
                 <button key={id} role="menuitem"
+                  /* لنگرِ پویا: هر مقصدی که به شیت اضافه یا از آن کم شود،
+                     لنگرش هم خودکار هست — تور برای نشان‌دادنِ «راهِ ورود»
+                     دقیقاً همین را هاله می‌کند. */
+                  data-tour={`more:${id}`}
                   className={tab === id ? 'on' : ''}
                   onClick={() => { setTab(id); setMoreOpen(false); }}>
                   <span><UiIcon name={icon} size={20} /></span>{label}

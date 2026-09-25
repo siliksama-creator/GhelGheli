@@ -73,6 +73,7 @@ const corpus = webFiles.map(read).join('\n');
 const DYNAMIC = {
   'nav:': 'data-tour={`nav:${id}`}',
   'league:tab:': 'data-tour={`league:tab:${id}`}',
+  'more:': 'data-tour={`more:${id}`}',
 };
 const missingAnchors = [...new Set(anchors)].filter(a => {
   if (corpus.includes(`data-tour="${a}"`)) return false;
@@ -125,6 +126,24 @@ check('صدا از مسیرِ پروکسی‌شدهٔ /api سرو می‌شود'
   svc.includes("AUDIO_URL_BASE = '/api/onboarding/audio'")
   && route.includes("router.get('/onboarding/audio/:file'")
   && svc.includes('AUDIO_FILES'));
+// ── مسیرِ ورود (خواستهٔ مالک، ۵ مهر) ─────────────────────────────────────
+// «انگشت باید دقیقاً نشون بده چطور وارد اون قسمت شده.» سه شرط دارد:
+//   الف) نگاشتِ `enter` در وب تعریف شده باشد
+//   ب) شیتِ «بیشتر» لنگر و پل داشته باشد (وگرنه چهار بخش بی‌مسیر می‌شوند)
+//   ج) موتور واقعاً مرحلهٔ «در» و «سفر» را اجرا کند
+check('نگاشتِ «درِ ورودی» در وب تعریف شده',
+  steps.includes('enter:') && steps.includes('more:invite'));
+check('دکمهٔ «بیشتر» و آیتم‌های شیت لنگر دارند',
+  main.includes('data-tour="nav:more"') && main.includes('data-tour={`more:${id}`}'));
+check('پلِ شیتِ «بیشتر» در main.jsx هست',
+  main.includes("'gg:tour-more'") && main.includes("'gg:tour-goto'"));
+check('موتور مرحلهٔ «در→سفر→هدف» را اجرا می‌کند',
+  engine.includes("setStage('door')") && engine.includes('tourFinger--travel')
+  && engine.includes('DOOR_MS'));
+// ── جای کارت (خواستهٔ مالک، ۵ مهر) ──────────────────────────────────────
+// «کارت نباید روی بخشِ درحالِ‌توضیح بیفتد» → جای کارت باید حساب شود.
+check('کارتِ متن قرینهِ هدف می‌نشیند',
+  engine.includes('roomBelow') && engine.includes('roomAbove') && engine.includes('maxHeight: pos.maxH'));
 check('تورِ خودکار فقط از خانه شروع می‌شود',
   engine.includes("tabRef.current !== 'home'") && engine.includes('blockedRef')
   && engine.includes('bootKey'));

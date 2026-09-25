@@ -123,7 +123,9 @@ export default function Referral({ token, setMsg }) {
   const showMyRow = (data) => data.me && !data.meInTop;
 
   return (
-    <section className="card wide refPage">
+    /* لنگرِ تور: بخشِ «دعوت دوستان» بعد از بازکردنِ شیت و کلیکِ آیتم،
+       روی همین سرصفحه می‌نشیند. */
+    <section className="card wide refPage" data-tour="invite:top">
       <div className="refHead">
         <h2>دعوت از دوستان</h2>
         <p className="hint">
