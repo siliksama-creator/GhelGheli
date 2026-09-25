@@ -52,6 +52,227 @@ function featureFlags() {
   }
 }
 
+// ── سرویسِ اعلان (تنبل، مثل بقیهٔ سرویس‌های این فایل) ─────────────────────
+//
+// بازیِ خودکارِ پایانِ مسابقه باید چیزی بنویسد که **بعداً هم** خواندنی باشد
+// (کاربر همان لحظه قطع است و صفحه‌ای ندارد). پس اعلانِ درون‌برنامه‌ای، نه
+// پوش: خواستهٔ صریح مالک — «بصورت پیام قسمت نوتیفکشن بره … فقط نیاز به پوش
+// نوتیفیکیشن نیست».
+//
+// `__setNotifier` درّهٔ تست است: تستِ موتور نباید برای نوشتنِ یک اعلان به
+// دیتابیسِ محصول وصل شود (قاعدهٔ ثابتِ این ریپو).
+let notifyOverride = null;
+function notificationService() {
+  if (notifyOverride) return { createNotification: notifyOverride };
+  try {
+    return require('../services/notificationService');
+  } catch {
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// بازیِ خودکارِ بازیکنِ قطع‌شده (۴ مهر ۱۴۰۵)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── رفتارِ قبلی ──
+//
+// بازیکن قطع می‌شد → `suspendForReconnect` ساعت را نگه می‌داشت و بعد از
+// `reconnectSeconds` (قاعدهٔ زندهٔ «ثانیهٔ فرصتِ اتصال دوباره») مسابقه را با
+// `DISCONNECT` می‌بست: یعنی بازیکنِ غایب **می‌باخت**، حتی اگر ۴-۰ جلو بود.
+//
+// ── رفتارِ تازه ──
+//
+// همان پنجرهٔ زمانی می‌ماند (همان عددی که ادمین در پنل می‌بیند و همان عددی
+// که کلاینت به کاربر نشان می‌دهد)، ولی بعد از تمام‌شدنش مسابقه بسته نمی‌شود:
+// سیستم صندلیِ خالی را **امانت** می‌گیرد و تا پایانِ مسابقه بهترین کارتِ آن
+// بازیکن را برای هر راند می‌گذارد. حریف بازی را ادامه می‌دهد و مسابقه سرِ
+// طبیعی خودش تمام می‌شود.
+//
+// چرا «بهترین کارت» و نه `botMove`: کامنتِ `bestMove` در فایلِ قواعد.
+//
+// ⚠️ این رفتار فقط برای قواعدی فعال است که `bestMove` دارند (هر دو دوئل:
+//    کارت و طوفان — هر دو یک فایلِ قواعد با پرچمِ `mayhem`). بازی‌های دیگر
+//    دقیقاً همان رفتارِ قبلی را نگه می‌دارند: قطعی = باخت. تغییرِ خاموشِ
+//    حکمِ همهٔ بازی‌ها چیزی نیست که کسی خواسته باشد.
+//
+// ── چرا حرکتِ خودکار با تأخیر ──
+//
+// راندِ تازه با اعلان و انیمیشن شروع می‌شود (`introMs` ۳ ثانیه در دوئل).
+// اگر کارتِ خودکار همان لحظهٔ صفر قفل شود، کارت **وسطِ انیمیشنِ اعلان**
+// می‌نشیند و حریف هم بلافاصله «حریف قفل کرد» می‌بیند — ریتمِ بازی مصنوعی
+// می‌شود. سه‌ونیم ثانیه یعنی اعلان تمام شده و حرکت طبیعی به نظر می‌رسد.
+const AUTOPILOT_DELAY_MS = 3500;
+let autopilotDelayMs = AUTOPILOT_DELAY_MS;
+
+/** ثانیهٔ پنجرهٔ بازگشت — همان عددی که متنِ کلاینت‌ها هم از آن ساخته می‌شود. */
+function autopilotWindowSeconds() {
+  return Math.round(reconnectWindowMs() / 1000);
+}
+
+/**
+ * صندلیِ [symbol] را به سیستم می‌سپارد.
+ * `false` یعنی این قواعد از این قابلیت پشتیبانی نمی‌کنند (فراخوان باید
+ * همان رفتارِ قبلیِ «باختِ قطعی» را اجرا کند).
+ */
+function engageAutopilot(room, symbol) {
+  if (!room || room.done || room.finalizing) return false;
+  if (!symbol) return false;
+  if (room.vsBot) return false;
+  if (typeof room.rules?.bestMove !== 'function') return false;
+  room.autopilot = room.autopilot || {};
+  const previous = room.autopilot[symbol];
+  if (previous && !previous.released) return true;
+  // صندلیِ قبلی «آزاد» شده (کاربر برگشته بود) ولی سابقهٔ راندهای خودکارش
+  // می‌ماند: پیامِ پایانِ مسابقه باید همهٔ راندهای امانتی را بگوید، نه فقط
+  // دورهٔ آخر.
+  const slot = previous || { rounds: [] };
+
+  room.reconnecting[symbol] = false;
+  clearTimeout(room.reconnectTimers?.[symbol]);
+  slot.since = Date.now();
+  slot.key = null;
+  slot.released = false;
+  room.autopilot[symbol] = slot;
+
+  const opponent = symbol === 'X' ? 'O' : 'X';
+  const opponentSocket = room.seats[opponent];
+  safeEmit(opponentSocket, 'game:opponent_autoplay', {
+    roomId: room.id,
+    userId: room.players?.[symbol]?.id || null,
+    reconnectWindowMs: reconnectWindowMs(),
+    message: `حریف برنگشت؛ از این راند به بعد سیستم بهترین کارت‌هایش را انتخاب می‌کند و مسابقه ادامه دارد.`,
+  }, room);
+  scheduleAutopilot(room, symbol, 0);
+  return true;
+}
+
+/**
+ * نوبتِ حرکتِ خودکار را برای همین راند مسلح می‌کند.
+ *
+ * `key` همان `clockKey` قواعد است (در دوئل: طولِ `history`) — یعنی در هر
+ * راند **یک بار** مسلح می‌شود. بدونِ آن، هر `advance` در همان راند یک تایمر
+ * تازه می‌ساخت و چند بار پشتِ سرِ هم حرکت می‌کرد.
+ */
+function scheduleAutopilot(room, symbol, delay = autopilotDelayMs) {
+  const slot = room.autopilot?.[symbol];
+  if (!slot || slot.released || room.done) return;
+  const key = room.rules.clockKey
+    ? room.rules.clockKey(room.state)
+    : (room.state?.roundIndex ?? 0);
+  if (slot.key === key) return;
+  slot.key = key;
+  room.autopilotTimers = room.autopilotTimers || {};
+  clearTimeout(room.autopilotTimers[symbol]);
+  room.autopilotTimers[symbol] = setTimeout(() => {
+    try {
+      playAutopilot(room, symbol);
+    } catch (e) {
+      // مثلِ `turnTimer`: استثنای داخلِ تایمر کلِ پروسه را می‌خواباند.
+      console.error(`[games:${room.gameId}] autopilot failed:`, e.message);
+    }
+  }, Math.max(0, delay));
+}
+
+/** یک حرکتِ «بهترین کارت» برای بازیکنِ غایب. */
+function playAutopilot(room, symbol) {
+  if (!room || room.done || room.finalizing) return;
+  const slot = room.autopilot?.[symbol];
+  if (!slot || slot.released) return;
+  // اگر بینِ این لحظه و مسلح‌شدن، کاربر برگشته بود (سوکتِ تازه)، هیچ کاری
+  // نمی‌کنیم — `resumeSeat` خودش کنترل را پس گرفته است.
+  if (room.reconnecting?.[symbol]) return;
+  const seat = room.seats[symbol];
+  if (seat && seat !== 'BOT' && seat.connected === true) return;
+
+  let move = null;
+  try {
+    move = room.rules.bestMove(room.state, symbol);
+  } catch (e) {
+    console.error(`[games:${room.gameId}] autopilot pick failed:`, e.message);
+  }
+  if (!move || !room.rules.isValidMove(room.state, move, symbol)) return;
+
+  const round = (Array.isArray(room.state.history) ? room.state.history.length : 0) + 1;
+  const cardId = String(move.cardId || '');
+  const card = (room.state.decks?.[symbol] || []).find(c => idOfCard(c) === cardId);
+  const focus = duelFocusLabel(room.state.roundIndex);
+  slot.rounds.push({
+    round,
+    cardId,
+    cardName: card?.name || cardId,
+    focusLabel: focus,
+  });
+  room.rules.applyMove(room.state, move, symbol);
+
+  // همان مسیرِ ربات: در بازیِ هم‌زمان هر دو صندلی باید انتخاب کنند، پس
+  // `advance` با `null` صدا زده می‌شود؛ در نوبتی، حرکت همین حالا گذاشته شد.
+  advance(room, room.rules.simultaneous ? null : move);
+}
+
+/** شناسهٔ کارت — همان قراردادِ قواعد (کارتِ واقعی، نه ردیفِ دیتابیس). */
+function idOfCard(card) {
+  return String(card?.cardTypeId || card?.id || '');
+}
+
+/** برچسبِ فارسیِ معیارِ راند (از خودِ سرویسِ دوئل — یک منبعِ حقیقت). */
+function duelFocusLabel(roundIndex) {
+  try {
+    const duelService = require('../services/cardDuelService');
+    const focus = duelService.ROUND_FOCUS?.[roundIndex];
+    return focus?.label || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * پیامِ پایانِ مسابقه برای بازیکنی که سیستم جایش بازی کرد.
+ *
+ * اعلان **درون‌برنامه‌ای** است (`push:false`) — خواستهٔ مالک. متن باید
+ * «چه اتفاقی برای راند افتاد» را بگوید، پس تعدادِ راندهای خودکار، نامِ
+ * کارت‌هایی که سیستم انتخاب کرده و نتیجهٔ نهایی داخلش می‌آید. بدونِ این
+ * جزئیات، کاربر فقط می‌فهمد «باختم» و فکر می‌کند بازی خراب بوده.
+ */
+function notifyAutoplayOutcome(room, resolvedWinner) {
+  const svc = notificationService();
+  if (!svc?.createNotification) return;
+  for (const symbol of ['X', 'O']) {
+    const played = room.autopilot?.[symbol]?.rounds || [];
+    if (!played.length) continue;
+    const player = room.players?.[symbol];
+    if (!player?.id || player.isBot) continue;
+    const other = symbol === 'X' ? 'O' : 'X';
+    const opponent = room.players?.[other];
+    const score = room.state?.score || {};
+    const outcome = resolvedWinner === 'DRAW' ? 'مساوی'
+      : resolvedWinner === symbol ? 'برد' : 'باخت';
+    // رقم‌ها فارسی: بقیهٔ اعلان‌های محصول هم همین‌طور ساخته می‌شوند
+    // (`faDigits`) و متنِ لاتین وسطِ رابطِ فارسی، کارِ ناتمام به نظر می‌رسد.
+    const { faDigits } = require('../lib/faNum');
+    const lines = played
+      .map(r => `راند ${faDigits(r.round)}: ${r.cardName}${r.focusLabel ? ` (${r.focusLabel})` : ''}`)
+      .join('، ');
+    const body = [
+      `اتصال شما وسط مسابقه قطع شد و تا ${faDigits(autopilotWindowSeconds())} ثانیه برنگشتید؛`,
+      `سیستم برای ${faDigits(played.length)} راند بهترین کارت‌های شما را انتخاب کرد — ${lines}.`,
+      `نتیجهٔ مسابقه: ${outcome} ${faDigits(Number(score[symbol] || 0))}–${faDigits(Number(score[other] || 0))}`,
+      `در برابر ${opponent?.nickname || 'حریف'}.`,
+    ].join(' ');
+    try {
+      Promise.resolve(svc.createNotification(
+        player.id,
+        'duel_autoplay',
+        'سیستم به‌جای شما بازی کرد',
+        body,
+        { push: false },
+      )).catch(e => console.error('[games] autopilot notification failed:', e.message));
+    } catch (e) {
+      console.error('[games] autopilot notification failed:', e.message);
+    }
+  }
+}
+
 function rejectIfDisabled(socket, gameId) {
   const ff = featureFlags();
   if (!ff) return false;
@@ -507,6 +728,10 @@ function finish(room, winner, disconnectedSym = null) {
       : disconnectedSym === 'O' ? 'X'
         : (room.seats.X && room.seats.X.connected ? 'X' : 'O'))
     : winner;
+
+  // ── «چی شد که این‌طور شد» برای بازیکنی که وسط بازی رفت ──────────────
+  // فقط وقتی چیزی برای گفتن هست (سیستم واقعاً راندی بازی کرده باشد).
+  notifyAutoplayOutcome(room, resolvedWinner);
 
   // Game-specific history is non-financial and must never block settlement
   // or game:over. Card duel uses this hook to persist the five revealed
@@ -982,6 +1207,14 @@ function advance(room, lastMove, extra = {}) {
     }, missHoldMs);
   }
 
+  // بازیکنِ غایب باید در هر راند یک حرکت بگذارد؛ راندِ تازه همین‌جا
+  // مسلح می‌شود (کلیدِ راند مانع می‌شود در همان راند دو بار حرکت بگذارد).
+  if (room.autopilot) {
+    for (const sym of ['X', 'O']) {
+      if (room.autopilot[sym] && !room.autopilot[sym].released) scheduleAutopilot(room, sym);
+    }
+  }
+
   scheduleBot(room);
 }
 
@@ -1129,16 +1362,35 @@ function suspendForReconnect(room, symbol) {
     message: `اتصال حریف ناپایدار شده؛ تا ${Math.round(windowMs / 1000)} ثانیه منتظر بازگشتش می‌مانیم.`,
   }, room);
   room.reconnectTimers[symbol] = setTimeout(() => {
-    if (!room.done && room.reconnecting[symbol]) finish(room, 'DISCONNECT', symbol);
+    if (room.done || !room.reconnecting[symbol]) return;
+    // ── از «باختِ قطعی» به «سیستم جایش بازی می‌کند» (۴ مهر ۱۴۰۵) ──
+    //
+    // قبلاً همین‌جا مسابقه با `DISCONNECT` بسته می‌شد و بازیکنِ غایب
+    // می‌باخت. حالا اول امانت‌گیری را امتحان می‌کنیم و فقط اگر قواعدِ آن
+    // بازی از این قابلیت پشتیبانی نکنند، به همان رفتارِ قبلی برمی‌گردیم.
+    if (engageAutopilot(room, symbol)) return;
+    finish(room, 'DISCONNECT', symbol);
   }, windowMs);
 }
 
 function resumeSeat(socket) {
   const found = roomSeatForUser(socket.user?.id);
-  if (!found || !found.room.reconnecting?.[found.symbol]) return false;
+  if (!found) return false;
   const { room, symbol } = found;
+  // دو حالتِ «صندلیِ خالی» وجود دارد: پنجرهٔ بازگشتِ هنوز باز، و حالتی که
+  // سیستم امانت گرفته و وسطِ بازی است. در دومی هم کاربر باید بتواند
+  // برگردد؛ وگرنه تا آخرِ مسابقه تماشاچیِ دستِ خودش می‌شود.
+  const wasAutopilot = Boolean(room.autopilot?.[symbol] && !room.autopilot[symbol].released);
+  if (!room.reconnecting?.[symbol] && !wasAutopilot) return false;
   clearTimeout(room.reconnectTimers[symbol]);
+  clearTimeout(room.autopilotTimers?.[symbol]);
   room.reconnectTimers[symbol] = null;
+  if (wasAutopilot) {
+    // «آزادسازی» نه پاک‌کردن: سابقه می‌ماند، ولی سیستم دیگر حرکت نمی‌گذارد.
+    room.autopilot[symbol].released = true;
+    room.autopilot[symbol].key = null;
+    room.autopilotTimers[symbol] = null;
+  }
   room.reconnecting[symbol] = false;
   room.seats[symbol] = socket;
   socket.join(room.id);
@@ -1149,7 +1401,11 @@ function resumeSeat(socket) {
   if (opponentSocket?.emit && !room.reconnecting[opponent]) {
     safeEmit(opponentSocket, 'game:opponent_reconnected', {
       roomId: room.id,
-      message: 'حریف برگشت؛ مسابقه ادامه دارد.',
+      // اگر سیستم چند راند جایش بازی کرده بود، حریف باید بداند که از این
+      // لحظه خودِ بازیکن برمی‌گردد — وگرنه فکر می‌کند ربات تا آخر می‌ماند.
+      message: wasAutopilot
+        ? 'حریف برگشت؛ از این لحظه خودش بازی می‌کند و مسابقه ادامه دارد.'
+        : 'حریف برگشت؛ مسابقه ادامه دارد.',
     }, room);
     safeEmit(opponentSocket, 'game:update', {
       state: snapshot(room, opponent), turn: room.turn, turnMs: room.turnMs,
@@ -1671,5 +1927,13 @@ attachGames.completedMatches = completedMatches;
 // برای تست‌ها و کلاینتِ قدیمی: «پنجرهٔ لحظه‌ای» را برمی‌گرداند نه ثابت.
 attachGames.reconnectWindowMs = reconnectWindowMs;
 attachGames.REMATCH_WINDOW_MS = REMATCH_WINDOW_MS;
+attachGames.AUTOPILOT_DELAY_MS = AUTOPILOT_DELAY_MS;
+// درّه‌های تست (قاعدهٔ ریپو: تستِ موتور نه به دیتابیس وصل می‌شود نه ثانیه‌ها
+// را واقعی منتظر می‌ماند). هیچ‌کدام در مسیرِ محصول صدا زده نمی‌شوند.
+attachGames.__setNotifier = fn => { notifyOverride = fn || null; };
+attachGames.__setAutopilotDelay = ms => {
+  autopilotDelayMs = Number.isFinite(ms) ? ms : AUTOPILOT_DELAY_MS;
+};
+attachGames.engageAutopilot = engageAutopilot;
 module.exports = attachGames;
 ;

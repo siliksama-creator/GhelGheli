@@ -299,6 +299,46 @@ function botMove(state, player) {
   return pick ? { cardId: idOf(pick) } : null;
 }
 
+/**
+ * بهترین کارتِ **همین راند** — برای «بازیِ خودکار پس از قطعیِ ارتباط».
+ *
+ * ── تفاوتش با `botMove` ──────────────────────────────────────────────────
+ *
+ * `botMove` حریفِ تمرینی است: ۱۴٪ مواقع عمداً کارتِ دوم را می‌گذارد و برای
+ * راندهای بعدی «صرفه‌جویی» می‌کند تا بازی برای کاربر قابل‌برد بماند. اینجا
+ * دقیقاً برعکس است: دستِ بازیکنی که قطع شده را ما امانت گرفته‌ایم و باید
+ * **بهترین** انتخابِ او را بکنیم، وگرنه عملاً به او ضرر زده‌ایم.
+ *
+ * پس معیار = همان چیزی که حکمِ راند می‌سنجد (ویژگیِ همان راند + افکتِ آشکار
+ * در همان راند)، بدونِ صرفه‌جویی و بدونِ تصادف. تساوی با شناسهٔ کارت شکسته
+ * می‌شود تا نتیجه **قطعی** باشد: یک وضعیت، همیشه یک انتخاب — و تست می‌تواند
+ * دقیقاً همان را سنجیده باشد که موتور بازی کرده.
+ *
+ * ⚠️ این تابع در `engine.js` (فقط وقتی بازیکن تا پایانِ پنجرهٔ بازگشت
+ *    نیامده) صدا زده می‌شود. بازیِ معمولی هیچ مسیری به این‌جا ندارد.
+ */
+function bestMove(state, player) {
+  const remaining = state.remaining[player] || [];
+  if (!remaining.length) return null;
+  const cards = state.decks[player] || [];
+  const focus = duel.ROUND_FOCUS[state.roundIndex] || duel.ROUND_FOCUS[duel.ROUND_FOCUS.length - 1];
+  const finalRound = state.roundIndex === duel.DECK_SIZE - 1;
+  const effectNow = card => ({
+    speedster: state.roundIndex === 0 ? 6 : 0,
+    playmaker: state.roundIndex > 0 && state.previousWinner === player ? 4 : 0,
+    wall: state.roundIndex === 3 ? 6 : 0,
+    finisher: finalRound ? 6 : 0,
+    lucky_star: state.roundIndex >= 2 ? 3 : 0,
+  })[card.effect] || 0;
+  const ranked = remaining
+    .map(cardId => cards.find(card => idOf(card) === cardId))
+    .filter(Boolean)
+    .map(card => ({ card, score: duel.focusStatOf(card, focus) + effectNow(card) }))
+    .sort((a, b) => b.score - a.score
+      || String(idOf(a.card)).localeCompare(String(idOf(b.card))));
+  return ranked.length ? { cardId: idOf(ranked[0].card) } : null;
+}
+
 async function onFinish({ matchId, players, state, winner, stake, netPot, vsBot, matchMode }) {
   return duel.recordEngineBattle({
     matchId,
@@ -363,5 +403,6 @@ module.exports = {
   publicState,
   decorate,
   botMove,
+  bestMove,
   onFinish,
 };

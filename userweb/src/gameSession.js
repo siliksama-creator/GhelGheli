@@ -265,6 +265,10 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     };
     const onOpponentReconnecting = d => setConnectionNotice(d?.message || 'منتظر بازگشت حریف…');
     const onOpponentReconnected = d => { setConnectionNotice(d?.message || 'حریف برگشت'); window.setTimeout(() => setConnectionNotice(''), 1800); };
+    // حریف برنگشت و سیستم از این راند به بعد جایش کارت می‌گذارد؛ مسابقه
+    // بسته نمی‌شود. این پیام عمداً پاک نمی‌شود: حریفِ حاضر باید تا پایانِ
+    // بازی بداند صندلیِ روبه‌رو خودکار است.
+    const onOpponentAutoplay = d => setConnectionNotice(d?.message || 'سیستم جای حریف بازی می‌کند؛ مسابقه ادامه دارد.');
     const onRematchStatus = d => setRematchWaiting(Boolean(d?.waitingForOpponent));
     const onRematchUnavailable = d => {
       setRematchWaiting(false);
@@ -295,6 +299,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     s.on('game:settlement', onSettlement);
     s.on('game:opponent_reconnecting', onOpponentReconnecting);
     s.on('game:opponent_reconnected', onOpponentReconnected);
+    s.on('game:opponent_autoplay', onOpponentAutoplay);
     s.on('game:rematch_status', onRematchStatus);
     s.on('game:rematch_unavailable', onRematchUnavailable);
     s.on('game:error', onError);
@@ -352,6 +357,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         ['game:over', onOver], ['game:settlement', onSettlement],
         ['game:opponent_reconnecting', onOpponentReconnecting],
         ['game:opponent_reconnected', onOpponentReconnected],
+        ['game:opponent_autoplay', onOpponentAutoplay],
         ['game:rematch_status', onRematchStatus],
         ['game:rematch_unavailable', onRematchUnavailable], ['game:error', onError],
       ]) s.off(event, handler);

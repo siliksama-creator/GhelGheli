@@ -491,6 +491,13 @@ class GameSession extends ChangeNotifier {
         notifyListeners();
       });
     });
+    // حریف برنگشت و سیستم از این راند به بعد جایش کارت می‌گذارد؛ مسابقه
+    // بسته نمی‌شود. پیام عمداً پاک نمی‌شود: بازیکنِ حاضر باید تا پایانِ بازی
+    // بداند صندلیِ روبه‌رو خودکار است.
+    s.on('game:opponent_autoplay', (d) {
+      connectionNotice = _msg(d) ?? 'سیستم جای حریف بازی می‌کند؛ مسابقه ادامه دارد.';
+      notifyListeners();
+    });
     s.on('game:rematch_status', (d) {
       rematchWaiting = _asMap(d)['waitingForOpponent'] == true;
       notifyListeners();
