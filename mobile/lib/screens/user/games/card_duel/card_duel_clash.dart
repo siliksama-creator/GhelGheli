@@ -863,8 +863,10 @@ class _Finale extends StatelessWidget {
                               : 'ورودی منهای کمسیون برگشت')
                           : won
                               // امتیازِ مثبت برای برنده — سودِ خالص:
-                              // پاتِ دریافتی منهای ورودیِ خودش (خواستهٔ مالک).
-                              ? '+${faNum((session.netPot - session.stake).clamp(0, 1 << 31))} امتیاز · تسویه شد'
+                              // آنچه **واقعاً** واریز شد منهای ورودیِ خودش.
+                              // از سقفِ روزانهٔ امتیاز (۴ مهر ۱۴۰۵) ممکن است
+                              // از پات کمتر باشد؛ عدد از سرور می‌آید.
+                              ? '+${faNum((session.receivedPot - session.stake).clamp(0, 1 << 31))} امتیاز · تسویه شد'
                               : '−${faNum(session.stake)} امتیاز',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 12, color: Colors.white60),

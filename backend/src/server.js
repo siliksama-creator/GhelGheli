@@ -630,6 +630,7 @@ app.use('/api', require('./routes/profile')({
   fieldCrypto, nicknamePolicy, bcrypt, changePasswordLimiter,
   signUser, points, rewardGroups,
   inviteLeague: require('./services/inviteLeagueService'),
+  pointQuota: require('./services/pointQuotaService'),
 }));
 app.use('/api', require('./routes/rewardsUser')({
   pool, auth, asyncHandler, validateUuid,

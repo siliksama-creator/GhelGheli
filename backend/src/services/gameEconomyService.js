@@ -37,6 +37,11 @@ const DEFAULTS = Object.freeze({
   }),
   // سهمیهٔ روزانهٔ مسابقهٔ سکه‌دار (تعداد بازی، مشترک بین هر سه بازی)
   dailyCoinQuota: Object.freeze({ 100: 30, 1000: 15 }),
+  // سقفِ روزانهٔ امتیازی که یک بازیکن می‌تواند از بازی‌های شرطیِ آنلاین
+  // «کسب» کند (سودِ خالص؛ اصلِ ورودیِ برگشتی حساب نیست). ۰ یعنی بی‌سقف.
+  // خواستهٔ مالک (۴ مهر ۱۴۰۵): پیش‌فرض ۲۰۰۰ — بعد از پر شدن، برد سکه
+  // می‌دهد ولی امتیاز نه؛ باخت جا باز می‌کند.
+  dailyPointQuota: 2000,
   // سکهٔ هر لولِ تمام‌شدهٔ بازی ضربه‌زن — خواستهٔ مالک: «هر لول ۵ سکه»
   tapCoinsPerLevel: 5,
   // ── منحنیِ بازی ضربه‌زن (دورِ ۳۳) ──────────────────────────────────────
@@ -122,6 +127,9 @@ function merge(raw) {
         ),
       ]),
     ),
+    dailyPointQuota: clampInt(
+      v.dailyPointQuota, 0, 1_000_000, DEFAULTS.dailyPointQuota,
+    ),
     tapCoinsPerLevel: clampInt(
       v.tapCoinsPerLevel, 1, 1000, DEFAULTS.tapCoinsPerLevel,
     ),
@@ -163,6 +171,7 @@ async function publicView() {
     coinCarryoverPercent: cfg.coinCarryoverPercent,
     coinRewards: cfg.coinRewards,
     dailyCoinQuota: cfg.dailyCoinQuota,
+    dailyPointQuota: cfg.dailyPointQuota,
     tapCoinsPerLevel: cfg.tapCoinsPerLevel,
     tapCurve: cfg.tapCurve,
   };
@@ -190,6 +199,7 @@ function isCustom(cfg) {
   for (const stake of stakeLevels()) {
     if (Number(cfg.dailyCoinQuota?.[stake]) !== Number(d.dailyCoinQuota?.[stake] ?? 15)) return true;
   }
+  if (Number(cfg.dailyPointQuota ?? d.dailyPointQuota) !== Number(d.dailyPointQuota)) return true;
   for (const k of Object.keys(d.tapCurve)) {
     if (Number(cfg.tapCurve[k]) !== Number(d.tapCurve[k])) return true;
   }

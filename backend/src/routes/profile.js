@@ -11,7 +11,7 @@ module.exports = ({
   gameEconomy, getGameRewardSettings, grants, level,
   loginStreak, pass, wheel, clubs,
   fieldCrypto, nicknamePolicy, bcrypt, changePasswordLimiter,
-  signUser, points, rewardGroups, inviteLeague,
+  signUser, points, rewardGroups, inviteLeague, pointQuota,
 }) => {
   const router = express.Router();
 
@@ -155,6 +155,10 @@ router.get('/bootstrap', auth, asyncHandler(async (req, res) => {
     // سهمیهٔ سکهٔ امروز — سوار بر همان bootstrap تا صفحهٔ بازی‌ها بتواند
     // «۳۰ از ۳۰ بازی سکه‌دار» را بدونِ درخواستِ اضافه نشان بدهد.
     coinQuota: await coins.getQuota(req.user.id),
+    // سقفِ روزانهٔ امتیازِ کسب‌شده از بازیِ شرطی (۴ مهر ۱۴۰۵) — همان قاعده:
+    // بدونِ درخواستِ اضافه، کنارِ سهمیهٔ سکه در صفحهٔ انتخابِ ورودی.
+    // `remaining: null` یعنی سقف غیرفعال است (۰) و کلاینت چیزی نشان نمی‌دهد.
+    pointQuota: await pointQuota.getQuota(req.user.id).catch(() => null),
     // اقتصادِ بازی‌ها برای متن‌های راهنمای داخلِ اپ/وب — از تنظیماتِ
     // ادمین می‌آید، پس حتی اپ‌های قدیمی هم متنِ جدید می‌بینند.
     economy: await gameEconomy.publicView().catch(() => null),

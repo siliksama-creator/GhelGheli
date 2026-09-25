@@ -13,6 +13,7 @@ import '../../core/deep_links.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/coin_quota_line.dart';
+import '../../widgets/point_quota_line.dart';
 import '../../widgets/coin_rate_strip.dart';
 import '../../widgets/level_badge.dart';
 import 'games/game_session.dart' show netPotFor;
@@ -122,6 +123,10 @@ class _GamesHubPageState extends State<GamesHubPage> {
   /// `null` یعنی سرور هنوز جواب نداده یا این نسخه از سرور سهمیه نمی‌فرستد —
   /// در هر دو حالت چیزی نشان نمی‌دهیم، چون عددِ اشتباه از نبودِ عدد بدتر است.
   Map<String, dynamic>? _coinQuota;
+  /// سقفِ روزانهٔ امتیازِ کسب‌شده از بازیِ شرطی، از `/api/bootstrap`.
+  /// شکلش: `{date, cap, earned, remaining}` که `remaining: null` یعنی سقف
+  /// غیرفعال است. `null` یعنی سرور قدیمی است — خطی نشان نمی‌دهیم.
+  Map<String, dynamic>? _pointQuota;
   /// اقتصادِ بازی‌ها از /api/bootstrap — سکهٔ هر نتیجه، درصدِ انتقالِ
   /// سکه بین لیگ‌ها و سکهٔ هر لولِ ضربه‌زن (تنظیماتِ ادمین، بدونِ آپدیت).
   Map<String, dynamic>? _economy;
@@ -230,6 +235,10 @@ class _GamesHubPageState extends State<GamesHubPage> {
         if (m['user'] is Map) _user = Map<String, dynamic>.from(m['user']);
         if (m['cosmetics'] is Map) _cosmetics = Map<String, dynamic>.from(m['cosmetics']);
         if (m['coinQuota'] is Map) _coinQuota = Map<String, dynamic>.from(m['coinQuota']);
+        // سقفِ روزانهٔ امتیازِ کسب‌شده از بازیِ شرطی (۴ مهر ۱۴۰۵) — کنارِ
+        // سهمیهٔ سکه در صفحهٔ انتخابِ ورودی. سرورهای قدیمی این کلید را
+        // ندارند و ویجت با `null` ساکت می‌ماند.
+        if (m['pointQuota'] is Map) _pointQuota = Map<String, dynamic>.from(m['pointQuota']);
         if (m['economy'] is Map) _economy = Map<String, dynamic>.from(m['economy']);
         if (m['gamePoints'] is Map) {
           _gamePoints = Map<String, dynamic>.from(m['gamePoints']);
@@ -618,6 +627,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
         Gaps.vSm,
         _StakeRulesBanner(mode: _selectedMode),
         CoinQuotaLine(mode: _selectedMode, quota: _coinQuota),
+        PointQuotaLine(mode: _selectedMode, quota: _pointQuota),
         Gaps.vMd,
 
         // ── ۳. محتوای حالت انتخاب شده ──

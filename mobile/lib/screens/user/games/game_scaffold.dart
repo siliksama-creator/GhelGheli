@@ -548,7 +548,9 @@ class _ResultStrip extends StatelessWidget {
                 '(کمسیون ${faNum(session.drawFee)})'
             : 'ورودی منهای کمسیون برگشت';
       } else if (won) {
-        final net = (session.netPot - stakeVal).clamp(0, 1 << 31);
+        // آنچه واقعاً واریز شد (بعد از سقفِ روزانهٔ امتیاز، ۴ مهر ۱۴۰۵) —
+        // ممکن است از پات کمتر باشد؛ عدد از سرور می‌آید، پات فقط فال‌بک.
+        final net = (session.receivedPot - stakeVal).clamp(0, 1 << 31);
         deltaText = '+${faNum(net)} امتیاز';
       } else {
         deltaText = '−${faNum(stakeVal)} امتیاز';
@@ -648,8 +650,10 @@ class _MemoryResultMomentState extends State<_MemoryResultMoment> {
         : (s.iWon ? RewardKind.win : RewardKind.loss);
     // فقط بردِ مسابقهٔ امتیازیِ واقعی عدد دارد: بازنده چیزی روی کارت نمی‌بیند
     // (چیپِ منفیِ حساب مسابقه پایین‌تر می‌ماند) و تساوی هم چیزی اضافه نمی‌کند.
+    // ⚠️ بعد از سقفِ روزانهٔ امتیاز واریزِ واقعی از پات کمتر است؛ عدد از
+    // سرور (`receivedPot`)، نه محاسبهٔ محلی از پات.
     final net = kind == RewardKind.win && !s.vsBot
-        ? math.max(0, s.netPot - s.stake)
+        ? math.max(0, s.receivedPot - s.stake)
         : 0;
     RewardMoment.moment(
       context,

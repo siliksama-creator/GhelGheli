@@ -1194,9 +1194,11 @@ export default function CardDuelWeb({ api, token, stake = 0, vsBot = false,
                   ? `${fa(session.g.drawRefund)} امتیاز برگشت · کمسیون ${fa(session.g.drawFee)}`
                   : 'ورودی منهای کمسیون برگشت')
                 : iWon
-                  // امتیازِ مثبت برای برنده — سودِ خالص: پاتِ دریافتی منهای
-                  // ورودیِ خودش. (خواستهٔ مالک)
-                  ? `+${fa(Math.max(0, Number(session.g.netPot || 0) - Number(session.g.stake || stake)))} امتیاز · ${({ pending: 'در حال تسویه', settled: 'تسویه شد', refunded: 'ورودی برگشت' }[session.g.settlementStatus || 'settled'])}`
+                  // امتیازِ مثبت برای برنده — سودِ خالص: آنچه **واقعاً**
+                  // واریز شد منهای ورودیِ خودش. از سقفِ روزانهٔ امتیاز
+                  // (۴ مهر ۱۴۰۵) به بعد ممکن است از پات کمتر باشد؛ عدد از
+                  // سرور می‌آید (`payoutPoints`) و پات فقط فال‌بک است.
+                  ? `+${fa(Math.max(0, Number(session.g.payoutPoints || session.g.netPot || 0) - Number(session.g.stake || stake)))} امتیاز · ${({ pending: 'در حال تسویه', settled: 'تسویه شد', refunded: 'ورودی برگشت' }[session.g.settlementStatus || 'settled'])}`
                   : `−${fa(session.g.stake || stake)} امتیاز`}
           </div>
         )}

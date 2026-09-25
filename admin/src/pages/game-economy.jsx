@@ -167,7 +167,7 @@ export function GameEconomyPage({ request, onNavigate }) {
       </Card>
 
       <div className="card-grid cols-2">
-        <Card title="سهمیهٔ روزانهٔ سکه" subtitle="تعداد مسابقهٔ سکه‌دار در روز — مشترک بین هر سه بازی. سطوح از ورودی‌های عمومی ops می‌آید.">
+        <Card title="سهمیهٔ روزانهٔ سکه و سقفِ امتیاز" subtitle="تعداد مسابقهٔ سکه‌دار در روز — مشترک بین هر سه بازی. سطوح از ورودی‌های عمومی ops می‌آید.">
           {stakes.map((stake) => (
             <Field key={stake} label={`سهمیهٔ ورودی ${stake} در روز`}>
               <Input type="number" min="0" max="1000"
@@ -175,6 +175,12 @@ export function GameEconomyPage({ request, onNavigate }) {
                 onChange={e => setEcon(`dailyCoinQuota.${stake}`, Number(e.target.value))} />
             </Field>
           ))}
+          <Field label="سقفِ روزانهٔ امتیازِ کسب‌شده از بازی آنلاین"
+            hint="۰ یعنی بی‌سقف. هر بازیکن روزانه تا همین عدد امتیاز از بُردهای شرطی کسب می‌کند (اصلِ ورودیِ خودش همیشه برمی‌گردد و جزوِ سقف نیست). بعد از پر شدن، بازی ادامه دارد و برد سکه می‌دهد ولی امتیاز نه؛ باخت از شمارنده کم می‌کند و جا باز می‌شود. پیش‌فرض: ۲۰۰۰.">
+            <Input type="number" min="0" max="1000000"
+              value={cfg.economy.dailyPointQuota ?? 2000}
+              onChange={e => setEcon('dailyPointQuota', Number(e.target.value))} />
+          </Field>
         </Card>
 
         <Card

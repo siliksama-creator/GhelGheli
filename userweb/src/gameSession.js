@@ -207,6 +207,12 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
           ...prev,
           settlementStatus: d?.status || prev.settlementStatus,
           netPot: Number(d?.netPot || prev.netPot || 0),
+          // مبلغِ **واقعیِ** واریز به برنده بعد از سقفِ روزانهٔ امتیاز
+          // (۴ مهر ۱۴۰۵) — ممکن است از پات کمتر باشد. سرور برای صندلیِ
+          // برنده می‌فرستد؛ صفر یعنی «این تسویه سهمی ندارد» و مقدارِ قبلی
+          // نگه داشته می‌شود تا رویدادهای تکراری عدد را صفر نکنند.
+          payoutPoints: Number(d?.payoutPoints || 0) > 0
+            ? Number(d.payoutPoints) : (prev.payoutPoints || 0),
           // ── تساویِ پنالتی (۳ مهر ۱۴۰۵) ──
           // «ورودی کامل برگشت» دیگر درست نیست: کمسیون از هر دو طرف کم
           // می‌شود. عددها را **سرور** می‌فرستد (`refund`/`fee` هر سوکت) و
@@ -221,7 +227,11 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         };
         const payoutId = String(d?.matchId || prev.matchId || '');
         const payoutWinner = String(d?.winner || '');
-        const payoutAmount = Number(d?.netPot || prev.netPot || 0);
+        // ── سقفِ روزانهٔ امتیاز (۴ مهر ۱۴۰۵) ──
+        // مبلغِ واقعیِ واریز به برنده بعد از سقف ممکن است از پات کمتر
+        // باشد؛ سرور آن را در `payoutPoints` می‌فرستد. انیمیشن و عددِ صفحه
+        // همان را نشان می‌دهند — هرگز محاسبهٔ محلی از پات.
+        const payoutAmount = Number(d?.payoutPoints || d?.netPot || prev.netPot || 0);
         if (gameId === 'card_duel' && d?.payout === true && d?.status === 'settled'
           && Number(prev.stake) > 0 && payoutAmount > 0
           && ['X', 'O'].includes(payoutWinner) && payoutId

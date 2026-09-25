@@ -97,6 +97,10 @@ cron.schedule('23 4 * * *', () => {
   coins.pruneQuota(7)
     .then(n => { if (n) logger.info(`[coins] pruned ${n} old quota row(s)`); })
     .catch(e => logger.error('[coins] quota prune failed:', e.message));
+  // سهمیهٔ امتیازِ کسب‌شده — همان ریتمِ هفت‌روزهٔ سهمیهٔ سکه (۴ مهر ۱۴۰۵).
+  require('./services/pointQuotaService').pruneQuota(7)
+    .then(n => { if (n) logger.info(`[points] pruned ${n} old earn-quota row(s)`); })
+    .catch(e => logger.error('[points] earn-quota prune failed:', e.message));
 }, { timezone: 'Asia/Tehran' });
 
 // هرسِ رویدادهای تحلیلیِ کهنه — بند ۶بِ ممیزیِ مستقلِ دوم: این جدول

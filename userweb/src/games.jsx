@@ -103,6 +103,10 @@ export default function Games({ api, token, externalLaunch = null, initialActive
   // سهمیهٔ سکهٔ امروز از /api/bootstrap. تا وقتی نیامده `null` است و
   // چیزی رسم نمی‌شود — بهتر از رسمِ «۰ باقی‌مانده» که دروغ است.
   const [coinQuota, setCoinQuota] = useState(null);
+  // سقفِ روزانهٔ امتیازِ کسب‌شده از بازیِ شرطی (۴ مهر ۱۴۰۵). قراردادش
+  // آینهٔ سهمیهٔ سکه است: `cap` صفر یا `remaining: null` یعنی سقف غیرفعال
+  // و هیچ خطی رسم نمی‌شود.
+  const [pointQuota, setPointQuota] = useState(null);
   const [customStake, setCustomStake] = useState(500);
   const [tapLevels, setTapLevels] = useState(50);
   const [publicStakes, setPublicStakes] = useState([100, 1000]);
@@ -211,6 +215,7 @@ export default function Games({ api, token, externalLaunch = null, initialActive
     req('/api/bootstrap', 'GET', null, token).then(d => {
       if (d?.user) setUser({ ...d.user, cosmetics: d.cosmetics || {} });
       if (d?.coinQuota) setCoinQuota(d.coinQuota);
+      if (d?.pointQuota) setPointQuota(d.pointQuota);
       if (d?.economy) setEconomy(d.economy);
       if (d?.gamePoints) setGamePoints(d.gamePoints);
     }).catch(() => {});
@@ -464,6 +469,20 @@ export default function Games({ api, token, externalLaunch = null, initialActive
           {coinQuota.remaining[mode] > 0
             ? <span>امروز <b style={{ color:'#FFD166' }}>{fa(coinQuota.remaining[mode])}</b> برد دیگر سکه می‌دهد</span>
             : <span>سهمیهٔ سکهٔ امروزِ این ورودی پر شده — برد امتیاز دارد، سکه نه</span>}
+        </div>
+      )}
+
+      {/* ── سقفِ امتیازِ امروز (۴ مهر ۱۴۰۵) ──
+          امتیازِ کسب‌شده از بُردهای شرطی روزانه سقف دارد (پیش‌فرض ۲۰۰۰).
+          بدون این خط، کاربری که سقفش پر شده می‌بَرد، امتیازِ کمی می‌گیرد
+          و فکر می‌کند باگ است. دقیقاً کنارِ سهمیهٔ سکه — همان‌جا که ورودی
+          انتخاب می‌شود. فقط در حالتِ شرط‌دار و فقط وقتی سرور عدد فرستاده. */}
+      {mode > 0 && pointQuota?.cap > 0 && Number.isFinite(pointQuota.remaining) && (
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', margin:'-2px 0 12px', fontSize:'13.5px', lineHeight:1.5, color: pointQuota.remaining > 0 ? '#CBD5E1' : '#F59E0B' }}>
+          <img src={ASSETS.points} alt="" width={22} height={22} style={{ display:'block', flexShrink:0, opacity: pointQuota.remaining > 0 ? 1 : 0.5 }} />
+          {pointQuota.remaining > 0
+            ? <span>امروز تا <b style={{ color:'#FFD166' }}>{fa(pointQuota.remaining)}</b> امتیاز دیگر از برد آنلاین می‌گیری</span>
+            : <span>سقفِ امتیازِ امروز پر شده — برد سکه می‌دهد، امتیاز نه؛ باخت جا باز می‌کند</span>}
         </div>
       )}
 
@@ -771,13 +790,16 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
     // فقط بردِ مسابقهٔ امتیازی عدد دارد: بازنده هیچ چیزی از دست نمی‌دهد
     // که روی کارت بیاید (چیپِ «−۵۰۰» پایین‌تر در حسابِ مسابقه می‌ماند) و
     // تساوی هم چیزی به کسی اضافه نمی‌کند.
-    const net = Math.max(0, Number(g.netPot || 0) - Number(activeStake || 0));
+    // ⚠️ از سقفِ روزانهٔ امتیاز (۴ مهر ۱۴۰۵) ممکن است واریزِ واقعی از پات
+    // کمتر باشد؛ `payoutPoints` عددِ سرور است و پات فقط فال‌بک.
+    const received = Number(g.payoutPoints || g.netPot || 0);
+    const net = Math.max(0, received - Number(activeStake || 0));
     rewardMoment({
       source: 'memory',
       kind,
       points: kind === 'win' && !g.vsBot ? net : 0,
     });
-  }, [phase, activeGameId, g.winner, g.me, g.netPot, g.vsBot, activeStake]);
+  }, [phase, activeGameId, g.winner, g.me, g.netPot, g.payoutPoints, g.vsBot, activeStake]);
 
 
   /**
@@ -814,7 +836,8 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
                 </span>
               ) : g.winner === g.me ? (
                 <span style={{ color: '#22E7A6', background: 'rgba(34,231,166,0.14)', padding: '5px 14px', borderRadius: 99 }}>
-                  +{fa(Math.max(0, Number(g.netPot || 0) - Number(activeStake)))} امتیاز
+                  {/* عددِ واقعیِ سرور بعد از سقفِ روزانه؛ پات فقط فال‌بک */}
+                  +{fa(Math.max(0, Number(g.payoutPoints || g.netPot || 0) - Number(activeStake)))} امتیاز
                 </span>
               ) : (
                 <span style={{ color: '#FB7185', background: 'rgba(251,113,133,0.14)', padding: '5px 14px', borderRadius: 99 }}>

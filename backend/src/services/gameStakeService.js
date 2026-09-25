@@ -7,6 +7,8 @@ const coinLedger = require('./coinLedger');
 const {
   coinRewardFor, hasCoinReward, quotaTracked, tehranDate,
 } = require('./coinService');
+// سقفِ روزانهٔ امتیازِ کسب‌شده از بازی‌های شرطی (خواستهٔ مالک، ۴ مهر ۱۴۰۵)
+const pointQuota = require('./pointQuotaService');
 
 // پیش‌فرض تاریخی — فقط fallback وقتی ops_limits هنوز بار نشده.
 const DEFAULT_PUBLIC_STAKES = Object.freeze([0, 100, 1000]);
@@ -259,9 +261,15 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
       let drawFee = 0;
       let drawFeeByUser = null;
       let drawRefundByUser = null;
-      // سکهٔ بازنده جدا نگه داشته می‌شود تا engine بتواند به هر سوکت عددِ
+      // سکهٔ بازنده جدا نگه داده می‌شود تا engine بتواند به هر سوکت عددِ
       // خودش را بفرستد. در تساوی بی‌معناست و صفر می‌ماند.
       let loserCoins = 0;
+      // ── سقفِ روزانهٔ امتیاز (خواستهٔ مالک، ۴ مهر ۱۴۰۵) ──
+      // آنچه **واقعاً** به برنده واریز شد و اینکه سقف باعثِ محدودشدنش شد
+      // یا نه. کلاینت‌ها پات را خودشان حساب نمی‌کنند؛ این دو عدد را سرور
+      // می‌فرستد تا صفحهٔ نتیجه با موجودیِ واقعی دروغ نگوید.
+      let payoutPoints = null;
+      let pointCapped = false;
 
       // ── پرداختِ سکه به هر دو طرف ────────────────────────────────────
       //
@@ -354,6 +362,11 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
             // برگشتِ ورودی «کسب» نیست؛ کمسیون هم باخت نیست.
             lifetimeGain: 0,
           });
+          // ── سقفِ امتیاز: تساوی به‌اندازهٔ کمسیونِ کسرشده جا باز می‌کند ──
+          // کمسیون تنها باختِ واقعیِ هر طرف در تساوی است؛ همان مقدار از
+          // شمارندهٔ «کسبِ امروز» کم می‌شود تا با امتیازِ ازدست‌رفته هماهنگ
+          // بماند (زیرِ صفر نمی‌رود).
+          await pointQuota.release(client, userId, fee);
         }
         outcome = 'draw';
 
@@ -381,17 +394,37 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
         if (![match.player_x_id, match.player_o_id].includes(winnerUserId)) {
           throw new StakeError('برنده مسابقه معتبر نیست', 'INVALID_WINNER');
         }
+        // ── سقفِ روزانهٔ امتیازِ کسب‌شده (خواستهٔ مالک، ۴ مهر ۱۴۰۵) ──
+        //
+        // اصلِ ورودیِ برنده **همیشه** برمی‌گردد و مشمولِ سقف نیست؛ فقط
+        // «سود» (پات منهای ورودیِ خود) با سقفِ روزانه محدود می‌شود. اگر
+        // جای کمی مانده باشد سود ناقص واریز می‌شود و اگر سقف پر باشد برد
+        // فقط سکه می‌دهد — بازی بسته نمی‌شود.
+        //
+        // چرا سود و نه کلِ پات: اگر کلِ پات سقف‌دار بود، بازیکنِ پُرِ سقف
+        // با بُردن «کمتر از ورودی‌اش» دریافت می‌کرد — یعنی بُرد مساویِ
+        // باخت می‌شد و انگیزهٔ بازی می‌مُرد.
+        const profit = Math.max(0, netPot - stake);
+        const earnRes = await pointQuota.earn(client, winnerUserId, profit);
+        const payoutAmount = stake + earnRes.granted;
         // lifetime فقط سود واقعی را می‌گیرد؛ برگشت اصل stake «کسب تازه» نیست.
+        // ⚠️ حالا خودِ سود هم ممکن است به‌خاطرِ سقف کمتر از پات باشد —
+        // همان چیزی که **واقعاً** واریز شد به تاریخچه می‌رود، نه عددِ پات.
         const payout = await points.credit(client, {
           userId: winnerUserId,
-          points: netPot,
+          points: payoutAmount,
           source: 'game',
           referenceType: 'game_stake_payout',
           referenceId: matchId,
-          description: `برد پات مسابقه ${faAmount(stake)} امتیازی`,
+          description: earnRes.capped
+            ? `برد پات مسابقه ${faAmount(stake)} امتیازی `
+              + `(محدودشده با سقفِ روزانه: ${faAmount(earnRes.granted)} امتیاز کسب شد)`
+            : `برد پات مسابقه ${faAmount(stake)} امتیازی`,
           league: false,
-          lifetimeGain: Math.max(0, netPot - stake),
+          lifetimeGain: earnRes.granted,
         });
+        payoutPoints = payoutAmount;
+        pointCapped = earnRes.capped;
         winnerBalanceAfter = Number(payout?.balanceAfter ?? 0);
         outcome = 'winner';
 
@@ -420,6 +453,12 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
           ? match.player_o_id
           : match.player_x_id;
 
+        // ── سقفِ امتیاز: باختِ حریف جا باز می‌کند ──
+        // بازنده به‌اندازهٔ ورودی‌اش امتیاز از دست داده؛ همان مقدار از
+        // شمارندهٔ «کسبِ امروز»ش کم می‌شود تا فردا نه، همین امروز بتواند
+        // دوباره تا سقف کسب کند. زیرِ صفر نمی‌رود (باختِ عمدی فضا نمی‌سازد).
+        await pointQuota.release(client, loserUserId, stake);
+
         coinsAwarded = await payCoins(winnerUserId, rewardOf.win);
         loserCoins = await payCoins(loserUserId, rewardOf.loss);
       }
@@ -445,6 +484,10 @@ function createGameStakeService(db = pool, points = pointService, coins = coinSe
         winnerBalanceAfter: draw ? null : winnerBalanceAfter,
         coinsAwarded,
         loserCoins,
+        // سقفِ روزانهٔ امتیاز: مبلغِ واقعیِ واریز به برنده (شاملِ اصلِ
+        // ورودی) و اینکه سقف محدودش کرده یا نه. در تساوی بی‌معناست.
+        payoutPoints: draw ? null : payoutPoints,
+        pointCapped: draw ? false : pointCapped,
         // تساوی: کمسیونِ کل و سهمِ هر کاربر (کسر‌شده و برگشت‌داده‌شده).
         // کلاینت‌ها همین‌ها را نشان می‌دهند و **حساب نمی‌کنند** — اگر
         // کلاینت خودش نصف می‌کرد، یک روز فرمولِ سرور عوض می‌شد و UI

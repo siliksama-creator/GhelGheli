@@ -873,6 +873,15 @@ function finish(room, winner, disconnectedSym = null) {
               stake: result.stake || room.stake || 0,
               commission: result.commission || room.commission || 0,
               payout: !result.duplicate && !draw,
+              // ── سقفِ روزانهٔ امتیاز (۴ مهر ۱۴۰۵) ──
+              // مبلغِ **واقعیِ** واریز به برنده — بعد از سقف ممکن است از
+              // پات کمتر باشد. صفر/هیچ برای صندلیِ بازنده و تساوی؛ کلاینت
+              // برای انیمیشنِ برد همین را ترجیح می‌دهد و هرگز خودش حساب
+              // نمی‌کند (قراردادِ همیشگی: عدد از سرور، نه از فرمولِ UI).
+              payoutPoints: (!draw && sym === winnerSym)
+                ? (result.payoutPoints || result.netPot || room.netPot || 0) : 0,
+              pointCapped: (!draw && sym === winnerSym)
+                ? Boolean(result.pointCapped) : false,
               balanceAfter: sym === winnerSym ? result.winnerBalanceAfter : null,
               // فقط در تساوی معنا دارند؛ در برد صفر می‌مانند تا کلاینت
               // مجبور نباشد شرط بگذارد.
@@ -914,6 +923,9 @@ function finish(room, winner, disconnectedSym = null) {
               stake: result.stake,
               commission: result.commission,
               coins: coinsForSeat(winnerSym),
+              // مبلغِ واقعی بعد از سقفِ روزانه — کلاینت همین را نشان می‌دهد.
+              payoutPoints: result.payoutPoints || result.netPot,
+              pointCapped: Boolean(result.pointCapped),
             }, room);
             // بازنده هم رویدادِ خودش را می‌گیرد. بدونِ این، تنها نشانهٔ
             // سکه‌اش عددِ داخلِ settlement بود که کلاینتِ فعلی برای

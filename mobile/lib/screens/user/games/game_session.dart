@@ -38,6 +38,15 @@ class GameSession extends ChangeNotifier {
   int totalPot = 0;
   int netPot = 0;
   int commission = 0;
+
+  /// مبلغِ **واقعیِ** واریز به برنده بعد از سقفِ روزانهٔ امتیاز
+  /// (۴ مهر ۱۴۰۵) — سرور در `game:settlement` می‌فرستد و ممکن است از
+  /// [netPot] کمتر باشد. صفر یعنی تسویه‌ای در کار نبوده/سهمی نداریم.
+  int payoutPoints = 0;
+
+  /// آنچه UI باید «دریافتیِ برنده» نشان دهد: عددِ سرور، و پات فقط
+  /// فال‌بکِ سرورهای قدیمی. هیچ صفحه‌ای حق ندارد پات را خودش حساب کند.
+  int get receivedPot => payoutPoints > 0 ? payoutPoints : netPot;
   GameSession({
     required this.api,
     required this.gameId,
@@ -434,6 +443,10 @@ class GameSession extends ChangeNotifier {
       }
       settlementStatus = '${m['status'] ?? settlementStatus}';
       netPot = (m['netPot'] as num?)?.toInt() ?? netPot;
+      // سقفِ روزانهٔ امتیاز (۴ مهر ۱۴۰۵): واریزِ واقعیِ برنده. سرور برای
+      // صندلیِ بازنده/تساوی صفر می‌فرستد؛ صفر نباید مقدارِ قبلی را پاک کند.
+      final pp = (m['payoutPoints'] as num?)?.toInt() ?? 0;
+      if (pp > 0) payoutPoints = pp;
       // فقط در تساوی معنا دارند؛ سرور در برد صفر می‌فرستد.
       drawRefund = (m['refund'] as num?)?.toInt() ?? drawRefund;
       drawFee = (m['fee'] as num?)?.toInt() ?? drawFee;
@@ -448,7 +461,8 @@ class GameSession extends ChangeNotifier {
 
       final payoutMatchId = '${m['matchId'] ?? matchId ?? ''}';
       final payoutWinner = '${m['winner'] ?? ''}';
-      final payout = (m['netPot'] as num?)?.toInt() ?? netPot;
+      // مبلغِ واقعی بعد از سقفِ روزانه؛ پات فقط فال‌بکِ سرورهای قدیمی.
+      final payout = pp > 0 ? pp : ((m['netPot'] as num?)?.toInt() ?? netPot);
       final balanceAfter = (m['balanceAfter'] as num?)?.toInt();
       final shouldAnimate = gameId == 'card_duel' &&
           m['payout'] == true &&
