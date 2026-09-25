@@ -385,11 +385,42 @@ async function main() {
   const netPot = Number(stA?.data?.netPot ?? stB?.data?.netPot ?? 0);
   const winnerBefore = winnerToken === p1.token ? beforeA : beforeB;
   if (winnerSeat === 'DRAW') {
-    // تساوی: هر دو اصلِ شرط برگشته.
-    ok(Math.abs(endA - beforeA) <= Math.max(5, netPot * 0.05),
-      `تساوی: موجودی الف تقریباً برگشت (${beforeA} → ${endA})`);
-    ok(Math.abs(endB - beforeB) <= Math.max(5, netPot * 0.05),
-      `تساوی: موجودی ب تقریباً برگشت (${beforeB} → ${endB})`);
+    // ── تساوی: ورودی برمی‌گردد منهای نصفِ کمسیون ──────────────────────────
+    //
+    // قاعدهٔ مالک: «هر وقت نفری ۱۰ ضربه زدن و بازی ۱۰ ۱۰ شد مساوی حساب
+    // می‌شه» و کمسیونِ مساوی نصف‌نصف بین دو نفر تقسیم می‌شود (۱۰۰۰ ورودی →
+    // ۹۰۰ برگشت). ملاکِ این سنجش همان دو عددی است که سندِ تسویه می‌فرستد.
+    //
+    // ⚠️ قبلاً اینجا `Math.max(5, netPot * 0.05)` بود: با شرطِ ۱۰۰ و
+    //    کمسیونِ ۱۰٪، سهمِ هر نفر ۱۰ امتیاز است ولی سقفِ ۵٪ از پاتِ خالص
+    //    (۱۸۰) می‌شد ۹ → سنجش **همیشه** در حالتِ تساوی قرمز می‌شد و فقط
+    //    به‌خاطرِ تصادفی‌بودنِ نتیجهٔ بازی گاهی سبز می‌ماند. قرمزیِ نوسانی
+    //    بدترین نوعِ سنجش است؛ حالا دقیق و مبتنی بر سند است.
+    const feeA = Number(stA?.data?.fee || 0);
+    const feeB = Number(stB?.data?.fee || 0);
+    const refundA = Number(stA?.data?.refund || 0);
+    const refundB = Number(stB?.data?.refund || 0);
+    const commission = Number(stA?.data?.commission ?? stB?.data?.commission ?? 0);
+    const stakePaid = Number(stA?.data?.stake || STAKE);
+
+    if (feeA || feeB) {
+      ok(Math.abs((beforeA - endA) - feeA) <= 1 && Math.abs((beforeB - endB) - feeB) <= 1,
+        `تساوی: هر دو دقیقاً «ورودی منهای سهمِ کمسیون» را پس گرفتند `
+        + `(الف ${beforeA} → ${endA}، کسرِ ${feeA} · ب ${beforeB} → ${endB}، کسرِ ${feeB})`);
+      ok(feeA + feeB === commission,
+        `تساوی: جمعِ کسرِ دو نفر دقیقاً کمسیون است، نه بیشتر (${feeA} + ${feeB} = ${commission})`);
+      ok(refundA === stakePaid - feeA && refundB === stakePaid - feeB,
+        `تساوی: برگشتِ هر صندلی = ورودی منهای کسرِ خودش (${refundA}/${refundB} از ${stakePaid})`);
+      ok(Math.max(feeA, feeB) - Math.min(feeA, feeB) <= 1,
+        `تساوی: کمسیون نصف‌نصف تقسیم شده (${feeA} و ${feeB})`);
+    } else {
+      // مسیرِ پشتیبان — پیامِ تسویهٔ تکراری یا سرورِ قدیمی که `fee` نمی‌فرستد.
+      // سقفِ کسرِ هر نفر نصفِ کمسیونِ کل است (نه درصدی از پات).
+      const cap = Math.ceil(commission / 2) + 1;
+      ok((beforeA - endA) <= cap && (beforeB - endB) <= cap,
+        `تساوی: کسرِ هیچ‌کدام از نصفِ کمسیون بیشتر نشد `
+        + `(الف ${beforeA - endA}، ب ${beforeB - endB}، سقف ${cap})`);
+    }
   } else {
     ok(winnerEnd >= winnerBefore - STAKE,
       `برنده (صندلی ${winnerSeat}) پات را گرفت: موجودی قبلِ شرط ${winnerBefore} → بعد ${winnerEnd} (netPot=${netPot})`);

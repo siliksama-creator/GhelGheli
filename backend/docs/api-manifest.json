@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 280,
+ "count": 286,
  "endpoints": [
   {
    "method": "GET",
@@ -176,6 +176,36 @@
    "method": "GET",
    "path": "/api/admin/games/results",
    "source": "routes/adminDashboard.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/admin/invite-league",
+   "source": "routes/adminInviteLeague.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/invite-league",
+   "source": "routes/adminInviteLeague.js"
+  },
+  {
+   "method": "PATCH",
+   "path": "/api/admin/invite-league/:id",
+   "source": "routes/adminInviteLeague.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/invite-league/:id/close",
+   "source": "routes/adminInviteLeague.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/invite-league/payouts/:id/cancel",
+   "source": "routes/adminInviteLeague.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/admin/invite-league/payouts/approve",
+   "source": "routes/adminInviteLeague.js"
   },
   {
    "method": "GET",
