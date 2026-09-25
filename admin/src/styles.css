@@ -1761,19 +1761,58 @@ table.data-table {
 @media (max-width: 410px) { .adminCardTop { grid-template-columns: 96px minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .adminRarityFrame, .adminRarityFrame > i { animation: none; } }
 
-/* Distinct card-class materials: not one generic frame with five colours. */
-.adminRarityFrame.rarity-normal{background:linear-gradient(145deg,#34d399,#14532d 58%,#334155);animation:none;box-shadow:0 8px 18px #0007,0 0 11px #22c55e40}
-.adminRarityFrame.rarity-normal>i{display:none}
-.adminRarityFrame.rarity-silver{background:linear-gradient(115deg,#fff,#64748b 30%,#f8fafc 52%,#334155 78%,#fff);background-size:230% 100%;animation:adminSilver 4.8s ease-in-out infinite;box-shadow:0 8px 22px #e2e8f055}
-.adminRarityFrame.rarity-silver>img{outline:1px solid #ffffff9c;outline-offset:-7px}
-.adminRarityFrame.rarity-gold{padding:5px;background:conic-gradient(from var(--rarity-turn),#fff0a3,#b77900,#ffd166,#7c4a00,#fff0a3);box-shadow:0 9px 25px #ffd16666}
-.adminRarityFrame.rarity-gold:after,.adminRarityFrame.rarity-premium:after{position:absolute;z-index:4;inset-inline-end:-5px;bottom:-6px;width:20px;height:20px;display:grid;place-items:center;border:1px solid #fff8;box-shadow:0 0 13px var(--rarity-a);font-size:8px}
-.adminRarityFrame.rarity-gold:after{content:'★';border-radius:50%;background:#ffd166;color:#6b3f00}
-.adminRarityFrame.rarity-premium{background:conic-gradient(from var(--rarity-turn),#22d3ee,#7c3aed,#f472b6,#071522,#22d3ee);box-shadow:0 10px 27px #7c3aed70;animation-duration:3.1s}
-.adminRarityFrame.rarity-premium:after{content:'◆';border-radius:6px;background:linear-gradient(135deg,#22d3ee,#7c3aed);color:#fff;transform:rotate(12deg)}
-.adminRarityFrame.rarity-legend{padding:5px;background:conic-gradient(from var(--rarity-turn),#ffd166,#ef4444,#7f1d1d,#071522,#ffd166);box-shadow:0 11px 30px #ef444477;animation-duration:2.7s}
+/* ═══════════════════════════════════════════════════════════════════════
+   چهار کلاسِ کارت — چهار مادهٔ متفاوت، نه یک قاب با چهار رنگ (مایگریشن ۱۰۰)
+
+   کلاس اکنون ردهٔ کمیابیِ امتیاز است: تا ۵۰۰ / تا ۱۰۰۰ / تا ۳۰۰۰ / بالاتر.
+   منبعِ حقیقت: `backend/src/lib/cardRarity.js` — گارد: `testCardRarity.js`.
+   ═══════════════════════════════════════════════════════════════════════ */
+/* معمولی — فولادِ مات، بی‌انیمیشن (این جدول تا ۵۰ کارت نشان می‌دهد؛
+   ۵۰ انیمیشنِ هم‌زمان روی پنلِ ادمین فقط CPU می‌خورد). */
+.adminRarityFrame.rarity-common{--rarity-a:#8FA3B8;--rarity-b:#243244;background:linear-gradient(146deg,#A9BCD0,#4A5C72 32%,#1B2635 66%,#080F17);animation:none;box-shadow:0 8px 18px #0007,0 0 11px #8fa3b840}
+.adminRarityFrame.rarity-common>i{display:none}
+.adminRarityFrame.rarity-common>img{outline:1px solid #ffffff24;outline-offset:-7px}
+/* کمیاب — زمردِ نفس‌کش */
+.adminRarityFrame.rarity-uncommon{--rarity-a:#34D399;--rarity-b:#065F46;background:linear-gradient(146deg,#7CF0C4,#10B981 26%,#065F46 62%,#03170F);background-size:210% 210%;box-shadow:0 9px 24px #10b98155;animation:adminClassBreath 5.4s ease-in-out infinite}
+.adminRarityFrame.rarity-uncommon>img{outline:1px solid #6ee7b7a6;outline-offset:-7px}
+/* نایاب — شفقِ بنفشِ چرخان */
+.adminRarityFrame.rarity-rare{--rarity-a:#A78BFA;--rarity-b:#312E81;background:conic-gradient(from var(--rarity-turn),#22D3EE,#8B5CF6 20%,#F472B6 40%,#1E1B4B 62%,#6366F1 82%,#22D3EE);box-shadow:0 10px 27px #8b5cf65e;animation-duration:4.6s}
+.adminRarityFrame.rarity-rare>img{outline:1px solid #c4b5fd6b;outline-offset:-7px}
+/* افسانه‌ای — طلای گداخته + تاج */
+.adminRarityFrame.rarity-legendary{--rarity-a:#FFD166;--rarity-b:#7F1D1D;padding:5px;background:conic-gradient(from var(--rarity-turn),#FFF3C4,#FFD166 16%,#F97316 36%,#7F1D1D 54%,#FBBF24 74%,#FFE9A8 88%,#FFF3C4);box-shadow:0 11px 30px #f59e0b7a;animation-duration:3.2s}
+.adminRarityFrame.rarity-legendary>img{outline:1px solid #ffe9a8b8;outline-offset:-8px}
+.adminRarityFrame.rarity-legendary:after{content:'♛';position:absolute;z-index:4;inset-inline-end:-5px;bottom:-6px;width:20px;height:20px;display:grid;place-items:center;border:1px solid #fff8;box-shadow:0 0 13px #f59e0b;border-radius:50%;background:#FFD166;color:#6b3f00;font-size:9px}
+@keyframes adminClassBreath{0%,100%{background-position:0% 50%;filter:brightness(1)}50%{background-position:100% 50%;filter:brightness(1.12)}}
+
+/* ── کلیدهای نسلِ قبل ─────────────────────────────────────────────────
+   دیگر تولید نمی‌شوند، ولی به کلاسِ تازه‌شان alias شده‌اند تا کارتی که با
+   نامِ قدیمی از کشِ مرورگر یا سرورِ نگرفته بیاید، قابِ درست بگیرد. */
+.adminRarityFrame.rarity-normal{--rarity-a:#8FA3B8;--rarity-b:#243244}
+.adminRarityFrame.rarity-silver,.adminRarityFrame.rarity-gold{--rarity-a:#34D399;--rarity-b:#065F46}
+.adminRarityFrame.rarity-premium{--rarity-a:#A78BFA;--rarity-b:#312E81}
+.adminRarityFrame.rarity-legend{--rarity-a:#FFD166;--rarity-b:#7F1D1D}
 @keyframes adminSilver{50%{background-position:100% 0;filter:brightness(1.13)}}
-@media(prefers-reduced-motion:reduce){.adminRarityFrame.rarity-silver{animation:none!important}}
+@media(prefers-reduced-motion:reduce){.adminRarityFrame.rarity-uncommon{animation:none!important}}
+
+/* ── چیپِ کلاسِ کارت در فرمِ ثبت ───────────────────────────────────────
+   جای selectِ حذف‌شده. رنگش عمداً از همان پالتِ قابِ پنل می‌آید تا مدیر
+   با یک نگاه بفهمد این کارت با چه قابی به دستِ کاربر می‌رسد. */
+.adminClassChip {
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--admin-class-accent, #8FA3B8);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--admin-class-accent, #8FA3B8) 22%, transparent),
+    transparent 70%);
+}
+.adminClassChip b { color: var(--admin-class-accent, #8FA3B8); font-size: 14px; font-weight: 950; }
+.adminClassChip small { color: var(--gg-text-muted); font-size: 10.5px; }
+.adminClassChip.rarity-common { --admin-class-accent: #8FA3B8; }
+.adminClassChip.rarity-uncommon { --admin-class-accent: #34D399; }
+.adminClassChip.rarity-rare { --admin-class-accent: #A78BFA; }
+.adminClassChip.rarity-legendary { --admin-class-accent: #FFD166; }
 
 /* ── نوعِ کارت: بازی یا کلکسیونی ───────────────────────────────────────
    سوییچی که بخشِ استاتس را حذف می‌کند. حاشیهٔ رنگی عمدی است: مدیر باید

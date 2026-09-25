@@ -1,12 +1,13 @@
 import { Pencil, Trash2 } from 'lucide-react';
 
 import { assetUrl, fmtNumber } from '../../lib/api.js';
+import * as adminRarity from '../../lib/rarity.js';
 import { Button } from '../ui.jsx';
 
 const SIDE_LABELS = { front: 'روی کارت', back: 'پشت کارت', alternate: 'نمای دیگر' };
-const RARITY_LABELS = {
-  normal: 'معمولی', silver: 'نقره‌ای', gold: 'طلایی', premium: 'پرمیوم', legend: 'لجند',
-};
+// برچسب و نگاشت از منبعِ مشترکِ پنل؛ گاردِ `testCardRarity.js` هم‌خوانی‌اش
+// با سرور و دو کلاینتِ دیگر را می‌سنجد.
+const RARITY_LABELS = adminRarity.RARITY_LABELS;
 const STAT_LABELS = [
   ['duel_attack','حمله'],['duel_defense','دفاع'],['duel_speed','سرعت'],
   ['duel_technique','تکنیک'],['duel_goal_chance','گل'],['duel_energy','انرژی'],
@@ -14,13 +15,17 @@ const STAT_LABELS = [
 
 /** One administrative card, regardless of how many recognition images it has. */
 export function GroupedCardTile({ card, deleting = false, onEdit, onToggle, onDelete }) {
-  const rarity = RARITY_LABELS[card.duel_rarity] ? card.duel_rarity : 'normal';
+  // ⚠️ کلاس **از امتیاز** خوانده می‌شود، نه از ستونِ ذخیره‌شده. ستون پس از
+  //    مایگریشن ۱۰۰ همیشه هم‌خوان است، ولی این‌جا اگر ردیفی از قلم افتاده
+  //    باشد مدیر در پنل همان واقعیتی را می‌بیند که بازی به کاربر نشان می‌دهد
+  //    — نه یک قابِ خوش‌بینانه.
+  const rarity = adminRarity.rarityForPoints(card.point_value);
   const primary = card.sides?.find(side => side.side === 'front') || card.sides?.[0];
   return (
     <article className="card adminCardShowcase" style={{ opacity: card.is_active ? 1 : 0.6 }}>
       <div className="adminCardTop">
         <div className={`adminRarityFrame rarity-${rarity}`}>
-          <span>{rarity === 'legend' ? '♛ ' : rarity === 'premium' ? '✦ ' : ''}{RARITY_LABELS[rarity]}</span>
+          <span>{RARITY_LABELS[rarity]}</span>
           {primary && <img src={assetUrl(primary.image_url)} alt={card.card_type_name || 'کارت'} loading="lazy" />}
           <i aria-hidden="true" />
         </div>

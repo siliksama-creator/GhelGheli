@@ -63,8 +63,8 @@ ok('وب: قابِ CardRarityFrame پراپِ corner را می‌پذیرد و �
   /corner = null/.test(webFrame) && /\{corner\}/.test(webFrame));
 ok('وب CSS: قاعدهٔ .rarityQtyCorner در گوشهٔ پایینِ قاب نشسته است',
   /\.rarityQtyCorner\{[^}]*bottom:-6px/.test(webCss));
-ok('وب CSS: نگینِ کمیابیِ پرمیوم/گلد وقتی عدد هست خاموش می‌شود',
-  /qtyCorner\.rarity-premium:after[^{]*\{content:none\}/.test(webCss));
+ok('وب CSS: نگینِ کمیابیِ نایاب/افسانه‌ای وقتی عدد هست خاموش می‌شود',
+  /qtyCorner\.rarity-rare:after[^{]*\{content:none\}/.test(webCss));
 
 ok('اندروید: چیپِ بالای کارت (_MiniChip با ×) حذف شده است',
   !/_MiniChip\(text:\s*'×/.test(andCard));

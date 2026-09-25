@@ -14,9 +14,16 @@ const DECK_SIZE = 5;
 const HISTORY_KEEP = 5;
 const HISTORY_TTL_DAYS = 14;
 const ONLINE_STAKES = Object.freeze([100, 1000]);
-const RARITIES = Object.freeze(['normal', 'silver', 'gold', 'premium', 'legend']);
+// ── کلاسِ کارت از منبعِ حقیقتِ مشترک می‌آید ──────────────────────────
+// قبلاً این فایل فهرست و برچسب و پاداشِ خودش را داشت و `cardBoxService` هم
+// یک نسخهٔ دیگر؛ دو فهرست که فقط با مراقبتِ دستی هم‌خوان می‌ماندند.
+const cardRarity = require('../lib/cardRarity');
+const RARITIES = cardRarity.RARITIES;
 const EFFECTS = Object.freeze(['none', 'finisher', 'wall', 'speedster', 'playmaker', 'lucky_star']);
-const RARITY_BONUS = Object.freeze({ normal: 0, silver: 5, gold: 10, premium: 16, legend: 24 });
+// پاداشِ قدرتِ دوئل برای هر کلاس — با همان مقدارِ ردهٔ امتیازیِ متناظرش
+// در نسلِ قبل، تا بالانسِ بازی دست‌نخورده بماند (توضیحِ کامل در
+// `src/lib/cardRarity.js`).
+const RARITY_BONUS = cardRarity.RARITY_BONUS;
 // ── هندیکپِ ربات: چقدر عمداً ضعیف‌تر از کاربر باشد ──
 //
 // تمرین باید قابلِ برد باشد ولی بی‌رقیب نه. این عدد تنها اهرمِ تنظیمِ
@@ -27,7 +34,7 @@ const RARITY_BONUS = Object.freeze({ normal: 0, silver: 5, gold: 10, premium: 16
 //    `scripts/testCardDuelBalance.js` را دوباره اجرا کن — همان تست
 //    بازه را نگه می‌دارد.
 const BOT_HANDICAP = 4;
-const RARITY_LABEL = Object.freeze({ normal: 'معمولی', silver: 'نقره‌ای', gold: 'طلایی', premium: 'پرمیوم', legend: 'لجند' });
+const RARITY_LABEL = cardRarity.RARITY_LABELS;
 const EFFECT_LABEL = Object.freeze({
   none: 'بدون افکت', finisher: 'فینیشر', wall: 'دیوار دفاعی', speedster: 'سرعتی',
   playmaker: 'بازی‌ساز', lucky_star: 'ستاره خوش‌شانس',
@@ -140,7 +147,10 @@ function int(v, fallback = 0) {
 }
 function clamp(n, min, max) { return Math.min(max, Math.max(min, int(n))); }
 function statInput(v, fallback = 50) { return clamp(v === undefined || v === null || v === '' ? fallback : v, 0, 100); }
-function rarityInput(v) { const s = String(v || 'normal'); return RARITIES.includes(s) ? s : 'normal'; }
+// نگاشتِ کلیدهای نسلِ قبل (`silver`, `legend`, …) به کلیدهای تازه هم اینجا
+// انجام می‌شود تا یک کلاینتِ کش‌شده کارتش را از «لجند» به «معمولی» سقوط
+// ندهد.
+function rarityInput(v) { return cardRarity.rarityInput(v); }
 function effectInput(v) { const s = String(v || 'none'); return EFFECTS.includes(s) ? s : 'none'; }
 
 /**
@@ -154,6 +164,29 @@ function collectibleInput(v, fallback = false) {
   if (v === undefined || v === null || v === '') return fallback === true;
   const s = String(v).trim().toLowerCase();
   return s === 'true' || s === '1' || s === 'on' || s === 'yes';
+}
+
+/**
+ * امتیازِ در دست را از بدنه بیرون می‌کشد؛ `null` یعنی «امتیاز نامعلوم».
+ *
+ * ⚠️ `0` با «نامعلوم» فرق دارد: بدنهٔ خالی از یک فرمِ multipart رشتهٔ `''`
+ *    می‌فرستد و `Number('')` صفر می‌شود. اگر آن را «امتیازِ صفر» بپذیریم،
+ *    ویرایشِ فقط-عکسِ یک کارتِ ۳۰۰۰ امتیازی کلاسش را به «معمولی» می‌انداخت.
+ */
+function pointValueFrom(body, fallback) {
+  const raw = body?.pointValue ?? body?.point_value
+    ?? fallback?.point_value ?? fallback?.pointValue;
+  if (raw === undefined || raw === null || String(raw).trim() === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : null;
+}
+
+/** کلاسِ کارت: از امتیاز اگر معلوم باشد، وگرنه از ورودیِ نگاشت‌شده. */
+function rarityField(body, fallback = {}) {
+  const points = pointValueFrom(body, fallback);
+  if (points !== null) return cardRarity.rarityForPoints(points);
+  return rarityInput(body?.duelRarity ?? body?.rarity
+    ?? fallback?.duel_rarity ?? fallback?.rarity);
 }
 
 function duelFieldsFromBody(body, fallback = {}) {
@@ -174,7 +207,15 @@ function duelFieldsFromBody(body, fallback = {}) {
     technique: statInput(body.duelTechnique ?? body.technique, fallback.duel_technique ?? fallback.technique ?? 50),
     goalChance: statInput(body.duelGoalChance ?? body.goalChance, fallback.duel_goal_chance ?? fallback.goalChance ?? 50),
     energy: statInput(body.duelEnergy ?? body.energy, fallback.duel_energy ?? fallback.energy ?? 100),
-    rarity: rarityInput(body.duelRarity ?? body.rarity ?? fallback.duel_rarity ?? fallback.rarity),
+    // ── چرا کلاس از ورودیِ دستی خوانده نمی‌شود ──────────────────────
+    //
+    // خواستهٔ مالک: کلاسِ کارت **همان** ردهٔ امتیازی‌اش است. تا وقتی کلاس
+    // یک فیلدِ آزادِ پنل بود، یک کارتِ ۱۰۰۰ امتیازی می‌توانست «لجند»
+    // ذخیره شود و بعد در دوئل ۲۴ واحد پاداشِ بی‌دلیل بگیرد. حالا اگر
+    // امتیاز در دست باشد، کلاس **از آن ساخته می‌شود** و ورودیِ `duelRarity`
+    // فقط وقتی به کار می‌آید که امتیاز اصلاً در بدنه نباشد (مثلاً ویرایشِ
+    // فقط-استاتِ یک کارتِ موجود).
+    rarity: rarityField(body, fallback),
     effect: effectInput(body.duelEffect ?? body.effect ?? fallback.duel_effect ?? fallback.effect),
   };
 }
@@ -552,7 +593,16 @@ function totalPower(c) {
     Number(c.duel_goal_chance || c.goalChance || 0) * STAT_WEIGHT +
     Number(c.duel_energy || c.energy || 0) * ENERGY_WEIGHT;
   const pointBoost = Math.min(22, Math.sqrt(Math.max(0, Number(c.point_value || c.pointValue || 0))) / 3.2);
-  return Math.round(weighted + pointBoost + (RARITY_BONUS[c.duel_rarity || c.rarity] || 0));
+  // ⚠️ `rarityInput` و نه دسترسیِ خام به نقشه.
+  //
+  // چرا: `RARITY_BONUS[card.duel_rarity]` روی یک کلیدِ نسلِ قبل (`gold`،
+  // `legend`) مقدارِ `undefined` می‌داد و `|| 0` بی‌صدا پاداشِ آن کارت را
+  // صفر می‌کرد. هر ردیفی که پیش از مایگریشن ۱۰۰ خوانده شود، یا هر پاسخِ
+  // کش‌شده‌ای که با نامِ قدیمی بیاید، کارتِ صاحبش را **ضعیف‌تر** از آنچه
+  // هست وارد دوئل می‌کرد — بی هیچ خطایی. با نگاشت، `gold` همان پاداشِ
+  // ردهٔ ۱۰۰۰ امتیازی را می‌گیرد.
+  const rarity = cardRarity.rarityInput(c.duel_rarity || c.rarity);
+  return Math.round(weighted + pointBoost + (RARITY_BONUS[rarity] || 0));
 }
 
 function publicCard(row) {
@@ -569,8 +619,16 @@ function publicCard(row) {
     technique: int(row.duel_technique ?? row.technique, 50),
     goalChance: int(row.duel_goal_chance ?? row.goalChance, 50),
     energy: int(row.duel_energy ?? row.energy, 100),
-    rarity: rarityInput(row.duel_rarity ?? row.rarity),
-    rarityLabel: RARITY_LABEL[rarityInput(row.duel_rarity ?? row.rarity)],
+    // ── چرا اینجا هم از امتیاز ساخته می‌شود ─────────────────────────
+    //
+    // `publicCard` تنها دروازهٔ کارت به کلاینت و به موتورِ بازی است. اگر
+    // یک ردیفِ قدیمی/دستیِ ناهمخوان در `card_types` بماند، این‌جا کلاس
+    // درست تولید می‌شود و هیچ‌کس — نه دوئل، نه جعبه، نه اپ — کارتی با
+    // کلاسِ ناهمخوانِ امتیازش نمی‌بیند. گاردِ `testCardRarity` هم مو‌به‌مو
+    // هم‌خوانیِ خودِ دیتابیس را جداگانه می‌سنجد تا این لایه پنهان‌کار نشود.
+    rarity: cardRarity.rarityForPoints(row.point_value ?? row.pointValue),
+    rarityLabel: cardRarity.rarityLabel(
+      cardRarity.rarityForPoints(row.point_value ?? row.pointValue)),
     effect: effectInput(row.duel_effect ?? row.effect),
     effectLabel: EFFECT_LABEL[effectInput(row.duel_effect ?? row.effect)],
     practiceOnly: row.practiceOnly === true,
@@ -1133,11 +1191,20 @@ function simulate(userCards, opponentCards, { opponentName = 'حریف', random 
 
 function starterDeck() {
   return [
-    { id: '00000000-0000-4000-8000-000000000001', name: 'مهاجم تمرینی', stat: 62, rarity: 'normal', effect: 'speedster' },
-    { id: '00000000-0000-4000-8000-000000000002', name: 'بازی‌ساز تمرینی', stat: 66, rarity: 'silver', effect: 'playmaker' },
-    { id: '00000000-0000-4000-8000-000000000003', name: 'مدافع تمرینی', stat: 68, rarity: 'silver', effect: 'wall' },
-    { id: '00000000-0000-4000-8000-000000000004', name: 'وینگر تمرینی', stat: 70, rarity: 'gold', effect: 'lucky_star' },
-    { id: '00000000-0000-4000-8000-000000000005', name: 'فینیشر تمرینی', stat: 74, rarity: 'gold', effect: 'finisher' },
+    // ⚠️ کلاسِ این پنج کارت **نوشته نمی‌شود**: `publicCard` آن را از
+    //    `point_value` می‌سازد (۱۰۰..۲۶۰ ⇒ همه «معمولی»). تا پیش از
+    //    مایگریشن ۱۰۰ اینجا `normal/silver/silver/gold/gold` نوشته شده بود
+    //    و همان مقادیر دور ریخته می‌شد؛ یعنی فیلدی که وانمود می‌کرد منبعِ
+    //    کلاس است ولی هیچ اثری نداشت. فیلدِ دروغ حذف شد.
+    //
+    //    اثرِ رفتاری‌اش هم صفر است: `botDeck` امتیاز و کلاسِ ربات را از
+    //    روی کارت‌های کاربر آینه می‌کند، و دستِ تمرینیِ کاربر هم اگر
+    //    کارتِ واقعی نداشته باشد همین دست است — پس دو طرف هم‌رده‌اند.
+    { id: '00000000-0000-4000-8000-000000000001', name: 'مهاجم تمرینی', stat: 62, effect: 'speedster' },
+    { id: '00000000-0000-4000-8000-000000000002', name: 'بازی‌ساز تمرینی', stat: 66, effect: 'playmaker' },
+    { id: '00000000-0000-4000-8000-000000000003', name: 'مدافع تمرینی', stat: 68, effect: 'wall' },
+    { id: '00000000-0000-4000-8000-000000000004', name: 'وینگر تمرینی', stat: 70, effect: 'lucky_star' },
+    { id: '00000000-0000-4000-8000-000000000005', name: 'فینیشر تمرینی', stat: 74, effect: 'finisher' },
   ].map((item, index) => publicCard({
     card_type_id: item.id,
     name: item.name,
@@ -1150,7 +1217,6 @@ function starterDeck() {
     duel_technique: item.stat + (index === 1 ? 10 : 0),
     duel_goal_chance: item.stat + (index === 4 ? 10 : 0),
     duel_energy: 100,
-    duel_rarity: item.rarity,
     duel_effect: item.effect,
     practiceOnly: true,
   }));
@@ -1450,7 +1516,15 @@ async function status(userId) {
       insights: suggestedDeck.insights,
     } : null,
     recentBattles: recent,
-    rarities: RARITIES.map(id => ({ id, label: RARITY_LABEL[id], bonus: RARITY_BONUS[id] })),
+    // پنل ادمین همین فهرست را نشان می‌دهد؛ `maxPoints` مرزِ رده است تا
+    // مدیر بفهمد چرا فلان کارت این کلاس را گرفته (خواستهٔ مالک: بازه‌ها).
+    rarities: RARITIES.map(id => ({
+      id,
+      label: RARITY_LABEL[id],
+      bonus: RARITY_BONUS[id],
+      accent: cardRarity.RARITY_ACCENT[id],
+      maxPoints: cardRarity.RARITY_MAX_POINTS[id] ?? null,
+    })),
     effects: EFFECTS.map(id => ({ id, label: EFFECT_LABEL[id] })),
     focuses: ROUND_FOCUS,
   };
@@ -1517,6 +1591,7 @@ module.exports = {
   DECK_SIZE, ONLINE_STAKES, RARITIES, EFFECTS, ROUND_FOCUS,
   FRONT_IMAGE_SQL, INVENTORY_IMAGE_SQL,
   RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, collectibleInput, publicCard, totalPower,
+  rarityField, RARITY_BONUS,
   playableCards, validateDeck, deckCards, status, saveDeck, botBattle,
   starterDeck, botDeck, resolveRound, simulate, scoreFromHistory, recentBattles, recordEngineBattle,
   LUCK_RANGE, seededLuck,

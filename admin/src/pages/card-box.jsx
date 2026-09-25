@@ -5,20 +5,16 @@ import { useToast } from '../lib/toast.jsx';
 import { fmtNumber } from '../lib/api.js';
 
 const ACCENT = {
-  normal: '#34D399',
-  silver: '#E5EEF8',
-  gold: '#FFD166',
-  premium: '#38BDF8',
-  legend: '#F97316',
+  common: '#8FA3B8',
+  uncommon: '#34D399',
+  rare: '#A78BFA',
+  legendary: '#FFD166',
 };
 
-const DEFAULT_ODDS = {
-  normal: 409,
-  silver: 306,
-  gold: 153,
-  premium: 122,
-  legend: 10,
-};
+// اعدادِ پیش‌فرضِ «بازگردانی» — همان مقادیر مایگریشن ۱۰۰. با شانسِ رده‌های
+// نسلِ قبل یکی است تا ارزشِ هر صندوق تغییر نکند (توضیحِ کامل در
+// `migrations/100_card_rarity_tiers.sql`).
+const DEFAULT_ODDS = { common: 409, uncommon: 459, rare: 122, legendary: 10 };
 
 /**
  * مدیریت کامل صندوق کارتِ فروشگاه: شانس، قیمت، سوییچ فروش و تاریخچه.

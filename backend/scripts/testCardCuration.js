@@ -41,10 +41,15 @@ check(rows.every(row => new Set(row.stats).size > 2),
   'no card retains a uniform placeholder stat profile');
 check(new Set(rows.map(row => row.stats.join(','))).size === 29,
   'all 29 card editions have differentiated stat profiles');
+// ⚠️ این شمارش دربارهٔ **مایگریشن ۰۵۸** است، نه دربارهٔ نردبانِ امروز.
+//    مایگریشن‌های قدیمی دست‌نخورده می‌مانند (تاریخِ تغییرات) و کلیدهای
+//    نسلِ قبل همان‌جا می‌مانند؛ آن‌چه عوض شده مایگریشن ۱۰۰ است که همین
+//    ردیف‌ها را بر اساس امتیاز به چهار کلاسِ تازه نگاشت می‌کند. هم‌خوانیِ
+//    خودِ دیتابیس و هر سه کلاینت را `testCardRarity.js` می‌سنجد.
 const rarityCounts = Object.fromEntries(['normal','silver','gold','premium','legend']
   .map(rarity => [rarity, rows.filter(row => row.rarity === rarity).length]));
 check(JSON.stringify(rarityCounts) === JSON.stringify({ normal:4, silver:6, gold:1, premium:15, legend:3 }),
-  'normal, silver, gold, premium and legend progression is fully populated');
+  'the (legacy) five-tier migration 058 progression is fully populated');
 check(rows.every(row => ['finisher','wall','speedster','playmaker'].includes(row.effect)),
   'every curated effect is supported by the live duel engine');
 check(/GREATEST\(user_card_inventory\.quantity,1\)/.test(migration)
@@ -91,16 +96,24 @@ try {
   if (fs.existsSync(stylesDir)) for (const f of fs.readdirSync(stylesDir).sort()) if (f.endsWith('.css')) webCss += '\n' + read('userweb/src/styles/' + f);
   try { webCss += '\n' + read('userweb/src/typography.css'); } catch {}
 } catch {}
-check(['معمولی','نقره‌ای','طلایی','پرمیوم','لجند'].every(label => webFrame.includes(label)),
-  'Web rarity frame has small readable Persian labels for every tier');
+// برچسب‌ها اکنون در منبعِ مشترکِ وب (`lib/cards.js`) زندگی می‌کنند و قاب
+// آن‌ها را می‌خواند؛ پس هر دو فایل سنجیده می‌شوند تا جابه‌جاییِ آیندهٔ
+// برچسب‌ها این گارد را کور نکند.
+check(['معمولی','کمیاب','نایاب','افسانه‌ای'].every(label => webCardsLib.includes(label)),
+  'Web rarity labels cover the four canonical scarcity tiers');
+check(/CARD_RARITY_META/.test(webFrame) && /normalizeCardRarity/.test(webFrame),
+  'Web rarity frame reads the shared class source and normalises legacy keys');
 check(/<PlayerCard/.test(webInventory) && /ggCardStats/.test(webPlayerCard)
   && /showStats/.test(webPlayerCard),
   'Web inventory grid and detail use the shared rarity card with compact stats');
 check(/<PlayerCard/.test(webDuel) && /rarityCardShine/.test(webCss) && /duelCardShell/.test(webCss),
   'Web duel uses the same animated shared card treatment');
-check(['rarity-normal','rarity-silver','rarity-gold','rarity-premium','rarity-legend']
+check(['rarity-common','rarity-uncommon','rarity-rare','rarity-legendary']
   .every(name => webCss.includes(`.rarityCardFrame.${name}`)),
-  'Web tiers use five materially distinct frame treatments, not color aliases');
+  'Web tiers use four materially distinct frame treatments, not color aliases');
+check(/@keyframes rarAurora/.test(webCss) && /@keyframes rarEmber/.test(webCss)
+  && /\.rarityCardAura/.test(webCss) && /prefers-reduced-motion/.test(webCss),
+  'Each web tier carries its own hand-authored animation and honours reduced motion');
 check(/imageUrl/.test(webCardsLib) && /image_url/.test(webCardsLib)
   && !/avatar_1_football/.test(webInventory),
   'Web collection resolves the real design URL and never substitutes a football avatar');
@@ -109,12 +122,15 @@ const mobileFrame = read('mobile/lib/widgets/rarity_card_frame.dart');
 const mobileInventory = read('mobile/lib/screens/user/inventory_page.dart');
 const mobileDetail = read('mobile/lib/screens/shared/card_detail_sheet.dart');
 const mobileDuel = ['card_duel_battle.dart', 'card_duel_scoreboard.dart', 'card_duel_clash.dart', 'card_duel_payout.dart', 'card_duel_focus.dart', 'card_duel_intro.dart'].map((f) => read('mobile/lib/screens/user/games/card_duel/' + f)).join('\n');
-check(['معمولی','نقره‌ای','طلایی','پرمیوم','لجند'].every(label => mobileFrame.includes(label)),
-  'Android rarity frame carries the same five Persian tier labels');
+check(['معمولی','کمیاب','نایاب','افسانه‌ای'].every(label => mobileFrame.includes(label)),
+  'Android rarity frame carries the same four Persian tier labels');
 check(/AnimationController/.test(mobileFrame) && /SweepGradient/.test(mobileFrame)
-  && /case 'normal'/.test(mobileFrame) && /case 'silver'/.test(mobileFrame)
-  && /case 'gold'/.test(mobileFrame) && /case 'premium'/.test(mobileFrame),
-  'Android uses materially distinct normal, silver, gold, premium and legend frames');
+  && /case 'common'/.test(mobileFrame) && /case 'uncommon'/.test(mobileFrame)
+  && /case 'rare'/.test(mobileFrame) && /case 'legendary'/.test(mobileFrame),
+  'Android uses materially distinct common, uncommon, rare and legendary frames');
+check(/_sparks\(/.test(mobileFrame) && /_shine\(/.test(mobileFrame)
+  && /normalizeRarity\(/.test(mobileFrame),
+  'Android rare/legendary frames stream sparks and map legacy class keys');
 check(!/football_icon/.test(mobileInventory) && !/football_icon/.test(mobileDetail)
   && /item\['image_url'\] \?\? item\['imageUrl'\]/.test(mobileInventory),
   'Android collection renders the real design URL without the misleading football fallback');
@@ -133,8 +149,10 @@ check(/side\.width/.test(adminTile) && /fingerprint_complete/.test(adminTile)
   'Admin preview displays dimensions, side identity, OCR count, and fingerprint health');
 check(/adminCardShine/.test(adminCss) && /prefers-reduced-motion/.test(adminCss),
   'Admin rarity animation is polished and respects reduced motion');
-check(['rarity-normal','rarity-silver','rarity-gold','rarity-premium','rarity-legend']
+check(['rarity-common','rarity-uncommon','rarity-rare','rarity-legendary']
   .every(name => adminCss.includes(`.adminRarityFrame.${name}`)),
-  'Admin preview mirrors all five distinct physical frame classes');
+  'Admin preview mirrors all four distinct physical frame classes');
+check(/adminRarity\.rarityForPoints/.test(adminTile),
+  'Admin tile derives the class from the card points, never from a hand-picked label');
 
 console.log(`\n✅ ${passed} card-curation regressions passed\n`);

@@ -12,7 +12,10 @@ function demoCard(id, stat) {
   return {
     id, cardTypeId: id, name: id, pointValue: 100,
     attack: stat, defense: stat, speed: stat, technique: stat,
-    goalChance: stat, energy: 100, rarity: 'normal', effect: 'none',
+    // کلاسِ «معمولی» با نامِ تازه‌اش. این ردیف‌ها ۱۰۰ امتیازی‌اند و در
+    // نردبانِ تازه (تا ۵۰۰ = معمولی) هم دقیقاً همین کلاس را می‌گیرند؛ پس
+    // نگهبانِ `testCardRarity.js` هم‌خوانیِ این مقدار را می‌سنجد.
+    goalChance: stat, energy: 100, rarity: 'common', effect: 'none',
   };
 }
 

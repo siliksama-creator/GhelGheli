@@ -45,7 +45,7 @@ import { SvgIcon } from './IconAsset.jsx';
 //    می‌سازد.
 function CardFallback({ item, loading = false }) {
   const rarity = cardRarityOf(item);
-  const meta = CARD_RARITY_META[rarity] || CARD_RARITY_META.normal;
+  const meta = CARD_RARITY_META[rarity] || CARD_RARITY_META.common;
   const initial = Array.from(cardNameOf(item))[0] || 'ک';
   return (
     <div className={`ggCardFallback ${item?.id?.startsWith('bot-') ? 'bot' : ''}`} style={{ '--card-accent': meta.accent }}>
@@ -92,7 +92,7 @@ export default function PlayerCard({
   className = '',
 }) {
   const rarity = cardRarityOf(item);
-  const meta = CARD_RARITY_META[rarity] || CARD_RARITY_META.normal;
+  const meta = CARD_RARITY_META[rarity] || CARD_RARITY_META.common;
   const art = cardArtOf(item);
   // دو حالتِ جدا: «آمد» و «شکست خورد». هر دو اسپینر را خاموش می‌کنند.
   const [artReady, setArtReady] = React.useState(false);

@@ -26,11 +26,19 @@ console.log('\n== شانس صندوق در پنل ادمین ==');
 
 const defSum = RARITIES.reduce((s, r) => s + DEFAULT_ODDS[r], 0);
 ok(defSum === WEIGHT_TOTAL, 'پیش‌فرض تولید دقیقاً ۱۰۰۰ است');
-ok(parseOddsInput(DEFAULT_ODDS).legend === 10, 'نقشهٔ پیش‌فرض قبول می‌شود');
-ok(parseOddsInput(RARITIES.map((r) => ({ rarity: r, permille: DEFAULT_ODDS[r] }))).gold === 153,
+ok(parseOddsInput(DEFAULT_ODDS).legendary === 10, 'نقشهٔ پیش‌فرض قبول می‌شود');
+ok(parseOddsInput(RARITIES.map((r) => ({ rarity: r, permille: DEFAULT_ODDS[r] }))).uncommon === 459,
   'آرایهٔ {rarity,permille} قبول می‌شود');
-ok(parseOddsInput({ odds: RARITIES.map((r) => ({ rarity: r, percent: DEFAULT_ODDS[r] / 10 })) }).normal === 409,
+ok(parseOddsInput({ odds: RARITIES.map((r) => ({ rarity: r, percent: DEFAULT_ODDS[r] / 10 })) }).common === 409,
   'درصد با یک رقم اعشار به در هزار تبدیل می‌شود');
+// ── ادغامِ وزنِ کلیدهای نسلِ قبل ─────────────────────────────────────
+// پنج کلیدِ قدیمی به چهار کلاس می‌رسند و **دو**‌تایشان (silver+gold) به
+// `uncommon` می‌روند. نسخهٔ اولِ نگاشت فقط اولین را برمی‌داشت و وزنِ
+// دومی بی‌صدا دور ریخته می‌شد: ۴۰۹/۳۰۶/۱۵۳/۱۲۲/۱۰ برای uncommon مقدارِ
+// ۳۰۶ می‌داد و جمع ۸۴٫۷٪ می‌شد. این سنجه همان ادغام را قفل می‌کند.
+const legacyOdds = parseOddsInput({ normal: 409, silver: 306, gold: 153, premium: 122, legend: 10 });
+ok(legacyOdds.uncommon === 459 && legacyOdds.common === 409 && legacyOdds.legendary === 10,
+  'نقشهٔ کهنهٔ پنج‌کلاسه با جمعِ وزن‌های هم‌کلاس نگاشته می‌شود');
 
 function throws(fn, code, msg) {
   let err;
@@ -39,11 +47,13 @@ function throws(fn, code, msg) {
 }
 throws(() => parseOddsInput({ normal: 500, silver: 500 }), 'ODDS_INCOMPLETE',
   'کلاس جاافتاده رد می‌شود نه صفرِ پنهان');
-throws(() => parseOddsInput({ ...DEFAULT_ODDS, legend: 11 }), 'ODDS_MISMATCH',
+throws(() => parseOddsInput({ common: 500, uncommon: 500 }), 'ODDS_INCOMPLETE',
+  'کلیدِ تازه هم اگر ناقص باشد رد می‌شود');
+throws(() => parseOddsInput({ ...DEFAULT_ODDS, legendary: 11 }), 'ODDS_MISMATCH',
   'جمع ناهماهنگ بی‌صدا نرمال نمی‌شود');
-throws(() => parseOddsInput({ ...DEFAULT_ODDS, legend: -1 }), 'ODDS_RANGE',
+throws(() => parseOddsInput({ ...DEFAULT_ODDS, legendary: -1 }), 'ODDS_RANGE',
   'شانس منفی رد می‌شود');
-throws(() => parseOddsInput({ ...DEFAULT_ODDS, legend: 1001 }), 'ODDS_RANGE',
+throws(() => parseOddsInput({ ...DEFAULT_ODDS, legendary: 1001 }), 'ODDS_RANGE',
   'شانس بالای ۱۰۰٪ رد می‌شود');
 
 ok(parsePrice(100000) === 100000, 'قیمت معتبر قبول می‌شود');

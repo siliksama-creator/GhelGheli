@@ -26,24 +26,38 @@ const DEFAULT_PRICE = 100000;
 
 // پنج کلاسِ ثابتِ جدول `card_box_odds`. ترتیب نمایش در پنل ادمین همین است
 // — از معمولی به کمیاب — تا مدیر شانس را مثل نردبان ببیند، نه مثل JSON.
-const RARITIES = Object.freeze(['normal', 'silver', 'gold', 'premium', 'legend']);
-const RARITY_LABELS = Object.freeze({
-  normal: 'معمولی',
-  silver: 'نقره‌ای',
-  gold: 'طلایی',
-  premium: 'پرمیوم',
-  legend: 'لجند',
-});
+// کلاس‌ها از منبعِ حقیقتِ مشترک می‌آیند (`src/lib/cardRarity.js`) — همان
+// فهرستی که دوئل و مهاجرت و هر سه کلاینت از آن تغذیه می‌کنند.
+const cardRarity = require('../lib/cardRarity');
+const RARITIES = cardRarity.RARITIES;
+const RARITY_LABELS = cardRarity.RARITY_LABELS;
 // در هزار. همان قیدِ مایگریشن ۰۷۲/۰۷۳: جمع باید دقیقاً ۱۰۰۰ باشد.
 const WEIGHT_TOTAL = 1000;
 // پیش‌فرض زندهٔ تولید بعد از مایگریشن ۰۷۳ (لجند ۱٪). دکمهٔ «بازگردانی»
 // پنل همین را می‌گذارد، نه اعدادِ اولیهٔ ۰۷۲.
+// ── نگاشتِ شانس‌ها به چهار کلاس، با **حفظِ ارزشِ امروزِ صندوق** ────────
+//
+// خواستهٔ مالک: «توزیعِ ارزشِ جعبه به‌هم نریزد.» پس شانسِ هر ردهٔ امتیازیِ
+// نسلِ قبل به کلاسِ تازهٔ همان رده منتقل شد:
+//
+//     normal  ۴۰۹  (کارتِ ۵۰۰)                → common     ۴۰۹
+//     silver  ۳۰۶  + gold ۱۵۳  (کارتِ ۱۰۰۰)   → uncommon   ۴۵۹
+//     premium ۱۲۲  (کارتِ ۳۰۰۰)                → rare       ۱۲۲
+//     legend   ۱۰  (کارتِ بالای ۳۰۰۰)          → legendary   ۱۰
+//                                              جمع        = ۱۰۰۰
+//
+// «silver + gold» با هم به uncommon می‌روند چون در کاتالوگِ واقعی **هر دو**
+// کارتِ ۱۰۰۰ امتیازی بودند؛ ادغامشان در یک کلاس یعنی وزنشان هم باید جمع شود،
+// نه اینکه یکی بی‌صدا دور ریخته شود.
+//
+// ⚠️ ارزشِ انتظاری هر صندوق با این نگاشت تقریباً ثابت می‌ماند
+//    (۱۰۴۹٫۵ → ۱۰۲۵ امتیاز، اختلافِ ۲٪ که از ادغامِ دو رده می‌آید).
+//    `scripts/testCardBoxAdmin.js` جمعِ ۱۰۰۰ را می‌سنجد.
 const DEFAULT_ODDS = Object.freeze({
-  normal: 409,
-  silver: 306,
-  gold: 153,
-  premium: 122,
-  legend: 10,
+  common: 409,
+  uncommon: 459,
+  rare: 122,
+  legendary: 10,
 });
 
 function fail(message, status = 400, code) {
@@ -65,15 +79,21 @@ function fail(message, status = 400, code) {
  * ناقص است، نه «شانس صفر».
  */
 function parseOddsInput(input) {
-  const raw = input && typeof input === 'object' ? input : {};
-  const list = Array.isArray(raw) ? raw
-    : Array.isArray(raw.odds) ? raw.odds
+  const source = input && typeof input === 'object' ? input : {};
+  const list = Array.isArray(source) ? source
+    : Array.isArray(source.odds) ? source.odds
       : null;
   const map = {};
   if (list) {
     for (const row of list) {
       if (!row || typeof row !== 'object') continue;
-      const rarity = String(row.rarity || '');
+      // کلیدهای نسلِ قبل (`silver`, `legend`, …) نگاشت می‌شوند، نه اینکه
+      // دور ریخته شوند. اگر یک پنلِ کش‌شده هنوز نام‌های قدیمی را بفرستد،
+      // پیامِ «شانس این کلاس‌ها مشخص نشده» می‌گرفت و مدیر فکر می‌کرد پنل
+      // خراب است — در حالی که فقط نامِ کلاس عوض شده بود.
+      const rawRarity = String(row.rarity || '');
+      if (!rawRarity) continue;
+      const rarity = cardRarity.rarityInput(rawRarity, '');
       if (!RARITIES.includes(rarity)) continue;
       if (row.permille !== undefined && row.permille !== null && row.permille !== '') {
         map[rarity] = Math.trunc(Number(row.permille));
@@ -82,7 +102,39 @@ function parseOddsInput(input) {
       }
     }
   } else {
+    // کپی، نه خودِ شیء: پایین‌تر روی `raw[rarity]` می‌نویسیم و نباید
+    // state پنلِ ادمین بی‌صدا عوض شود.
+    const raw = { ...source };
     for (const rarity of RARITIES) {
+      // نقشهٔ ارسالی هم ممکن است با کلیدهای نسلِ قبل بیاید.
+      if (raw[rarity] === undefined) {
+        // ⚠️ تلهٔ واقعی که اینجا بود: **چند** کلیدِ نسلِ قبل می‌توانند به
+        //    یک کلاسِ تازه برسند — `silver` و `gold` هر دو `uncommon`.
+        //    نسخهٔ اولِ این نگاشت فقط «اولین» کلیدِ رسیده را برمی‌داشت و
+        //    وزن دومی **بی‌صدا** دور ریخته می‌شد: نقشهٔ کهنهٔ
+        //    ۴۰۹/۳۰۶/۱۵۳/۱۲۲/۱۰ به‌جای ۴۵۹ برای uncommon مقدارِ ۳۰۶
+        //    می‌گرفت و جمع ۸۴٫۷٪ می‌شد — یعنی یک پنلِ کش‌شده یا خطای
+        //    «جمع باید ۱۰۰٪ باشد» می‌گرفت یا (بدتر) شانسِ صندوق را عوض
+        //    می‌کرد. حالا وزن‌ها **جمع** می‌شوند.
+        let legacySum = 0;
+        let legacyFound = false;
+        for (const [oldKey, newKey] of Object.entries(cardRarity.LEGACY_RARITY)) {
+          if (newKey !== rarity) continue;
+          const value = raw[oldKey];
+          if (value === undefined || value === null || value === '') continue;
+          if (typeof value === 'object') {
+            // شکلِ شیء (`{permille}`/`{percent}`) فقط از اولین کلید خوانده
+            // می‌شود؛ جمع‌کردنِ دو شکلِ متفاوت معنیِ روشنی ندارد و پنلِ
+            // امروز این شکل را روی کلیدهای نسلِ قبل نمی‌فرستد.
+            raw[rarity] = value;
+            legacyFound = true;
+            break;
+          }
+          legacySum += Number(value);
+          legacyFound = true;
+        }
+        if (legacyFound && raw[rarity] === undefined) raw[rarity] = legacySum;
+      }
       const v = raw[rarity];
       if (v === undefined || v === null || v === '') continue;
       if (typeof v === 'object') {

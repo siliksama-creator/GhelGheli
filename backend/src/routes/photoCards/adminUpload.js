@@ -71,7 +71,13 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
         const name = String(req.body.name || '').trim();
         const points = Math.max(0, Math.floor(Number(req.body.pointValue || 0)));
         const cash = Math.max(0, Math.floor(Number(req.body.cashAmount || 0)));
-        const duel = cardDuel.duelFieldsFromBody(req.body);
+        // ── کلاسِ کارت از امتیازِ کارت ساخته می‌شود (قفل، نه فیلدِ آزاد) ──
+        //
+        // `points` را به‌عنوان fallback پاس می‌دهیم تا کلاس همیشه از **همان
+        // عددی** ساخته شود که در همان `UPDATE`/`INSERT` روی `point_value`
+        // می‌نشیند. اگر این دو از دو جا می‌آمدند، یک کارتِ ۳۰۰۰ امتیازی
+        // می‌توانست کلاسِ «معمولی» ذخیره کند و در دوئل پاداشِ اشتباه بگیرد.
+        const duel = cardDuel.duelFieldsFromBody(req.body, { point_value: points });
         const existingTypeId = req.body.cardTypeId;
 
         if (!name && !existingTypeId) {

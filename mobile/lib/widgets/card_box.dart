@@ -428,8 +428,8 @@ class _CardBoxState extends State<CardBox>
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: rarityColors['${(c as Map)['rarity']}']?.first ??
-                        const Color(0xFF64748B),
+                    color: rarityColors[normalizeRarity((c as Map)['rarity'])]?.first ??
+                        const Color(0xFF8FA3B8),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -583,7 +583,7 @@ class _CardBoxState extends State<CardBox>
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 3),
                           child: _OddChip(
-                            rarity: '${(o as Map)['rarity']}',
+                            rarity: normalizeRarity((o as Map)['rarity']),
                             percent: (o['percent'] as num?)?.toDouble() ?? 0,
                           ),
                         ),
@@ -941,12 +941,14 @@ class _RevealScreen extends StatefulWidget {
 class _RevealScreenState extends State<_RevealScreen> {
   int _revealed = 0;
 
+  // همان پنج فایلِ صوتیِ قبلی؛ فقط نگاشت به چهار کلاسِ تازه. هر کلاس
+  // صدای همان ردهٔ ارزشیِ نسلِ قبل را می‌گیرد تا حسِ «چه چیزی گرفتم»
+  // عوض نشود.
   static const Map<String, Sfx> _raritySfx = {
-    'normal': Sfx.cardNormal,
-    'silver': Sfx.cardSilver,
-    'gold': Sfx.cardGold,
-    'premium': Sfx.cardPremium,
-    'legend': Sfx.cardLegend,
+    'common': Sfx.cardNormal,
+    'uncommon': Sfx.cardSilver,
+    'rare': Sfx.cardPremium,
+    'legendary': Sfx.cardLegend,
   };
 
   @override
@@ -956,7 +958,7 @@ class _RevealScreenState extends State<_RevealScreen> {
     GameAudio.instance.play(Sfx.boxOpen);
     for (var i = 0; i < widget.cards.length; i++) {
       final rarity =
-          '${(widget.cards[i] as Map)['rarity'] ?? 'normal'}';
+          normalizeRarity((widget.cards[i] as Map)['rarity']);
       final sfx = _raritySfx[rarity] ?? Sfx.cardNormal;
       Future<void>.delayed(Duration(milliseconds: 260 * i + 180), () {
         if (mounted) setState(() => _revealed = i + 1);
@@ -1072,7 +1074,24 @@ class _RevealScreenState extends State<_RevealScreen> {
   }
 }
 
-class _PrizeCard extends StatelessWidget {
+/// رونماییِ یک کارتِ برنده در صفحهٔ صندوق.
+///
+/// ── چرا Stateful شد ──────────────────────────────────────────────────
+///
+/// خواستهٔ مالک: «برای هر کلاس افکتِ انیمیشنیِ فوق‌العاده جذاب درست کن».
+/// ورودِ فنری (اسلاید+چرخش+مقیاس) برای همه یکسان بود؛ یعنی کارتِ نایاب و
+/// افسانه‌ای هم مثل معمولی «می‌پرید» و تفاوتشان فقط رنگِ حاشیه بود.
+///
+/// حالا **خودِ لحظهٔ رونمایی** پله‌ای شده است:
+///
+///   معمولی/کمیاب  همان ورودِ فنری (کمیاب یک لغزشِ نور هم دارد)
+///   نایاب         + پرتوهای چرخان + ۵ جرقهٔ بالارو
+///   افسانه‌ای     + پرتوهای تندتر + ۷ اخگرِ طلایی + هالهٔ نبض‌دار
+///
+/// ⚠️ کنترلر فقط وقتی ساخته می‌شود که کلاس انرژی‌دار باشد و کاربر
+///    «کاهشِ حرکت» نخواسته باشد؛ در غیر این صورت تک‌فریم می‌ماند و
+///    صفحهٔ صندوق با ۵ کارت، ۵ تا سبکِ رندرِ بی‌مصرف باز نمی‌کند.
+class _PrizeCard extends StatefulWidget {
   const _PrizeCard({
     required this.card,
     required this.shown,
@@ -1084,112 +1103,263 @@ class _PrizeCard extends StatelessWidget {
   final String baseUrl;
 
   @override
+  State<_PrizeCard> createState() => _PrizeCardState();
+}
+
+class _PrizeCardState extends State<_PrizeCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _fx = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: _isLegendary ? 2300 : 3600),
+  )..repeat();
+
+  String get _rarity => normalizeRarity(widget.card['rarity']);
+  bool get _isRare => _rarity == 'rare';
+  bool get _isLegendary => _rarity == 'legendary';
+  bool get _energetic => _isRare || _isLegendary;
+
+  @override
+  void dispose() {
+    _fx.dispose();
+    super.dispose();
+  }
+
+  /// پرتوهای چرخانِ پشتِ کارت.
+  ///
+  /// نکتهٔ فنی: مربعِ گرادیان ۱٫۵۵ برابر بزرگ‌تر و چرخان است تا در هیچ
+  /// زاویه‌ای گوشهٔ قاب بی‌نور نماند؛ سپس `ClipRRect` آن را به شکلِ کارت
+  /// برش می‌دهد. بدونِ بزرگ‌سازی، چرخشِ ۴۵ درجه گوشه‌ها را خالی می‌کرد.
+  Widget _rays(Color accent) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedBuilder(
+            animation: _fx,
+            builder: (_, __) => Transform.rotate(
+              angle: _fx.value * 2 * math.pi,
+              child: Transform.scale(
+                scale: 1.55,
+                child: SizedBox.expand(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: SweepGradient(
+                        colors: [
+                          Colors.transparent,
+                          accent.withValues(alpha: _isLegendary ? .58 : .38),
+                          Colors.transparent,
+                          Colors.transparent,
+                          accent.withValues(alpha: _isLegendary ? .48 : .30),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// ذراتِ بالارو. مسیرِ هر ذره از `index` ساخته می‌شود (نه تصادفی) تا
+  /// انیمیشن بین فریم‌ها نلرزد و تست قابلِ تکرار بماند.
+  Widget _sparks(Color color, Color glow, int count, double size) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _fx,
+          builder: (_, __) {
+            final items = <Widget>[];
+            for (var i = 0; i < count; i++) {
+              final phase = (_fx.value + i / count) % 1.0;
+              final lane = ((i * 37) % 100) / 100 * 1.7 - 0.85;
+              final wobble = math.sin((phase + i) * math.pi * 2) * 0.07;
+              items.add(Positioned.fill(
+                child: Align(
+                  alignment: Alignment(lane + wobble, 0.95 - phase * 2.05),
+                  child: Opacity(
+                    opacity: math.sin(phase * math.pi).clamp(0.0, 1.0),
+                    child: Container(
+                      width: size,
+                      height: size,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color,
+                        boxShadow: [
+                          BoxShadow(color: glow, blurRadius: size * 2, spreadRadius: size * .3),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ));
+            }
+            return Stack(clipBehavior: Clip.none, children: items);
+          },
+        ),
+      ),
+    );
+  }
+
+  /// هالهٔ نبض‌دارِ دورِ کارت (فقط نایاب/افسانه‌ای).
+  Widget _pulseRing(Color accent) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _fx,
+          builder: (_, __) {
+            final pulse = math.sin(_fx.value * math.pi * 2).abs();
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: accent.withValues(alpha: .22 + pulse * .55),
+                  width: 1.5,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final rarity = '${card['rarity']}';
-    final accent = (rarityColors[rarity] ?? const [Color(0xFF94A3B8)]).first;
-    final label = rarityLabels[rarity] ?? rarity;
-    final points = (card['pointValue'] as num?)?.toInt() ?? 0;
-    final imgUrl = '${card['imageUrl'] ?? ''}';
+    final accent = (rarityColors[_rarity] ?? const [Color(0xFF8FA3B8)]).first;
+    final label = rarityLabels[_rarity] ?? _rarity;
+    final points = (widget.card['pointValue'] as num?)?.toInt() ?? 0;
+    final imgUrl = '${widget.card['imageUrl'] ?? ''}';
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final fx = _energetic && !reduceMotion;
+
+    final body = Container(
+      width: 98,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent, width: 1.5),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.13),
+            Colors.black.withValues(alpha: 0.4),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.42),
+            blurRadius: _isLegendary ? 26 : 22,
+            spreadRadius: -6,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+                color: accent,
+                letterSpacing: 0.3),
+          ),
+          const SizedBox(height: 6),
+          if (imgUrl.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                imgUrl.startsWith('http') ? imgUrl : '${widget.baseUrl}$imgUrl',
+                width: 62,
+                height: 62,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const SizedBox(width: 62, height: 62),
+                loadingBuilder: (_, child, progress) => progress == null
+                    ? child
+                    : Container(
+                        width: 62,
+                        height: 62,
+                        color: Colors.white10,
+                      ),
+              ),
+            ),
+          const SizedBox(height: 7),
+          SizedBox(
+            height: 34,
+            child: Center(
+              child: Text(
+                '${widget.card['name'] ?? 'کارت'}',
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    height: 1.5),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${faNum(points)} امتیاز',
+            style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFFFFD166),
+                fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
 
     // انیمیشن ورود: از پایین می‌پرد بالا با چرخش و فنر — «جذاب‌تر از فلپ ساده».
     return AnimatedSlide(
-      offset: shown ? Offset.zero : const Offset(0, 0.6),
+      offset: widget.shown ? Offset.zero : const Offset(0, 0.6),
       duration: const Duration(milliseconds: 440),
       curve: Curves.easeOutCubic,
       child: AnimatedRotation(
-        turns: shown ? 0 : -0.055,
+        turns: widget.shown ? 0 : -0.055,
         duration: const Duration(milliseconds: 460),
         curve: Curves.easeOutBack,
         child: AnimatedScale(
-          scale: shown ? 1 : 0.25,
+          scale: widget.shown ? 1 : 0.25,
           duration: const Duration(milliseconds: 520),
           curve: Curves.easeOutBack,
           child: AnimatedOpacity(
-            opacity: shown ? 1 : 0,
+            opacity: widget.shown ? 1 : 0,
             duration: const Duration(milliseconds: 260),
-            child: Container(
-          width: 98,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: accent, width: 1.5),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.white.withValues(alpha: 0.13),
-                Colors.black.withValues(alpha: 0.4),
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: accent.withValues(alpha: 0.42),
-                blurRadius: 22,
-                spreadRadius: -6,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w900,
-                    color: accent,
-                    letterSpacing: 0.3),
-              ),
-              const SizedBox(height: 6),
-              if (imgUrl.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    imgUrl.startsWith('http') ? imgUrl : '$baseUrl$imgUrl',
-                    width: 62,
-                    height: 62,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const SizedBox(width: 62, height: 62),
-                    loadingBuilder: (_, child, progress) => progress == null
-                        ? child
-                        : Container(
-                            width: 62,
-                            height: 62,
-                            color: Colors.white10,
-                          ),
-                  ),
-                ),
-              const SizedBox(height: 7),
-              SizedBox(
-                height: 34,
-                child: Center(
-                  child: Text(
-                    '${card['name'] ?? 'کارت'}',
-                    maxLines: 2,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        height: 1.5),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${faNum(points)} امتیاز',
-                style: const TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFFFFD166),
-                    fontWeight: FontWeight.w900),
-              ),
-            ],
-              ),
-            ),
+            child: fx
+                ? SizedBox(
+                    width: 98,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // ترتیب: پرتوها زیرِ کارت، ذرات و هاله روی آن.
+                        _rays(accent),
+                        body,
+                        _sparks(
+                          _isLegendary
+                              ? const Color(0xFFFFE9A8)
+                              : const Color(0xFFE9D5FF),
+                          _isLegendary
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFFA78BFA),
+                          _isLegendary ? 7 : 5,
+                          _isLegendary ? 5 : 4,
+                        ),
+                        _pulseRing(accent),
+                      ],
+                    ),
+                  )
+                : body,
           ),
         ),
       ),
@@ -1205,8 +1375,9 @@ class _OddChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = (rarityColors[rarity] ?? const [Color(0xFF94A3B8)]).first;
-    final label = rarityLabels[rarity] ?? rarity;
+    final accent = (rarityColors[normalizeRarity(rarity)] ??
+        const [Color(0xFF8FA3B8)]).first;
+    final label = rarityLabels[normalizeRarity(rarity)] ?? rarity;
     // درصد یک‌رقمِ اعشار: «۳٫۵٪» خواناست، «۳.۵۰۰٪» نه. عددِ صحیح هم
     // بی‌خودی «٫۰» نگیرد.
     //

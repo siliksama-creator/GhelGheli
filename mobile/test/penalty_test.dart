@@ -136,7 +136,21 @@ void main() {
       final src = File('lib/screens/user/games/penalty_board.dart').readAsStringSync();
       expect(src.contains("outcome == 'save' && kick > 0.38"), isTrue,
           reason: 'توپ نباید از داخل بدن دروازه‌بان رد شود؛ در فریم مهار، keeper جلو می‌آید');
-      expect(src.contains('if (keeperInFront) _drawKeeper'), isTrue);
+      // ⚠️ چرا این سنجه عوض شد (مهر ۱۴۰۵ — نه برای سبز شدنِ الکی):
+      //
+      // کامیتِ «دروازه‌بانِ پنالتی حالا خودِ قلقلی است» رسمِ دروازه‌بان را
+      // به یک closure به نامِ `paintKeeper` برد تا **دو بار** صدا زده شود:
+      // یک‌بار پشتِ توپ و یک‌بار جلوی آن. این تست روی نامِ قدیمیِ
+      // `_drawKeeper` قفل مانده بود و از همان کامیت قرمز شد — ولی چون
+      // مرحلهٔ Analyze شکست می‌خورد، مرحلهٔ تست‌های ویجت در CI اصلاً
+      // **اجرا نمی‌شد** و کسی قرمزی‌اش را ندید.
+      //
+      // حالا خودِ **ترتیب** سنجیده می‌شود، که همان قصدِ اصلیِ تست است:
+      // «دروازه‌بان جلو باشد» یعنی رسمش بعد از رسمِ توپ بیاید.
+      final behind = src.indexOf('if (!keeperInFront) paintKeeper();');
+      final front = src.indexOf('if (keeperInFront) paintKeeper();');
+      expect(behind >= 0 && front > behind, isTrue,
+          reason: 'رسمِ دروازه‌بانِ جلویی باید بعد از رسمِ توپ بیاید');
     });
 
     test('نتیجهٔ بازی در کروم ثابت بازی است، نه پایینِ اسکرول', () {

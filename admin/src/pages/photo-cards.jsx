@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 
 import { assetUrl, fmtDateTime, fmtNumber } from '../lib/api.js';
+import * as adminRarity from '../lib/rarity.js';
+import { RARITY_LABELS, RARITY_BONUS, RARITY_MAX_POINTS, RARITY_KEYS } from '../lib/rarity.js';
 import {
   Badge, Button, Card, EmptyState, Field, IconButton, Input, Skeleton,
   Textarea,
@@ -111,10 +113,13 @@ export function PhotoCardsPage({ request }) {
   const [previewBack, setPreviewBack] = useState('');
   const [name, setName] = useState('');
   const [points, setPoints] = useState('');
+  // کلاسِ زندهٔ کارت — هر بار که امتیاز عوض شود بازمحاسبه می‌شود. یک مقدار
+  // مشتق است نه state جدا، وگرنه می‌شد امتیاز را عوض کرد و کلاس عقب بماند.
+  const cardClass = adminRarity.rarityForPoints(points || 0);
   const [cash, setCash] = useState('');
   const [duel, setDuel] = useState({
     attack: '50', defense: '50', speed: '50', technique: '50',
-    goalChance: '50', energy: '100', rarity: 'normal', effect: 'none',
+    goalChance: '50', energy: '100', effect: 'none',
   });
   // ── کارتِ کلکسیونی ──
   //
@@ -311,7 +316,12 @@ export function PhotoCardsPage({ request }) {
           duelTechnique: duel.technique || 50,
           duelGoalChance: duel.goalChance || 50,
           duelEnergy: duel.energy || 100,
-          duelRarity: duel.rarity || 'normal',
+          // کلاس **از امتیاز** ساخته می‌شود (خواستهٔ مالک: «این لیست بر
+          // اساسِ میزانِ کمیابیِ کارت‌هاست»). سرور هم همین کار را می‌کند و
+          // گارد `testCardRarity.js` هر دو را می‌سنجد؛ فرستادنش این‌جا فقط
+          // برای قطارِ نسلِ قبل است تا اگر روزی این build با سرورِ قدیمی
+          // حرف زد، مقدارِ درست ذخیره شود.
+          duelRarity: adminRarity.rarityForPoints(points || 0),
           duelEffect: duel.effect || 'none',
           // رشته و نه boolean: postForm بدنه را multipart می‌سازد و آنجا
           // همه‌چیز رشته است. سرور با collectibleInput هر دو را می‌فهمد.
@@ -327,7 +337,7 @@ export function PhotoCardsPage({ request }) {
       pickBack(null);
       setName(''); setPoints(''); setCash('');
       setDuel({ attack: '50', defense: '50', speed: '50', technique: '50',
-        goalChance: '50', energy: '100', rarity: 'normal', effect: 'none' });
+        goalChance: '50', energy: '100', effect: 'none' });
       setCollectible(false);
       setOwnCodes(''); setOwnBatch('');
       loadCodes();
@@ -742,16 +752,26 @@ export function PhotoCardsPage({ request }) {
                 ))}
               </div>
               <div className="card-grid cols-2">
-                <Field label="کلاس کارت"
-              hint="به قدرتِ دوئل عددِ ثابت اضافه می‌کند (معمولی ۰، نقره‌ای ۵، طلایی ۱۰، پرمیوم ۱۶، لجند ۲۴) و شانسِ افتِ همین کارت از جعبه هم با همین نام‌ها تنظیم می‌شود.">
-                  <select value={duel.rarity}
-                    onChange={e => setDuel(d => ({ ...d, rarity: e.target.value }))}>
-                    <option value="normal">معمولی</option>
-                    <option value="silver">نقره‌ای</option>
-                    <option value="gold">طلایی</option>
-                    <option value="premium">پرمیوم</option>
-                    <option value="legend">لجند</option>
-                  </select>
+                {/* ── کلاس کارت: نمایشِ خودکار، نه انتخابی ──────────────
+                    خواستهٔ مالک: کلاس **همان ردهٔ کمیابیِ امتیاز** است
+                    («این لیست بر اساسِ میزانِ کمیابیِ کارت‌هاست»). تا وقتی
+                    این فیلد یک selectِ آزاد بود، مدیر می‌توانست کارتِ ۱۰۰۰
+                    امتیازی را «افسانه‌ای» ذخیره کند و آن کارت در دوئل ۲۴
+                    واحد پاداشِ بی‌دلیل می‌گرفت — همان ناهم‌خوانی‌ای که در
+                    کاتالوگِ امروز بود. حالا هرچه امتیاز تایپ شود، کلاس همان
+                    لحظه عوض می‌شود و سرور هم **همان** را ذخیره می‌کند. */}
+                <Field label="کلاس کارت (خودکار از امتیاز)"
+                  hint={`قابلِ انتخاب نیست و از امتیازِ کارت ساخته می‌شود — تا ۵۰۰ معمولی، تا ۱۰۰۰ کمیاب، تا ۳۰۰۰ نایاب، بالای ۳۰۰۰ افسانه‌ای. پاداشِ قدرتِ دوئل در سرور ثابت است: ${RARITY_KEYS.map(k => `${RARITY_LABELS[k]} ${fmtNumber(RARITY_BONUS[k])}`).join(' · ')}. شانسِ افتِ هر کلاس از جعبه هم با همین چهار نام تنظیم می‌شود.`}>
+                  <div className={`adminClassChip rarity-${cardClass}`}>
+                    <b>{RARITY_LABELS[cardClass]}</b>
+                    <small>
+                      {cardClass === 'legendary'
+                        ? 'بیش از ۳٬۰۰۰ امتیاز'
+                        : `تا ${fmtNumber(RARITY_MAX_POINTS[cardClass])} امتیاز`}
+                      {' · '}
+                      {fmtNumber(RARITY_BONUS[cardClass])}+ قدرت در دوئل
+                    </small>
+                  </div>
                 </Field>
                 <Field label="افکت خاص"
               hint="امتیازِ هر راند را عوض می‌کند، نه استات‌ها را: سرعتی راندِ اول را بالا می‌برد، فینیشر راندِ آخر را ۲۰ تا زیاد و بقیه را ۱۰ تا کم می‌کند، دیوار دفاعی راندِ چهارم را محکم می‌کند.">

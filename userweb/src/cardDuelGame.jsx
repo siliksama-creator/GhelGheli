@@ -34,10 +34,15 @@ function StakePayoutFlight({ amount, winner, mine, opponentRole, sequence, balan
   </div>;
 }
 
+// رنگِ کلاس در میدانِ دوئل — همان پالتِ قابِ کارت، تا کارتی که کاربر در
+// کلکسیون می‌بیند با همان رنگی که در دوئل می‌جنگد خوانده شود. کلیدهای
+// نسلِ قبل هم نگاشته شده‌اند: پاسخِ دوئل ممکن است از یک سرورِ نگرفته یا
+// کشِ مرورگر بیاید و آن‌وقت کارت بی‌رنگ می‌شد.
 const rarityColor = rarity => ({
-  legend: '#FF6B35', premium: '#A855F7', gold: '#F7C948',
-  silver: '#C7D2FE', normal: '#22E7A6',
-}[rarity] || '#22E7A6');
+  legendary: '#FFD166', rare: '#A78BFA', uncommon: '#34D399', common: '#8FA3B8',
+  legend: '#FFD166', premium: '#A78BFA', gold: '#34D399', silver: '#34D399',
+  normal: '#8FA3B8',
+}[rarity] || '#8FA3B8');
 
 // ── افسانهٔ همیشگیِ «دوئل طوفان» + آموزش بار اول ───────────────────────
 // فقط وقتی پرچمِ زنده روشن است رندر می‌شود که طوفان در *همین* تجربه فعال

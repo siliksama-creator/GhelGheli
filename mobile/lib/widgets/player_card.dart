@@ -35,8 +35,10 @@ String cardIdOf(Map? item) =>
     '${item?['cardTypeId'] ?? item?['card_type_id'] ?? item?['id'] ?? ''}';
 
 String cardRarityOf(Map? item) {
-  final raw = '${item?['rarity'] ?? item?['duel_rarity'] ?? 'normal'}';
-  return rarityColors.containsKey(raw) ? raw : 'normal';
+  // `normalizeRarity` کلیدهای نسلِ قبل (gold/silver/legend/…) را هم
+  // می‌فهمد؛ بی آن، کارتی که از یک پاسخِ کش‌شده با نامِ قدیمی می‌آمد
+  // بی‌قاب و با برچسبِ خامِ انگلیسی دیده می‌شد.
+  return normalizeRarity(item?['rarity'] ?? item?['duel_rarity']);
 }
 
 int cardQtyOf(Map? item) {
@@ -243,7 +245,7 @@ class _PaintedFace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rarity = cardRarityOf(card);
-    final colors = rarityColors[rarity] ?? rarityColors['normal']!;
+    final colors = rarityColors[rarity] ?? rarityColors['common']!;
     final name = cardNameOf(card);
     final initial = name.isEmpty
         ? 'ک'

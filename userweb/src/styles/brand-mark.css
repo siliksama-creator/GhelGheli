@@ -2235,7 +2235,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 @media(prefers-reduced-motion:reduce){.duelHeroV2:before,.duelHeroIcon,.duelHolo,.duelClash,.duelHandV2 .duelCardV2:not(:disabled),.duelRadar:before,.duelRadar:after,.duelEnergyRail,.duelCardV2.selected,.duelClash:after,.duelClashCore strong,.duelChoicePrompt>strong,.duelLiveArena:before,.duelFocusBox,.duelFocusBoxIcon{animation:none!important}.duelCardV2,.duelLaunch{transition:none!important}}
 
 /* قاب کمیابی واقعی کارت‌ها — مشترک بین گرید و نمای جزئیات. */
-.rarityCardFrame{--rar-a:#22e7a6;--rar-b:#164e63;position:relative;border-radius:21px;padding:4px;background:linear-gradient(145deg,var(--rar-a),var(--rar-b),#071522);background-size:220% 220%;box-shadow:0 10px 25px #0008,0 0 18px color-mix(in srgb,var(--rar-a) 25%,transparent);overflow:visible;isolation:isolate}.rarity-normal{--rar-a:#22c55e;--rar-b:#334155}.rarity-silver{--rar-a:#f8fafc;--rar-b:#64748b}.rarity-gold{--rar-a:#fff0a3;--rar-b:#b77900}.rarity-premium{--rar-a:#38bdf8;--rar-b:#7c3aed}.rarity-legend{--rar-a:#ffd166;--rar-b:#ef4444;animation:rarityLegend 2.6s ease-in-out infinite}.rarityCardContent{height:100%;border-radius:17px;overflow:hidden;background:#071522}.rarityCardLabel{position:absolute;z-index:7;top:-8px;inset-inline-start:9px;display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:99px;background:linear-gradient(120deg,var(--rar-a),var(--rar-b));color:#071522;border:1px solid #fff6;font-size:11.5px;font-weight:800;box-shadow:0 4px 12px #0008}.rarityCardLabel i{font-style:normal;font-size:11.5px}.rarityCardShine{position:absolute;z-index:5;inset:4px;border-radius:17px;pointer-events:none;background:linear-gradient(115deg,transparent 32%,#fff5 48%,transparent 62%);background-size:250% 100%;mix-blend-mode:screen;animation:raritySweep 3.4s linear infinite}.rarity-legend:before{content:'✦';position:absolute;z-index:8;top:-8px;inset-inline-end:-5px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:#ffd166;color:#7f1d1d;box-shadow:0 0 13px #ffd166;font-size:9px;animation:badgeBeat 1.7s ease-in-out infinite}@keyframes raritySweep{to{background-position:-250% 0}}@keyframes rarityLegend{50%{background-position:100% 100%;filter:brightness(1.18);box-shadow:0 10px 30px #0008,0 0 26px #ffd16666}}
+.rarityCardFrame{--rar-a:#8FA3B8;--rar-b:#243244;--rar-glow:#8FA3B8;position:relative;border-radius:21px;padding:4px;background:linear-gradient(145deg,var(--rar-a),var(--rar-b),#071522);background-size:220% 220%;box-shadow:0 10px 25px #0008,0 0 18px color-mix(in srgb,var(--rar-glow) 25%,transparent);overflow:visible;isolation:isolate}.rarity-normal,.rarity-common{--rar-a:#8FA3B8;--rar-b:#243244;--rar-glow:#8FA3B8}.rarity-silver,.rarity-gold,.rarity-uncommon{--rar-a:#34D399;--rar-b:#065F46;--rar-glow:#10B981}.rarity-premium,.rarity-rare{--rar-a:#A78BFA;--rar-b:#312E81;--rar-glow:#8B5CF6}.rarity-legend,.rarity-legendary{--rar-a:#FFD166;--rar-b:#7F1D1D;--rar-glow:#F59E0B}.rarityCardContent{height:100%;border-radius:17px;overflow:hidden;background:#071522}.rarityCardLabel{position:absolute;z-index:7;top:-8px;inset-inline-start:9px;display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:99px;background:linear-gradient(120deg,var(--rar-a),var(--rar-b));color:#071522;border:1px solid #fff6;font-size:11.5px;font-weight:800;box-shadow:0 4px 12px #0008}.rarityCardLabel i{font-style:normal;font-size:11.5px}.rarityCardShine{position:absolute;z-index:5;inset:4px;border-radius:17px;pointer-events:none;background:linear-gradient(115deg,transparent 32%,#fff5 48%,transparent 62%);background-size:250% 100%;mix-blend-mode:screen;animation:raritySweep 3.4s linear infinite}.rarity-legend:before{content:'✦';position:absolute;z-index:8;top:-8px;inset-inline-end:-5px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:#ffd166;color:#7f1d1d;box-shadow:0 0 13px #ffd166;font-size:9px;animation:badgeBeat 1.7s ease-in-out infinite}@keyframes raritySweep{to{background-position:-250% 0}}@keyframes rarityLegend{50%{background-position:100% 100%;filter:brightness(1.18);box-shadow:0 10px 30px #0008,0 0 26px #ffd16666}}
 .cardDuelStatsMini{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:5px}.cardDuelStatsMini span{padding:3px;border-radius:7px;background:#ffffff0b;color:#a9bed2;font-size:9px;text-align:center}.cardDuelStatsMini b{display:block;color:#fff;font-size:10.5px}.inventoryTile{overflow:visible!important}.inventoryTile>.rarityCardFrame{height:218px}.inventoryTile .rarityCardContent>.invArt{height:100%}.invModal>.rarityCardFrame{width:100%;max-height:58vh}.invModal>.rarityCardFrame .rarityCardContent{max-height:56vh}.invModal>.rarityCardFrame img{width:100%;max-height:55vh;object-fit:contain;background:#02070d}
 @media(prefers-reduced-motion:reduce){.rarityCardFrame,.rarityCardShine,.rarity-legend:before{animation:none!important}}
 
@@ -2300,20 +2300,101 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 @media(max-width:700px){.duelRarityFrame.compact{width:100%}}
 
 /* Each card class has a genuinely different physical frame language. */
-.rarityCardFrame.rarity-normal{padding:3px;background:linear-gradient(145deg,#34d399,#14532d 56%,#334155);box-shadow:0 8px 18px #0008,0 0 10px #22c55e35}
-.rarity-normal .rarityCardShine{display:none}.rarity-normal .rarityCardContent{border:1px solid #ffffff22}
-.rarityCardFrame.rarity-silver{background:linear-gradient(115deg,#fff,#64748b 30%,#f8fafc 51%,#334155 78%,#fff);background-size:240% 100%;box-shadow:0 10px 25px #0008,0 0 18px #e2e8f055;animation:raritySilver 4.8s ease-in-out infinite}
-.rarity-silver .rarityCardContent{outline:1px solid #ffffff9c;outline-offset:-7px}
-.rarityCardFrame.rarity-gold{padding:5px;background:conic-gradient(from 25deg,#fff0a3,#b77900,#ffd166,#7c4a00,#fff0a3);box-shadow:0 12px 28px #0008,0 0 22px #ffd16666}
-.rarity-gold:after{content:'★';position:absolute;z-index:8;inset-inline-end:-5px;bottom:-6px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:#ffd166;color:#6b3f00;border:1px solid #fff8;box-shadow:0 0 12px #ffd166aa;font-size:9px}
-.rarityCardFrame.rarity-premium{background:conic-gradient(from var(--premium-turn,0deg),#22d3ee,#7c3aed,#f472b6,#071522,#22d3ee);box-shadow:0 12px 30px #0009,0 0 25px #7c3aed70;animation:rarityPremium 3.1s linear infinite}
-.rarity-premium:after{content:'◆';position:absolute;z-index:8;inset-inline-end:-5px;bottom:-6px;width:21px;height:21px;border-radius:6px;display:grid;place-items:center;background:linear-gradient(135deg,#22d3ee,#7c3aed);color:#fff;border:1px solid #fff8;box-shadow:0 0 14px #22d3ee99;font-size:8px;transform:rotate(12deg)}
-.rarityCardFrame.rarity-legend{padding:5px;background:conic-gradient(from var(--legend-turn,0deg),#ffd166,#ef4444,#7f1d1d,#071522,#ffd166);box-shadow:0 13px 34px #0009,0 0 30px #ef444477;animation:rarityLegendSpin 2.7s linear infinite}
+/* ═══════════════════════════════════════════════════════════════════════
+   چهار کلاسِ کارت — چهار مادهٔ فیزیکیِ متفاوت (مایگریشن ۱۰۰، مهر ۱۴۰۵)
+
+   کلاس دیگر یک برچسبِ دستی نیست؛ ردهٔ کمیابیِ کارت است:
+     common ≤۵۰۰ · uncommon ≤۱۰۰۰ · rare ≤۳۰۰۰ · legendary >۳۰۰۰
+   منبعِ حقیقت: backend/src/lib/cardRarity.js — گارد: testCardRarity.js
+   ═══════════════════════════════════════════════════════════════════════ */
+@property --rar-turn{syntax:'<angle>';inherits:false;initial-value:0deg}
+
+/* ── معمولی — فولادِ مات، ساکن و باوقار ───────────────────────────────
+   چرا بی‌انیمیشن: کلکسیون تا ۲۴ کارت نشان می‌دهد و بیشترشان معمولی‌اند.
+   ۲۴ انیمیشنِ هم‌زمان روی قاب‌ها باتری می‌خورد و هیچ چیزی اضافه نمی‌کرد. */
+.rarityCardFrame.rarity-common{padding:3px;background:linear-gradient(146deg,#A9BCD0,#4A5C72 32%,#1B2635 66%,#080F17);background-size:220% 220%;box-shadow:0 8px 20px #0009,0 0 0 1px #ffffff12 inset,0 0 12px #8fa3b829}
+.rarity-common .rarityCardContent{border:1px solid #ffffff24}
+.rarity-common .rarityCardShine{display:none}
+/* خطِ حکاکی: یک قابِ موییِ داخلی با سایهٔ فرورفته — همان چیزی که «فلزِ
+   ساختگی» را از «تصویرِ تخت» جدا می‌کند. */
+.rarity-common:after{content:'';position:absolute;z-index:6;inset:7px;border-radius:15px;pointer-events:none;border:1px solid #ffffff1c;box-shadow:0 1px 0 0 #00000073 inset}
+
+/* ── کمیاب — زمردِ صیقلی که نفس می‌کشد ──────────────────────────────── */
+.rarityCardFrame.rarity-uncommon{background:linear-gradient(146deg,#7CF0C4,#10B981 26%,#065F46 62%,#03170F);background-size:210% 210%;box-shadow:0 10px 26px #0009,0 0 18px #10b98155;animation:rarUncommonBreath 5.4s ease-in-out infinite}
+.rarity-uncommon .rarityCardContent{outline:1px solid #6ee7b7a6;outline-offset:-7px}
+.rarity-uncommon .rarityCardShine{background:linear-gradient(115deg,transparent 34%,#a7f3d06b 48%,transparent 62%);background-size:250% 100%;animation:raritySweep 5.8s linear infinite}
+@keyframes rarUncommonBreath{
+  0%,100%{background-position:0% 50%;box-shadow:0 10px 26px #0009,0 0 15px #10b9813d}
+  50%{background-position:100% 50%;box-shadow:0 10px 30px #0009,0 0 27px #34d39969}
+}
+
+/* ── نایاب — شفقِ قطبی ──────────────────────────────────────────────── */
+.rarityCardFrame.rarity-rare{background:conic-gradient(from var(--rar-turn),#22D3EE,#8B5CF6 20%,#F472B6 40%,#1E1B4B 62%,#6366F1 82%,#22D3EE);box-shadow:0 12px 30px #0009,0 0 24px #8b5cf65e;animation:rarAurora 4.6s linear infinite}
+.rarity-rare .rarityCardContent{outline:1px solid #c4b5fd6b;outline-offset:-7px}
+.rarity-rare .rarityCardShine{background:linear-gradient(115deg,transparent 32%,#e9d5ff7a 48%,transparent 64%);background-size:250% 100%;animation:raritySweep 4.2s linear infinite}
+@keyframes rarAurora{to{--rar-turn:360deg}}
+
+/* ── افسانه‌ای — طلای گداخته و اخگر ─────────────────────────────────── */
+.rarityCardFrame.rarity-legendary{padding:5px;background:conic-gradient(from var(--rar-turn),#FFF3C4,#FFD166 16%,#F97316 36%,#7F1D1D 54%,#FBBF24 74%,#FFE9A8 88%,#FFF3C4);box-shadow:0 14px 36px #0009,0 0 34px #f59e0b7a;animation:rarAurora 3.2s linear infinite}
+.rarity-legendary .rarityCardContent{outline:1px solid #ffe9a8b8;outline-offset:-8px}
+.rarity-legendary .rarityCardShine{background:linear-gradient(118deg,transparent 30%,#fff8dc8c 46%,#ffd16659 56%,transparent 72%);background-size:260% 100%;animation:raritySweep 2.6s linear infinite}
+
+/* ── هاله و ذراتِ شناور ───────────────────────────────────────────────
+   هاله با `mix-blend-mode:screen` روی کارت می‌نشیند، پس **روشن** می‌کند و
+   هرگز تصویرِ بازیکن را نمی‌پوشاند. ذرات بیرونِ قاب می‌روند (قاب
+   `overflow:visible` است) و همین «زنده بودن» را از یک حاشیهٔ رنگی جدا
+   می‌کند. */
+.rarityCardAura{position:absolute;z-index:5;inset:-10px;border-radius:30px;pointer-events:none;mix-blend-mode:screen;opacity:0}
+.rarityCardAura i{position:absolute;display:block;border-radius:50%;opacity:0}
+.rarity-rare .rarityCardAura{opacity:1;background:radial-gradient(circle at 26% 14%,#8b5cf647,transparent 58%),radial-gradient(circle at 76% 86%,#22d3ee3d,transparent 60%);filter:blur(7px);animation:rarAuraBreath 4.2s ease-in-out infinite}
+.rarity-rare .rarityCardAura i{width:4px;height:4px;background:#E9D5FF;box-shadow:0 0 8px 1px #A78BFA;animation:rarSpark 3.6s linear infinite}
+.rarity-legendary .rarityCardAura{opacity:1;background:radial-gradient(circle at 50% 112%,#f59e0b80,transparent 62%),radial-gradient(circle at 50% -12%,#ffd16661,transparent 55%);filter:blur(9px);animation:rarLegendHalo 3.1s ease-in-out infinite}
+.rarity-legendary .rarityCardAura i{width:5px;height:5px;background:#FFE9A8;box-shadow:0 0 10px 2px #F59E0B;animation:rarEmber 3.2s linear infinite}
+/* موقعیت و تأخیرِ هر ذره — توزیعِ نامنظم تا «شبکه‌ای» به نظر نرسد. */
+.rarityCardAura i:nth-child(1){inset-inline-start:12%;bottom:20%;animation-delay:0s}
+.rarityCardAura i:nth-child(2){inset-inline-start:34%;bottom:8%;animation-delay:.55s}
+.rarityCardAura i:nth-child(3){inset-inline-start:56%;bottom:26%;animation-delay:1.15s}
+.rarityCardAura i:nth-child(4){inset-inline-start:78%;bottom:12%;animation-delay:1.7s}
+.rarityCardAura i:nth-child(5){inset-inline-start:22%;bottom:44%;animation-delay:2.25s}
+.rarityCardAura i:nth-child(6){inset-inline-start:66%;bottom:52%;animation-delay:2.8s}
+.rarityCardAura i:nth-child(7){inset-inline-start:46%;bottom:36%;animation-delay:1.4s}
+@keyframes rarSpark{
+  0%{opacity:0;transform:translate(0,10px) scale(.5)}
+  16%{opacity:1}
+  70%{opacity:.85}
+  100%{opacity:0;transform:translate(6px,-34px) scale(1.15)}
+}
+@keyframes rarEmber{
+  0%{opacity:0;transform:translateY(16px) scale(.45)}
+  14%{opacity:1}
+  72%{opacity:.92}
+  100%{opacity:0;transform:translateY(-46px) scale(1.2)}
+}
+@keyframes rarAuraBreath{50%{opacity:.55;filter:blur(13px)}}
+@keyframes rarLegendHalo{
+  0%,100%{opacity:.74;filter:blur(9px)}
+  50%{opacity:1;filter:blur(13px)}
+}
+
+/* ── حرکاتِ نسلِ قبل ──────────────────────────────────────────────────
+   ⚠️ عمداً **حذف نشدند**. این کلاس‌ها (normal/silver/gold/premium/legend)
+   دیگر تولید نمی‌شوند و بالاتر به کلاسِ تازه‌شان alias شده‌اند؛ ولی قیدِ
+   ثبت‌شدهٔ این پروژه «انیمیشن‌ها دست‌نخورده» است و اگر روزی کلاسی به‌عنوان
+   سازگاری برگردد، انیمیشنش هم باید سرِ جایش باشد. حذفشان هیچ سودی جز
+   کوچک‌تر شدنِ فایل نداشت و در عوض یک ریسکِ بازگشت می‌ساخت. */
 @keyframes raritySilver{50%{background-position:100% 0;filter:brightness(1.13)}}
 @keyframes rarityPremium{to{--premium-turn:360deg}}
 @keyframes rarityLegendSpin{to{--legend-turn:360deg}}
-@property --premium-turn{syntax:'<angle>';inherits:false;initial-value:0deg}@property --legend-turn{syntax:'<angle>';inherits:false;initial-value:0deg}
-@media(prefers-reduced-motion:reduce){.rarityCardFrame.rarity-silver,.rarityCardFrame.rarity-premium,.rarityCardFrame.rarity-legend{animation:none!important}}
+@keyframes rarityLegend{50%{background-position:100% 100%;filter:brightness(1.18)}}
+@keyframes badgeBeat{50%{transform:scale(1.18)}}
+@property --premium-turn{syntax:'<angle>';inherits:false;initial-value:0deg}
+@property --legend-turn{syntax:'<angle>';inherits:false;initial-value:0deg}
+
+@media(prefers-reduced-motion:reduce){
+  .rarityCardFrame.rarity-uncommon,.rarityCardFrame.rarity-rare,.rarityCardFrame.rarity-legendary{animation:none!important}
+  .rarityCardAura,.rarityCardAura i{animation:none!important;opacity:.7}
+  .rarityCardShine{animation:none!important}
+}
 .invMissingArt{width:100%;height:100%;min-height:150px;display:grid;place-items:center;background:linear-gradient(145deg,#13253a,#050a11);color:#ffffff52;font-size:42px}
 
 .duelWinnerStamp{display:inline-block;margin:6px 0 4px;padding:4px 10px;border-radius:99px;background:#ffd166;color:#3b2500;font-size:11.5px;font-weight:800;letter-spacing:1px}
@@ -2359,7 +2440,7 @@ button:not(:disabled):active { transform: translateY(1px) scale(.985); }
 .ggCardCheck{top:8px;inset-inline-end:8px;width:28px;height:28px;border-radius:50%;background:#FFD166;color:#07111d;font-size:15px}
 .ggCardBadge{top:8px;padding:4px 8px;border-radius:999px;background:rgba(2,7,13,.78);border:1px solid rgba(255,255,255,.1);font-size:11.5px}
 .rarityQtyCorner{position:absolute;z-index:8;inset-inline-end:-5px;bottom:-6px;min-width:21px;height:21px;padding:0 5px;border-radius:6px;display:grid;place-items:center;background:linear-gradient(135deg,#22d3ee,#7c3aed);color:#fff;border:1px solid #fff8;box-shadow:0 0 14px #22d3ee99;font-size:9.5px;font-weight:900}
-.rarityCardFrame.qtyCorner.rarity-premium:after,.rarityCardFrame.qtyCorner.rarity-gold:after{content:none}
+.rarityCardFrame.qtyCorner.rarity-rare:after,.rarityCardFrame.qtyCorner.rarity-legendary:after{content:none}
 .ggCardBadge{inset-inline-end:8px;background:#22E7A6;color:#07111d;border:0}.ggPlayerCard.selected .ggCardBadge{inset-inline-end:42px}
 .ggCardWinnerStamp{left:50%;top:50%;transform:translate(-50%,-50%);padding:5px 12px;border-radius:999px;background:#FFD166;color:#432800;letter-spacing:1.2px;font-size:11.5px;box-shadow:0 0 18px rgba(255,209,102,.48)}
 .ggCardLoserVeil{position:absolute;inset:0;background:rgba(2,7,13,.36);pointer-events:none}

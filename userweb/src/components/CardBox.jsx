@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { req, fa, API } from '../lib/api.js';
-import { CARD_RARITY_META } from '../lib/cards.js';
+import { CARD_RARITY_META, normalizeCardRarity } from '../lib/cards.js';
 import { play, playShake, stopShake, warmup } from '../gameAudio.js';
 import { CardBoxReveal } from './CardBoxReveal.jsx';
 
@@ -11,9 +11,11 @@ import { CardBoxReveal } from './CardBoxReveal.jsx';
 const money = n => `${fa(Number(n || 0))} تومان`;
 
 // صدای رونمایی هر سطح — زنگ‌های نرمِ جعبه‌موسیقی؛ بالاتر = درخشان‌تر.
+// همان پنج فایلِ صوتیِ قبلی؛ فقط نگاشت به چهار کلاسِ تازه. هر کلاس صدای
+// همان ردهٔ ارزشیِ نسلِ قبل را می‌گیرد تا حسِ «چه چیزی گرفتم» عوض نشود.
 const REVEAL_SFX = {
-  normal: 'card_normal', silver: 'card_silver', gold: 'card_gold',
-  premium: 'card_premium', legend: 'card_legend',
+  common: 'card_normal', uncommon: 'card_silver',
+  rare: 'card_premium', legendary: 'card_legend',
 };
 
 /**
@@ -154,7 +156,7 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
         setPhase('revealing');
         cards.forEach((c, i) => later(() => {
           setRevealed(i + 1);
-          play(REVEAL_SFX[c.rarity] || 'flip');
+          play(REVEAL_SFX[normalizeCardRarity(c.rarity)] || 'flip');
         }, 260 * i + 180));
       }, shakeRemain + 640);
     } catch (e) {
@@ -195,7 +197,7 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
         setPhase('revealing');
         cards.forEach((c, i) => later(() => {
           setRevealed(i + 1);
-          play(REVEAL_SFX[c.rarity] || 'flip');
+          play(REVEAL_SFX[normalizeCardRarity(c.rarity)] || 'flip');
         }, 260 * i + 180));
       }, shakeRemain + 640);
     } catch (e) {
@@ -437,7 +439,10 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
 
         <div className="cardBoxOdds">
           {(data.odds || []).map(o => {
-            const meta = CARD_RARITY_META[o.rarity] || { label: o.rarity, accent: '#94A3B8' };
+            const meta = CARD_RARITY_META[normalizeCardRarity(o.rarity)] || { label: o.rarity, accent: '#94A3B8' };
+            // کلیدِ ردیف همان کلیدِ تازه است (سرور پس از مایگریشن ۱۰۰ فقط
+            // چهار کلید می‌فرستد) و ردیف با همان کلید هم مرتب می‌شود تا
+            // react در هر رندر ترتیب را عوض نکند.
             return <div key={o.rarity} className="cardBoxOdd">
               <b style={{ color: meta.accent }}>{fa(o.percent)}٪</b>
               <span>{meta.label}</span>
@@ -499,7 +504,7 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
               <span className="cardBoxHistPts">{fa(h.points)} امتیاز</span>
               <span className="cardBoxHistCards">
                 {(h.cards || []).map(c => {
-                  const meta = CARD_RARITY_META[c.rarity] || { accent: '#94A3B8', label: c.rarity };
+                  const meta = CARD_RARITY_META[normalizeCardRarity(c.rarity)] || { accent: '#94A3B8', label: c.rarity };
                   return <i key={c.slot} title={`${c.name} · ${meta.label}`}
                     style={{ background: meta.accent }} />;
                 })}
