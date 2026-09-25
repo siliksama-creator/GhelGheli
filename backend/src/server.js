@@ -1136,6 +1136,18 @@ server.listen(port, bindHost, async () => {
   await leagueCountdown.refresh().catch((e) =>
     logger.error('[league] گرم‌کردنِ کشِ شماره معکوس ناموفق بود:', e.message));
   await ensureActiveSeason();
+  // استخرِ کارتِ ربات را گرم می‌کنیم.
+  //
+  // مسیرِ سوکت (`createWithContext`) **همگام** `botDeck` را صدا می‌زند، پس
+  // نمی‌تواند منتظرِ کوئری بماند؛ بدونِ کشِ گرم، ربات تا اولین
+  // تازه‌سازی به همان دستِ ساختگیِ قدیمی برمی‌گشت و کاربر دوئلِ تمرینی را
+  // با کارت‌های واقعی شروع نمی‌کرد. تایمرِ تازه‌سازی هم هست تا کارتِ
+  // تازه‌ای که ادمین ثبت می‌کند (بدونِ دیپلوی) وارد قرعه شود.
+  await cardDuel.refreshBotPool().catch((e) =>
+    logger.error('[duel] گرم‌کردنِ استخرِ کارتِ ربات ناموفق بود:', e.message));
+  setInterval(() => {
+    cardDuel.refreshBotPool().catch(() => {});
+  }, cardDuel.BOT_POOL_TTL_MS).unref();
   logger.info(`GhelGheli API on ${bindHost}:${port}`);
   // خطِ «ظرفیت» در بوت: تنها جایی که بعد از ارتقای سرور (بدون گشتن در
   // کانفیگ‌ها) می‌شود فهمید پروسه سخت‌افزار را درست دیده یا نه.

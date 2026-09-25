@@ -1223,7 +1223,13 @@ function starterDeck() {
 }
 
 /**
- * حریفِ تمرینی — هم‌تراز با کارت‌های کاربر، نه قوی‌تر.
+ * حریفِ تمرینی — دستِ **ساختگی**، هم‌تراز با کارت‌های کاربر، نه قوی‌تر.
+ *
+ * ⚠️ از ۴ مهر ۱۴۰۵ این تابع **پشتیبان** است، نه مسیرِ اصلی: دستِ ربات
+ *    حالا از کارت‌های واقعیِ `card_types` قرعه‌کشی می‌شود (بالاتر،
+ *    بخشِ «دستِ ربات»). این‌جا فقط وقتی می‌رسیم که استخرِ کش‌شده خالی
+ *    یا کمتر از پنج کارت باشد — بازیِ تمرینی نباید به‌خاطرِ نبودِ
+ *    کاتالوگ بایستد. توضیح‌های پایین برای همان مسیرِ پشتیبان معتبرند.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  * باگی که اینجا بود و چرا کاربر همیشه می‌باخت
@@ -1273,7 +1279,7 @@ function starterDeck() {
  * هدف: نرخِ بردِ کاربر در بازهٔ ۵۵٪ تا ۷۵٪ برای همهٔ سطوحِ کارت.
  * نگهبان: `scripts/testCardDuelBalance.js`.
  */
-function botDeck(userCards) {
+function syntheticBotDeck(userCards) {
   const n = Math.max(1, userCards.length);
   // میانگینِ استاتِ خام — هم‌واحد با چیزی که بات دریافت می‌کند.
   const avgStat = userCards.reduce((sum, card) => {
@@ -1388,6 +1394,241 @@ function botDeck(userCards) {
       duel_rarity: rarity, duel_effect: effects[i],
     });
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// دستِ ربات — ۵ کارتِ واقعیِ تصادفی از کلِ کارت‌های ذخیره‌شدهٔ سیستم
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ مالک (۴ مهر ۱۴۰۵): «بازی دوئل کارت و دوئل طوفان از این به بعد ربات
+// بصورت کاملا تصادفی از کارت های ذخیره شده کل سیستم ۵ کارت رو انتخاب میکنه و
+// باهاش بازی میکنه.»
+//
+// ── چرا این تغییر لازم بود ────────────────────────────────────────────────
+//
+// دستِ ربات تا امروز **ساختگی** بود: پنج کارتِ «ربات سرعتی/تاکتیکی/دیوار/…»
+// با استاتِ ساخته‌شده در کد و بدونِ هیچ عکسی. کاربر حریفی می‌دید که یک کارتِ
+// دنیای قلقلی هم نداشت — نه اسمِ بازیکن، نه کلاس، نه افکتِ واقعی. حالا ربات با
+// همان کارت‌هایی بازی می‌کند که کاربران ثبت می‌کنند؛ همان عکس، همان کلاس،
+// همان افکت. دوئل طوفان هم همین مسیر را می‌رود (`createWithContext` فقط
+// `mayhem` را عوض می‌کند، دستِ ربات یکی است).
+//
+// ── «کاملا تصادفی» یعنی چه، دقیقاً ────────────────────────────────────────
+//
+// تصادفی‌بودن مربوط به **انتخاب** است و همان هم پیاده شده: هر پنج کارت با
+// توزیعِ یکنواخت روی *همهٔ* کارت‌های فعالِ `card_types` قرعه‌کشی می‌شوند و
+// هیچ کارتی بختِ بیشتری از دیگری ندارد (بدونِ تکرار در یک دست). تنها قیدِ
+// ظاهری این است که کارت‌های خودِ همان کاربر از استخر کنار گذاشته می‌شوند تا
+// دو طرفِ صفحه دو عکسِ یکسان نشان ندهند — و اگر استخر بعد از آن کمتر از پنج
+// کارت شود، این قید برداشته می‌شود.
+//
+// ── چرا قدرتِ همان کارت‌ها دست‌نخورده رها نشد (سنجیده شد، حدس نزدم) ───────
+//
+// با ۲۹ کارتِ امروزِ سیستم و ۵۰۰ شبیه‌سازی برای هر ردیف (مسیرِ واقعیِ موتور:
+// `rules.createFromDecks` + `botMove`)، نرخِ بردِ کاربر وقتی ربات با **قدرتِ
+// واقعیِ** کارت‌ها بازی کند:
+//
+//   | دستِ کاربر                    | بردِ کاربر |
+//   |-------------------------------|-----------|
+//   | دستِ تمرینی (کاربرِ بی‌کارت)   | **۰٪**    |
+//   | ضعیف‌ترین ۵ کارتِ سیستم (۵۰۰) | **۱٪**    |
+//   | ۵ کارتِ تصادفی (کاربرِ عادی)   | **۱۰٪**   |
+//   | قوی‌ترین ۵ کارتِ سیستم (۳۰۰۰) | ۷۶٪       |
+//
+// یعنی برای هر کاربری که کارتِ ۵۰۰ امتیازی دارد تمرین به بازیِ نابرابر تبدیل
+// می‌شد — دقیقاً همان شکایتی که `scripts/testCardDuelBalance.js` برای رفعش
+// نوشته شد («امتیاز بات کمتره باز میبره») فقط در جهتِ مخالف.
+//
+// پس یک **سقفِ تمرینی** گذاشته شد و شکلش را هم سنجیدم (هر ردیف ۸۰۰ بازی،
+// مسیرِ واقعیِ موتور). دو نسخهٔ دیگر نوشتم و رد شدند:
+//
+//   ۱. «سقفِ میانگینِ دست»: یک عدد برای کلِ پنج کارت تا میانگینِ استات
+//      برابر شود. روی کاغذ درست است، در بازی نه — کارت‌های واقعیِ سیستم
+//      **نوک‌دارند** (مثلاً دروازه‌بان: دفاع ۹۸ و حمله ۳۰) و ربات هم هر
+//      راند بهترین کارتش را می‌گذارد؛ پس نوکِ بلند حتی با میانگینِ برابر،
+//      راند را می‌برد. نتیجهٔ سنجش: کاربرِ تختِ ۶۰ فقط **۳٪** می‌برد.
+//   ۲. هم‌ترازیِ دوسویه (بالا کشیدنِ رباتِ ضعیف تا سطحِ کاربرِ قوی): تمرین
+//      را از قوی‌ترین کاربران می‌گیرد (۷۶٪ → ۳۶٪).
+//
+// قاعدهٔ نهایی **سقفِ همان ویژگی** است: هر ویژگیِ کارت‌های ربات حداکثر
+// `سقفِ همان ویژگی در دستِ خودِ کاربر − ۸` می‌شود. چون حکمِ راند فقط ویژگیِ
+// همان راند است، این قاعده دقیقاً چیزی را هم‌تراز می‌کند که در بازی اثر دارد؛
+// نوکِ بلندِ کارتِ واقعی حفظ می‌شود ولی هرگز از بهترین کارتِ خودِ کاربر
+// بالاتر نمی‌زند. اگر کارت‌های قرعه‌ای از این سقف ضعیف‌تر باشند، **دست‌نخورده**
+// می‌مانند (تصادف باید گاهی به سودِ کاربر هم باشد).
+//
+//   | دستِ کاربر                      | با قدرتِ واقعی | با سقفِ ویژگی |
+//   |---------------------------------|---------------|---------------|
+//   | دستِ تمرینی (کاربرِ بی‌کارت)     | ۰٪           | **۵۱٪**       |
+//   | تختِ استات ۴۰ (تازه‌کار)          | ۰٪           | **۹۴٪**       |
+//   | تختِ استات ۹۰ (پرقدرت)            | ۱۸٪          | **۹۵٪**       |
+//   | ۵ کارتِ تصادفیِ سیستم             | ۱۰٪          | **۷۲٪**       |
+//   | ۵ کارتِ ضعیفِ سیستم               | ۱٪           | **۶۸٪**       |
+//   | ۵ کارتِ قویِ سیستم                | ۷۶٪          | **۹۲٪**       |
+//
+// ⚠️ حاشیهٔ ۸ حدسی نیست: با ۴ هنوز بازیکنِ تازه‌کار ۵۹٪ می‌برد و دستِ تمرینی
+//    ۱۷٪ (سخت)، و با ۱۰ همه‌چیز آسان می‌شود (تختِ ۹۰ به ۹۹٪ می‌رسد). ۸ نقطهٔ
+//    تعادل است. `BOT_CEIL_MARGIN` تنها اهرمِ تنظیمِ سختیِ این مسیر است.
+//    گاردِ `scripts/testCardDuelBalance.js` همین بازه را می‌پاید.
+//
+// تنها موردی که هنوز سخت است، همان ردیفِ اول است (۵۱٪): کاربرِ بی‌کارت دستِ
+// تمرینیِ **بی‌افکت** دارد و ربات کارت‌های واقعیِ افکت‌دار. یکسان‌کردنِ این دو
+// یعنی دست‌زدن به کارت‌های خودِ کاربر (خارج از این خواسته) — عمداً نکردم و
+// در گزارش ثبت شد.
+//
+// ── چرا هم‌ترازی در واحدِ «استاتِ خام» است، نه totalPower ───────────────
+//
+// چون حکمِ راند **فقط** از ویژگیِ همان راند + افکت + شانس می‌آید
+// (`roundScoreBreakdown`: «قدرت کلی، rarity و دفاعِ نامرتبط همچنان دخالت
+// ندارند») و `rules/cardDuel.botMove` هم با همین عدد تصمیم می‌گیرد. امتیاز،
+// کلاس و حتی `totalPower` در نتیجهٔ هیچ راندی دخالت نمی‌کنند.
+//
+// ⚠️ این را حدس نزدم؛ اول در واحدِ اشتباه نوشتم و سنجیدم. هم‌ترازیِ
+//    `totalPower` روی کاغذ درست است ولی عملاً کار نمی‌کند: کاربری با کارتِ
+//    ۵۰ استاتِ ۵۰۰۰ امتیازی (`totalPower` ۹۹) در برابر رباتِ هم‌ترازشده در
+//    همان واحد، **۹۹.۸٪** می‌باخت — چون ۳۳ واحد از آن قدرت را `pointBoost`
+//    و `rarityBonus` می‌ساختند که در حکمِ راند هیچ نقشی ندارند، در حالی که
+//    استاتِ خامِ کارت‌های واقعی (۷۸ میانگین) همچنان بالای استاتِ ۵۰ او بود.
+//    سقفِ استات‌محور همان ردیف را به ۷۶٪ برد می‌رساند.
+//
+// ── چرا کشِ حافظه‌ای، و چرا تازه‌سازیِ دوره‌ای ─────────────────────────────
+//
+// مسیرِ سوکت (`createWithContext`) **همگام** `botDeck` را صدا می‌زند (تعریفِ
+// نبرد در همان لحظه ساخته می‌شود)، پس نمی‌تواند منتظرِ کوئریِ دیتابیس بماند.
+// یک استخرِ کوچک (۲۹ ردیفِ سبک) در حافظه نگه داشته می‌شود، در بوت گرم می‌شود
+// و هر چند دقیقه تازه می‌شود تا کارتِ تازه‌ای که ادمین ثبت/ویرایش می‌کند هم
+// وارد قرعه شود.
+const BOT_POOL_TTL_MS = 5 * 60 * 1000;
+let botPoolCache = null;
+let botPoolAt = 0;
+let botPoolCount = -1;
+
+/**
+ * استخرِ قرعهٔ دستِ ربات را از دیتابیس می‌خواند (فقط کارت‌های فعال).
+ * خطا را بالا می‌دهد؛ فراخوان تصمیم می‌گیرد (بوت لاگ می‌کند، تایمر بی‌صدا رد می‌شود).
+ */
+async function refreshBotPool(client = pool) {
+  const { rows } = await client.query(
+    `SELECT id, name, image_url, point_value, duel_attack, duel_defense,
+            duel_speed, duel_technique, duel_goal_chance, duel_energy, duel_effect
+       FROM card_types
+      WHERE is_active`);
+  botPoolCache = rows;
+  botPoolAt = Date.now();
+  if (rows.length !== botPoolCount) {
+    botPoolCount = rows.length;
+    logger.info(`[duel] استخرِ کارتِ ربات: ${rows.length} کارتِ فعال`);
+  }
+  return rows;
+}
+
+/** استخرِ کش‌شده (همگام) — `null` یعنی هنوز گرم نشده. */
+function botPool() { return botPoolCache; }
+
+/**
+ * تنها برای تست‌ها/پنل: استخر را دستی می‌گذارد بدونِ دیتابیس.
+ * بدونِ این، گاردِ بالانس مجبور بود به دیتابیس وصل شود — تستِ واحد نباید
+ * به دیتابیسِ محصول وابسته باشد.
+ */
+function setBotPool(rows) {
+  botPoolCache = Array.isArray(rows) ? rows : null;
+  botPoolAt = Date.now();
+  return botPoolCache;
+}
+
+/** سنِ استخر به میلی‌ثانیه — برای سنجشِ تازگی در تست/دیباگ. */
+function botPoolAgeMs() { return botPoolCache ? Date.now() - botPoolAt : Infinity; }
+
+/** قرعهٔ یکنواخت بدونِ تکرار (Fisher–Yates با مولدِ رمزنگاریِ خودِ Node). */
+function sampleUniform(items, k) {
+  const idx = items.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i -= 1) {
+    const j = crypto.randomInt(0, i + 1);
+    [idx[i], idx[j]] = [idx[j], idx[i]];
+  }
+  return idx.slice(0, k).map(i => items[i]);
+}
+
+/** اهرمِ سختیِ مسیرِ «کارت‌های واقعی» — توضیح و اعدادش بالاتر. */
+const BOT_CEIL_MARGIN = 8;
+
+/** ویژگی‌هایی که در حکمِ راند وزن دارند (پنج ویژگیِ راندی). */
+const DUEL_STATS = Object.freeze([
+  'attack', 'defense', 'speed', 'technique', 'goalChance',
+]);
+
+/**
+ * همان کارتِ واقعی با ویژگی‌های بُریده‌شده تا سقفِ دستِ کاربر.
+ * هویتِ کارت دست‌نخورده می‌ماند: شناسه، اسم، عکس، امتیاز، کلاس (از امتیاز
+ * ساخته می‌شود)، افکت و انرژی. فقط عددهای دوئل کم می‌شوند — و همان عددها
+ * هم روی صفحه دیده می‌شوند، پس نمایش و حکم از هم جدا نمی‌افتند.
+ */
+function capCardStats(card, caps) {
+  const cl = (v, cap) => Math.max(5, Math.min(100, Math.min(Math.round(v), cap)));
+  const out = publicCard({
+    card_type_id: card.cardTypeId,
+    name: card.name,
+    image_url: card.imageUrl,
+    point_value: card.pointValue,
+    quantity: 1,
+    duel_attack: cl(card.attack, caps.attack),
+    duel_defense: cl(card.defense, caps.defense),
+    duel_speed: cl(card.speed, caps.speed),
+    duel_technique: cl(card.technique, caps.technique),
+    duel_goal_chance: cl(card.goalChance, caps.goalChance),
+    duel_energy: card.energy,
+    duel_effect: card.effect,
+    practiceOnly: true,
+  });
+  out.practiceAdjusted = true;
+  return out;
+}
+
+/**
+ * سقفِ تمرینی «همان ویژگی» — توضیح، اعداد و نسخه‌های رد‌شده بالاتر.
+ *
+ * فقط می‌بُرد؛ کارتی که از قبل زیرِ سقف است دست‌نخورده می‌ماند (شاید همهٔ
+ * پنج کارتِ قرعه‌ای از دستِ کاربر ضعیف‌تر باشند — آن‌وقت هیچ‌چیز عوض نمی‌شود).
+ */
+function practiceCap(cards, userCards) {
+  if (!userCards || !userCards.length) return cards;
+  const caps = {};
+  for (const stat of DUEL_STATS) {
+    const ceiling = Math.max(...userCards.map(c => Number(c[stat]) || 0));
+    caps[stat] = ceiling - BOT_CEIL_MARGIN;
+  }
+  let touched = false;
+  const out = cards.map(card => {
+    if (!DUEL_STATS.some(stat => card[stat] > caps[stat])) return card;
+    touched = true;
+    return capCardStats(card, caps);
+  });
+  return touched ? out : cards;
+}
+
+/**
+ * دستِ ربات (۴ مهر ۱۴۰۵): ۵ کارتِ واقعیِ تصادفی از کلِ سیستم + سقفِ تمرینی.
+ * `opts.pool` فقط برای تست‌هاست؛ در محصول از کشِ گرم می‌خواند.
+ */
+function botDeck(userCards, opts = {}) {
+  const poolRows = Array.isArray(opts.pool) ? opts.pool : botPoolCache;
+  // پشتیبان: کشِ سرد، سیستمِ تازه با کمتر از پنج کارت، یا تستِ واحدی که
+  // دیتابیس ندارد. تمرین نباید به‌خاطرِ نبودِ کاتالوگ بایستد.
+  if (!poolRows || poolRows.length < DECK_SIZE) return syntheticBotDeck(userCards);
+
+  const mine = new Set((userCards || []).map(c => String(c.cardTypeId || c.id)));
+  const others = poolRows.filter(r => !mine.has(String(r.id || r.card_type_id)));
+  const source = others.length >= DECK_SIZE ? others : poolRows;
+  const drawn = sampleUniform(source, DECK_SIZE).map(row => publicCard({
+    ...row,
+    card_type_id: row.card_type_id || row.id,
+    quantity: 1,
+    // ⚠️ `practiceOnly` این‌جا **false** است: این کارت‌ها کارت‌های واقعیِ
+    //    سیستم‌اند، نه کارت‌های ساختگی. فقط اگر سقفِ تمرینی قدر‌تشان را
+    //    کم کند، همان تابع نسخهٔ هم‌تراز را با نشانِ تمرینی می‌سازد.
+    practiceOnly: false,
+  }));
+  return practiceCap(drawn, userCards || []);
 }
 
 async function pruneBattleHistory(client = pool) {
@@ -1593,7 +1834,8 @@ module.exports = {
   RARITY_LABEL, EFFECT_LABEL, duelFieldsFromBody, collectibleInput, publicCard, totalPower,
   rarityField, RARITY_BONUS,
   playableCards, validateDeck, deckCards, status, saveDeck, botBattle,
-  starterDeck, botDeck, resolveRound, simulate, scoreFromHistory, recentBattles, recordEngineBattle,
+  starterDeck, botDeck, syntheticBotDeck, resolveRound, simulate, scoreFromHistory, recentBattles, recordEngineBattle,
+  refreshBotPool, setBotPool, botPool, botPoolAgeMs, BOT_POOL_TTL_MS,
   LUCK_RANGE, seededLuck,
   analyzeDeck, suggestDeckFromPool, createSeededRandom, focusStatOf, balanceSnapshot,
   // دوئل طوفان (logicVersion 3)

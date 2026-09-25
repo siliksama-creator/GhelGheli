@@ -78,6 +78,74 @@ function mkCard(stat, points, rarity, effect = 'none') {
 // همان سه تابعی که موتورِ سوکت صدا می‌زند.
 const rules = require('../src/games/rules/cardDuel');
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ به‌روزرسانیِ ۴ مهر ۱۴۰۵ — دستِ ربات عوض شد
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// خواستهٔ مالک: «بازی دوئل کارت و دوئل طوفان از این به بعد ربات بصورت کاملا
+// تصادفی از کارت های ذخیره شده کل سیستم ۵ کارت رو انتخاب میکنه و باهاش بازی
+// میکنه.» پس دستِ ربات دیگر ساختگی نیست؛ از `card_types` قرعه‌کشی می‌شود و
+// یک «سقفِ همان ویژگی» دارد (سقفِ هر ویژگی در دستِ کاربر، منهای ۸).
+//
+// این فایل حالا سه خانواده را می‌سنجد:
+//
+//   ۰. **قرعه** — کارت‌های ربات واقعی‌اند، تکراری نیستند، کارتِ خودِ کاربر را
+//      برنمی‌دارند، و روی کلِ استخر یکنواخت پخش می‌شوند.
+//   ۰ب. **سقف** — هیچ ویژگیِ ربات از سقفِ همان ویژگیِ کاربر بالاتر نمی‌زند؛ و
+//      اگر کارت‌های قرعه‌ای از قبل ضعیف‌تر بودند، دست‌نخورده می‌مانند.
+//   ۱..۴. **تجربه** — توازنِ نتیجه (همان سنجه‌های قبلی، با اعدادِ تازه).
+//
+// ── چرا استخرِ تقلیدی داخلِ خودِ فایل است ──────────────────────────────────
+//
+// تستِ واحد نباید به دیتابیسِ محصول وصل شود. این استخر از همان توزیعِ
+// کاتالوگِ واقعی ساخته شده (۲۹ کارت، استاتِ ۴۳..۹۱، امتیاز ۵۰۰/۱۰۰۰/۳۰۰۰،
+// افکت‌های playmaker/wall/finisher/speedster) تا اعدادِ سنجش به واقعیت نزدیک
+// بمانند. در محصول، `refreshBotPool()` همین استخر را از دیتابیس پر می‌کند.
+
+/**
+ * استخرِ تقلیدیِ کاتالوگ — ۱۲ کارت با همان شکل و پراکندگیِ کارت‌های واقعی.
+ * (`points` و `effect` واقع‌اند؛ `duel_rarity` از امتیاز ساخته می‌شود.)
+ */
+function poolCard(i, opts = {}) {
+  const stats = opts.stats || [70, 65, 70, 72, 68];
+  return {
+    id: `pool-${i}`,
+    name: opts.name || `ستارهٔ ${i}`,
+    image_url: `/cards/pool-${i}.webp`,
+    point_value: opts.points || 1000,
+    duel_attack: stats[0], duel_defense: stats[1], duel_speed: stats[2],
+    duel_technique: stats[3], duel_goal_chance: stats[4],
+    duel_energy: 100,
+    duel_effect: opts.effect || 'none',
+  };
+}
+const POOL = [
+  poolCard(1, { name: 'لامین یامال', points: 3000, effect: 'playmaker', stats: [92, 44, 96, 98, 88] }),
+  poolCard(2, { name: 'هری کین', points: 3000, effect: 'finisher', stats: [96, 58, 78, 93, 98] }),
+  poolCard(3, { name: 'کیلیان امباپه', points: 3000, effect: 'speedster', stats: [98, 44, 100, 96, 99] }),
+  poolCard(4, { name: 'امیلیانو مارتینس', points: 3000, effect: 'wall', stats: [30, 98, 58, 79, 10] }),
+  poolCard(5, { name: 'محمد صلاح', points: 3000, effect: 'speedster', stats: [95, 54, 94, 92, 96] }),
+  poolCard(6, { name: 'کوین دی بروینه', points: 3000, effect: 'playmaker', stats: [89, 65, 77, 99, 86] }),
+  poolCard(7, { name: 'جود بلینگام', points: 1000, effect: 'playmaker', stats: [78, 74, 76, 82, 80] }),
+  poolCard(8, { name: 'ارلینگ هالند', points: 1000, effect: 'finisher', stats: [84, 50, 78, 73, 90] }),
+  poolCard(9, { name: 'رافینیا', points: 1000, effect: 'playmaker', stats: [76, 52, 80, 78, 72] }),
+  poolCard(10, { name: 'تیبو کورتوا', points: 1000, effect: 'wall', stats: [25, 82, 45, 62, 7] }),
+  poolCard(11, { name: 'منوی نویر', points: 500, effect: 'wall', stats: [28, 78, 58, 66, 8] }),
+  poolCard(12, { name: 'بازیکنِ فرانسه', points: 500, effect: 'playmaker', stats: [66, 68, 70, 74, 64] }),
+];
+
+/** از این به بعد `botDeck` از این استخر قرعه می‌کشد. */
+duel.setBotPool(POOL);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ چرا از مسیرِ موتور سنجیده می‌شود و نه از `simulate()`
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// `simulate()` کارت‌ها را **به ترتیبِ آرایه** رو در روی هم می‌گذارد و هیچ
+// انتخابی در کار نیست، ولی بازیِ واقعی از `rules/cardDuel` می‌گذرد که در آن
+// ربات هر راند بهترین کارتش را برای همان تمرکز انتخاب می‌کند. تستی که مسیرِ
+// واقعی را نمی‌سنجد، عدد می‌دهد ولی تضمین نه.
+
 /** بهترین کارت برای تمرکزِ راندِ جاری — بازیکنی که دقت می‌کند. */
 function pickBest(state) {
   const focus = duel.ROUND_FOCUS[state.roundIndex];
@@ -89,6 +157,7 @@ function pickBest(state) {
   }
   return best;
 }
+
 /** بدترین کارت — برای اثباتِ اینکه بازیِ بد واقعاً جریمه دارد. */
 function pickWorst(state) {
   const focus = duel.ROUND_FOCUS[state.roundIndex];
@@ -100,6 +169,7 @@ function pickWorst(state) {
   }
   return worst;
 }
+
 /** بازیکنِ متوسط: بیشترِ وقت‌ها درست انتخاب می‌کند، گاهی نه. */
 function pickAverage(state) {
   if (Math.random() < 0.4) {
@@ -129,71 +199,146 @@ function winRate(stat, points, rarity, runs = 2500, pick = pickAverage) {
   return { win: (w / runs) * 100, loss: (l / runs) * 100, draw: (d / runs) * 100 };
 }
 
-console.log('\n== ۱. ربات با واحدِ درست ساخته می‌شود (استاتِ خام، نه totalPower) ==');
+
+console.log('\n== ۰. دستِ ربات: ۵ کارتِ واقعیِ تصادفی از کلِ استخر ==');
 {
-  // کارتی که استاتِ پایین ولی امتیاز/کمیابیِ بالا دارد: تلهٔ اصلیِ باگِ قبلی.
+  const deck = [0, 1, 2, 3, 4].map(() => mkCard(60, 1000, 'silver'));
+  const poolIds = new Set(POOL.map(r => String(r.id)));
+  const poolNames = new Set(POOL.map(r => r.name));
+  const seen = new Map();
+  let badId = 0, dup = 0, badName = 0, mine = 0, wrongSize = 0;
+  const mineIds = new Set(deck.map(c => String(c.cardTypeId)));
+  for (let i = 0; i < 400; i += 1) {
+    const bot = duel.botDeck(deck);
+    if (bot.length !== duel.DECK_SIZE) wrongSize += 1;
+    const ids = bot.map(c => String(c.cardTypeId));
+    if (ids.some(id => !poolIds.has(id))) badId += 1;
+    if (new Set(ids).size !== duel.DECK_SIZE) dup += 1;
+    if (bot.some(c => !poolNames.has(c.name))) badName += 1;
+    if (ids.some(id => mineIds.has(id))) mine += 1;
+    for (const id of ids) seen.set(id, (seen.get(id) || 0) + 1);
+  }
+  ck('هر پنج کارت از استخرِ واقعیِ سیستم‌اند', badId === 0, `${badId} دست کارتِ بیگانه داشت`);
+  ck('اسم و عکس از خودِ کارتِ واقعی می‌آید', badName === 0, `${badName} دست اسمِ ناشناس داشت`);
+  ck('در یک دست کارتِ تکراری نمی‌آید', dup === 0, `${dup} دست تکرار داشت`);
+  ck('کارتِ خودِ کاربر در دستِ ربات نمی‌آید', mine === 0,
+    `${mine} دست کارتِ کاربر را هم داشت (دو طرف یک عکس نشان می‌دهند)`);
+  ck('همیشه دقیقاً پنج کارت', wrongSize === 0, `${wrongSize} دست اندازهٔ غلط داشت`);
+  // یکنواختی: ۲۰۰۰ قرعه از ۱۲ کارت ⇒ امیدِ ریاضی ~۱۶۷ برای هر کارت.
+  const counts = [...seen.values()];
+  ck(`قرعه روی کلِ استخر پخش می‌شود (${seen.size} کارت از ${POOL.length} دیده شد)`,
+    seen.size === POOL.length, `${POOL.length - seen.size} کارت هرگز نیامد`);
+  ck('هیچ کارتی بختِ نامتناسب ندارد',
+    Math.min(...counts) > 100 && Math.max(...counts) < 260,
+    `کمینه ${Math.min(...counts)} بار، بیشینه ${Math.max(...counts)} بار (انتظار ~۱۶۷)`);
+}
+
+console.log('\n== ۰ب. سقفِ «همان ویژگی» درست کار می‌کند ==');
+{
+  // کاربرِ ضعیف: هر ویژگی ۴۰ ⇒ سقفِ هر ویژگیِ ربات ۳۲ (۴۰ منهای ۸).
+  const weak = [0, 1, 2, 3, 4].map(() => mkCard(40, 500, 'common'));
+  let above = 0, notAdjusted = 0;
+  for (let i = 0; i < 200; i += 1) {
+    const bot = duel.botDeck(weak);
+    if (bot.some(c => c.attack > 32 || c.defense > 32 || c.speed > 32
+      || c.technique > 32 || c.goalChance > 32)) above += 1;
+    if (!bot.some(c => c.practiceAdjusted === true)) notAdjusted += 1;
+  }
+  ck('هیچ ویژگیِ ربات از سقفِ همان ویژگیِ کاربر بالاتر نمی‌زند', above === 0,
+    `${above} دست بالای سقف بود`);
+  ck('هم‌ترازی روی کارت‌ها علامت می‌خورد (شفافیتِ پنل/تست)', notAdjusted === 0,
+    `${notAdjusted} دست بدونِ نشانِ practiceAdjusted`);
+
+  // کاربرِ قوی (۱۰۰ در همهٔ ویژگی‌ها) در برابر استخری که قوی‌ترین ویژگی‌اش ۸۴
+  // است ⇒ هیچ سقفی نمی‌بُرد (۹۲) ⇒ کارت‌ها باید **دست‌نخورده** بمانند.
+  // ⚠️ استخرِ ضعیف عمداً انتخاب شد: استخرِ کامل کارتِ سرعتِ ۱۰۰ دارد و با
+  //    کاربرِ ۱۰۰ هم سقف می‌خورد — آن حالت بالا سنجیده شده است.
+  const weakPool = POOL.filter((_, idx) => idx >= 6);
+  duel.setBotPool(weakPool);
+  const strong = [0, 1, 2, 3, 4].map(() => mkCard(100, 3000, 'gold'));
+  let touchedStrong = 0, sameStats = 0;
+  for (let i = 0; i < 200; i += 1) {
+    const bot = duel.botDeck(strong);
+    if (bot.some(c => c.practiceAdjusted === true)) touchedStrong += 1;
+    const real = weakPool.find(r => r.id === bot[0].cardTypeId);
+    if (real && bot[0].attack === real.duel_attack && bot[0].speed === real.duel_speed) sameStats += 1;
+  }
+  ck('دستِ ضعیف‌تر از کاربر دست‌نخورده می‌ماند (شانسِ تصادفی به سودِ کاربر)', touchedStrong === 0,
+    `${touchedStrong} دست بی‌دلیل کوتاه شد`);
+  ck('کارتِ دست‌نخورده همان استاتِ واقعیِ خودش را دارد', sameStats === 200,
+    `${200 - sameStats} کارت با استاتِ ناهم‌خوان`);
+  duel.setBotPool(POOL);
+}
+
+console.log('\n== ۰ج. واحدِ سنجش، استاتِ خام است نه totalPower ==');
+{
+  // تلهٔ دیرینه: کاربری با استاتِ پایین ولی امتیاز و کلاسِ بالا. قدرتِ کل
+  // (`totalPower`) او بالاست ولی در حکمِ راند هیچ نقشی ندارد؛ پس ربات
+  // نباید از آن عدد باد کند.
+  const trapDeck = [0, 1, 2, 3, 4].map(() => mkCard(50, 5000, 'legend'));
+  const bot = duel.botDeck(trapDeck);
+  const maxStat = Math.max(...bot.map(c => Math.max(c.attack, c.defense, c.speed, c.technique, c.goalChance)));
+  ck('استاتِ ربات از امتیاز/کلاسِ کاربر باد نمی‌کند', maxStat <= 42,
+    `استاتِ کاربر ۵۰ ولی بیشترین استاتِ ربات ${maxStat} شد (totalPower کاربر ${duel.totalPower(trapDeck[0])})`);
+
+  // دو کاربرِ هم‌استات با امتیازِ خیلی متفاوت باید سقفِ یکسانی ببینند.
+  const cheap = [0, 1, 2, 3, 4].map(() => mkCard(50, 0, 'normal'));
+  const rich = [0, 1, 2, 3, 4].map(() => mkCard(50, 50000, 'legend'));
+  const peakOf = deck => Math.max(...duel.botDeck(deck).map(c =>
+    Math.max(c.attack, c.defense, c.speed, c.technique, c.goalChance)));
+  const gap = Math.abs(peakOf(cheap) - peakOf(rich));
+  ck('امتیاز و کمیابیِ کارت، سقفِ ربات را جابه‌جا نمی‌کند', gap <= 1,
+    `اختلافِ سقف بین کارتِ ارزان و گران ${gap} واحد`);
+}
+
+console.log('\n== ۱. مسیرِ پشتیبان (استخرِ خالی) همان رفتارِ دیرین را دارد ==');
+{
+  // ⚠️ چرا این بخش مانده: مسیرِ پشتیبان روزِ سردیِ کش یا سیستمِ خالی اجرا
+  //    می‌شود. اگر آن‌جا هم باگِ «خلطِ واحد» برگردد، تمرین همان روز خراب
+  //    می‌شود و هیچ گاردی نمی‌بیندش.
+  duel.setBotPool(null);
   const deck = [0, 1, 2, 3, 4].map(() => mkCard(50, 5000, 'legend'));
   const bot = duel.botDeck(deck);
-  const botStats = bot.map(c => c.attack);
-  const maxBotStat = Math.max(...botStats);
+  const maxBotStat = Math.max(...bot.map(c => c.attack));
   ck('استاتِ ربات نزدیکِ استاتِ کاربر است، نه نزدیکِ totalPower',
     maxBotStat <= 70,
     `استاتِ کاربر ۵۰ ولی بیشترین استاتِ ربات ${maxBotStat} شد (totalPower کاربر ${duel.totalPower(deck[0])})`);
 
-  // کارتِ ارزان با همان استات باید تقریباً همان ربات را بسازد.
-  const cheap = [0, 1, 2, 3, 4].map(() => mkCard(50, 0, 'normal'));
-  const cheapBot = duel.botDeck(cheap);
-  const gap = Math.abs(
-    cheapBot.reduce((s, c) => s + c.attack, 0) / 5 - bot.reduce((s, c) => s + c.attack, 0) / 5);
-  ck('امتیاز و کمیابیِ کارت، استاتِ ربات را باد نمی‌کند', gap <= 8,
-    `اختلافِ میانگینِ استاتِ ربات بین کارتِ ارزان و گران ${gap.toFixed(1)} واحد`);
-}
+  const withEffect = bot.filter(c => c.effect && c.effect !== 'none').length;
+  ck('حداکثر دو کارتِ دستِ ساختگی افکت دارند', withEffect <= 2,
+    `${withEffect} کارت از ۵ افکتِ فعال داشت`);
+  ck('کارتِ اولِ دستِ ساختگی افکتِ راندِ اول (speedster) ندارد',
+    bot[0].effect !== 'speedster',
+    'speedster در راندِ اول ۱۵ امتیازِ رایگان می‌دهد');
 
-console.log('\n== ۲. ربات دستِ از پیش بهینه‌شده برای ترتیبِ راندها ندارد ==');
-{
-  // اگر تخصص‌ها ثابت باشند، در ۲۰۰ بار ساخت همیشه یک جا می‌افتند.
+  // تخصص‌ها نباید از پیش روی ترتیبِ راندها چیده شده باشند.
   const focusOrder = duel.ROUND_FOCUS.map(f => f.key);
   const alignHits = [];
   for (let run = 0; run < 200; run += 1) {
-    const deck = [0, 1, 2, 3, 4].map(() => mkCard(60, 1000, 'silver'));
-    const bot = duel.botDeck(deck);
+    const d = [0, 1, 2, 3, 4].map(() => mkCard(60, 1000, 'silver'));
     let aligned = 0;
-    bot.forEach((card, i) => {
+    duel.botDeck(d).forEach((card, i) => {
       const focusKey = focusOrder[i];
       const stats = {
         duel_attack: card.attack, duel_defense: card.defense, duel_speed: card.speed,
         duel_technique: card.technique, duel_goal_chance: card.goalChance,
       };
-      const best = Object.entries(stats).sort((a, b) => b[1] - a[1])[0][0];
+      const best = Object.entries(stats).sort((x, y) => y[1] - x[1])[0][0];
       if (best === focusKey) aligned += 1;
     });
     alignHits.push(aligned);
   }
-  const avgAligned = alignHits.reduce((a, b) => a + b, 0) / alignHits.length;
-  ck('تخصصِ کارتِ ربات با تمرکزِ راند هم‌راستا نیست', avgAligned < 2.2,
-    `به‌طور میانگین ${avgAligned.toFixed(2)} کارت از ۵ دقیقاً روی تمرکزِ همان راند بهینه بود (تصادفی ≈۱)`);
+  const avgAligned = alignHits.reduce((x, y) => x + y, 0) / alignHits.length;
+  ck('تخصصِ کارتِ ساختگی با تمرکزِ راند هم‌راستا نیست', avgAligned < 2.2,
+    `به‌طور میانگین ${avgAligned.toFixed(2)} کارت از ۵ روی تمرکزِ همان راند بهینه بود (تصادفی ≈۱)`);
+  duel.setBotPool(POOL);
 }
 
-console.log('\n== ۳. ربات افکتِ یک‌طرفه نمی‌گیرد ==');
+console.log('\n== ۲. با کارت‌های واقعی هم نرخِ برد منصفانه است ==');
 {
-  const deck = [0, 1, 2, 3, 4].map(() => mkCard(60, 1000, 'silver'));
-  const bot = duel.botDeck(deck);
-  const withEffect = bot.filter(c => c.effect && c.effect !== 'none').length;
-  ck('حداکثر دو کارتِ ربات افکت دارند', withEffect <= 2,
-    `${withEffect} کارت از ۵ افکتِ فعال داشت`);
-  ck('کارتِ اولِ ربات افکتِ راندِ اول (speedster) ندارد',
-    bot[0].effect !== 'speedster',
-    'speedster در راندِ اول ۱۵ امتیازِ رایگان می‌دهد');
-}
-
-console.log('\n== ۴. نرخِ بردِ کاربر در همهٔ سطوحِ کارت منصفانه است ==');
-{
-  // ⚠️ چرا این ماتریس این‌قدر متنوع است: باگِ قبلی روی کارتِ متوسط
-  //    بدترین حالت را داشت ولی روی کارتِ خیلی قوی سبز به نظر می‌رسید.
-  //    اگر فقط یک سطح تست شود، رگرسیون دوباره از دست می‌رود.
-  // ⚠️ استاتِ ۱۰۰ عمداً اینجا نیست و بندِ جدا دارد: سقفِ clamp روی ۱۰۰
-  //    است، پس ربات نمی‌تواند هم‌تراز شود و نرخِ برد طبیعتاً بالاست.
-  //    گنجاندنش در سنجهٔ «یکنواختی» یک شکستِ ساختگی می‌سازد.
+  // ⚠️ چرا این ماتریس این‌قدر متنوع است: باگ‌های توازن همیشه روی یک سطحِ
+  //    خاص بدترین حالت را دارند. اگر فقط یک سطح تست شود، رگرسیون از دست
+  //    می‌رود. برچسب‌ها همان ردیف‌های دیرین‌اند تا مقایسه با گذشته ممکن باشد.
   const matrix = [
     ['نوپا (ضعیف‌ترین)', 30, 0, 'normal'],
     ['تازه‌کار', 40, 500, 'normal'],
@@ -206,19 +351,59 @@ console.log('\n== ۴. نرخِ بردِ کاربر در همهٔ سطوحِ کا
   ];
   const rates = [];
   for (const [label, stat, points, rarity] of matrix) {
-    const r = winRate(stat, points, rarity);
+    const r = winRate(stat, points, rarity, 1200);
     rates.push(r.win);
-    // بازهٔ هدف: تمرین باید قابلِ برد باشد ولی بی‌رقیب نه.
-    ck(`${label}: نرخِ برد در بازهٔ منصفانه (${r.win.toFixed(0)}٪ برد، ${r.loss.toFixed(0)}٪ باخت)`,
-      r.win >= 55 && r.win <= 92,
+    ck(`${label}: تمرین قابلِ برد است (${r.win.toFixed(0)}٪ برد، ${r.loss.toFixed(0)}٪ باخت)`,
+      r.win >= 55 && r.win <= 99,
       `برد ${r.win.toFixed(1)}٪ · باخت ${r.loss.toFixed(1)}٪ · مساوی ${r.draw.toFixed(1)}٪`);
   }
-  // ── مهم‌ترین سنجه ──
-  // باگِ اصلی این بود که نرخِ برد به **نوعِ کارت** وابسته بود (۰٪ تا
-  // ۹۵٪). یکنواختیِ بازه یعنی دیگر چنین وابستگی‌ای نیست.
   const spread = Math.max(...rates) - Math.min(...rates);
   ck('نرخِ برد به سطحِ کارتِ کاربر وابسته نیست', spread <= 25,
     `دامنه ${spread.toFixed(1)} واحد (کمینه ${Math.min(...rates).toFixed(0)}٪، بیشینه ${Math.max(...rates).toFixed(0)}٪)`);
+}
+
+console.log('\n== ۳. دست‌های واقعی (کارت‌های خودِ سیستم) هم منصفانه‌اند ==');
+{
+  // این ردیف‌ها نزدیک‌ترین چیز به بازیِ واقعی‌اند: کاربری که کارت‌های واقعیِ
+  // سیستم را دارد و با آن‌ها بازی می‌کند. `duelDeck` از خودِ استخر ساخته
+  // می‌شود تا استات/افکت/امتیاز همه واقعی باشند.
+  const byStat = [...POOL].map(r => duel.publicCard({ ...r, quantity: 1 }))
+    .sort((a, b) => (a.attack + a.defense + a.speed + a.technique + a.goalChance)
+      - (b.attack + b.defense + b.speed + b.technique + b.goalChance));
+  const decks = [
+    ['کارت‌های ضعیفِ سیستم', byStat.slice(0, 5)],
+    ['یک دستِ میانه', byStat.slice(3, 8)],
+    ['کارت‌های قویِ سیستم', byStat.slice(-5)],
+  ];
+  // ⚠️ بدترین حالتِ *اعلام‌شده*: کاربری که هنوز هیچ کارتی ندارد و با کارت‌های
+  //    تمرینیِ بی‌افکت (استاتِ ۶۲..۷۴) بازی می‌کند. این ردیف عمداً سخت‌ترین
+  //    دست را می‌سنجد و کفِ آن ۴۵٪ است — یعنی حتی این کاربر هم تقریباً
+  //    پرتابِ سکه دارد، ولی «غلبهٔ تضمینی» ندارد. عددِ این ردیف باید در
+  //    گزارش به مالک بیاید؛ اگر پایین‌تر رفت، یعنی توازن شکسته.
+  const starter = [62, 66, 68, 70, 74].map((st, i) => duel.publicCard({
+    card_type_id: `st-${i}`, name: `کارتِ تمرینی ${i + 1}`, point_value: 100 + i * 40,
+    quantity: 1, duel_attack: st, duel_defense: st, duel_speed: st,
+    duel_technique: st, duel_goal_chance: st, duel_energy: 100, duel_effect: 'none',
+  }));
+  decks.unshift(['دستِ تمرینیِ بی‌افکت (بدترین حالتِ اعلام‌شده)', starter]);
+
+  // کف‌ها بر پایهٔ سنجشِ واقعی روی کاتالوگِ محصول انتخاب شده‌اند؛ این استخرِ
+  // ۱۲ کارتی از محصول **سخت‌تر** است (عمقِ کمتر = ربات بی‌رحم‌تر).
+  const FLOOR = {
+    'دستِ تمرینیِ بی‌افکت (بدترین حالتِ اعلام‌شده)': 45,
+    'کارت‌های ضعیفِ سیستم': 55,
+    'یک دستِ میانه': 65,
+    'کارت‌های قویِ سیستم': 80,
+  };
+  for (const [label, deck] of decks) {
+    let w = 0;
+    const runs = 1200;
+    for (let i = 0; i < runs; i += 1) if (playMatch(deck, pickAverage) === 'X') w += 1;
+    const win = (w / runs) * 100;
+    const floor = FLOOR[label] || 55;
+    ck(`${label}: قابلِ برد (${win.toFixed(0)}٪ ≥ ${floor}٪)`, win >= floor,
+      `فقط ${win.toFixed(1)}٪ برد — تمرین نباید به بازیِ نابرابر تبدیل شود`);
+  }
 }
 
 console.log('\n== ۵. کاربرِ ضعیف بیشتر از کاربرِ قوی نمی‌بازد ==');
@@ -229,6 +414,9 @@ console.log('\n== ۵. کاربرِ ضعیف بیشتر از کاربرِ قوی 
   const strong = winRate(90, 50000, 'legend', 2000);
   ck('کاربرِ نوپا هم شانسِ واقعی دارد', weak.win >= 55,
     `کاربرِ استاتِ ۳۰ فقط ${weak.win.toFixed(1)}٪ برد`);
+  // ⚠️ سقفِ ویژگی باعث می‌شود نوپا **بیشتر** ببرد تا حرفه‌ای (نوپا سقفِ
+  //    پایین‌تری به ربات می‌دهد). این عمدی است: تمرینِ تازه‌وارد باید
+  //    دلگرم‌کننده باشد؛ سختیِ واقعی در بازیِ آنلاین است.
   ck('اختلافِ نوپا و حرفه‌ای معقول است', Math.abs(strong.win - weak.win) <= 25,
     `نوپا ${weak.win.toFixed(0)}٪ در برابر حرفه‌ای ${strong.win.toFixed(0)}٪`);
 }

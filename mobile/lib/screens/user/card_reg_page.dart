@@ -45,6 +45,17 @@ const TextStyle _cardRegNoteStyle = TextStyle(
   fontWeight: FontWeight.w600,
 );
 
+/// استایلِ سطرهای شرطِ ثبتِ کارت (خطِ ۵۰۰ امتیازی + خطِ کارت‌های خاص).
+///
+/// یک ثابت برای هر دو سطر: کنارِ هم دیده می‌شوند و اگر روزی اندازهٔ
+/// فونت یا رنگ عوض شد، سطرِ دوم نباید جا بماند.
+const TextStyle _cardRegRuleStyle = TextStyle(
+  color: Color(0xFFFBBF24),
+  fontSize: 11.5,
+  height: 1.45,
+  fontWeight: FontWeight.w700,
+);
+
 class CardRegPage extends StatelessWidget {
   const CardRegPage({
     super.key,
@@ -147,12 +158,17 @@ class CardRegPage extends StatelessWidget {
                                   liveText(
                                       'cardReg.minPointsNote',
                                       'فقط کارت‌های ۵۰۰ امتیازی و بالاتر ثبت می‌شود.'),
-                                  style: const TextStyle(
-                                    color: Color(0xFFFBBF24),
-                                    fontSize: 11.5,
-                                    height: 1.45,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  style: _cardRegRuleStyle,
+                                ),
+                                // شرطِ دومِ ثبت — خواستهٔ مالک (۴ مهر ۱۴۰۵):
+                                // این جمله از کادرِ آبیِ پایین برداشته شد و
+                                // آمد زیرِ خطِ ۵۰۰ امتیازی، چون هر دو شرطِ
+                                // ثبتِ کارت‌اند و باید یک‌جا خوانده شوند.
+                                Text(
+                                  liveText(
+                                      'cardReg.specialCardsNote',
+                                      'کارت های خاص نقره ای طلایی پلاتینیوم و غیره فعلا در اپلیکیشن ثبت نمیشن و پشتیبانی روبیکا این کارت هارو ثبت میکنه'),
+                                  style: _cardRegRuleStyle,
                                 ),
                               ],
                             ),
@@ -179,7 +195,7 @@ class CardRegPage extends StatelessWidget {
             grants: grants,
             api: api,
             onRefresh: onRefresh,
-            // کادرِ راهنمای ثبتِ کارت (دو جملهٔ زندهٔ پنل) **سرصفحهٔ فهرست**
+            // کادرِ راهنمای ثبتِ کارت (متنِ زندهٔ پنل) **سرصفحهٔ فهرست**
             // است، نه فرزندِ ثابتِ این Column — دلیلش کامنتِ `header` در
             // `inventory_page.dart`: متنِ زنده هر لحظه می‌تواند بلندتر شود و
             // سرصفحهٔ ثابت روی صفحهٔ کوتاه سرریز می‌کرد (گاردِ CI همین را
@@ -193,7 +209,7 @@ class CardRegPage extends StatelessWidget {
 }
 
 
-/// کادرِ راهنمای ثبتِ کارت — دو جملهٔ **زندهٔ** سرور.
+/// کادرِ راهنمای ثبتِ کارت — جملهٔ **زندهٔ** سرور.
 ///
 /// ── چرا ویجتِ جدا ─────────────────────────────────────────────────────
 ///
@@ -204,8 +220,8 @@ class CardRegPage extends StatelessWidget {
 /// افزودنِ جملهٔ دوم در CI افتاد (۷ پیکسل، دو تست).
 ///
 /// `ListenableBuilder` عمدی است: با هر تغییرِ `/api/config` متن بی‌نیاز به
-/// رفرشِ صفحه عوض می‌شود، و شرطِ «هر دو خالی ⇒ هیچ چیز» فقط همین‌جا
-/// نوشتنی است (اپراتورِ `final` را وسطِ لیستِ فرزندان نمی‌شود گذاشت).
+/// رفرشِ صفحه عوض می‌شود، و شرطِ «خالی ⇒ هیچ چیز» فقط همین‌جا نوشتنی
+/// است (اپراتورِ `final` را وسطِ لیستِ فرزندان نمی‌شود گذاشت).
 class _CardRegNotes extends StatelessWidget {
   const _CardRegNotes();
 
@@ -218,11 +234,7 @@ class _CardRegNotes extends StatelessWidget {
           'cardReg.duelEffectNote',
           'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده و افکت اصلی کارتش ضعیف تر هستش دست رو ببازه با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه.',
         );
-        final special = liveText(
-          'cardReg.specialCardsNote',
-          'کارت های خاص نقره ای طلایی پلاتینیوم و غیره فعلا در اپلیکیشن ثبت نمیشن و پشتیبانی روبیکا این کارت هارو ثبت میکنه',
-        );
-        if (note.isEmpty && special.isEmpty) return const SizedBox.shrink();
+        if (note.isEmpty) return const SizedBox.shrink();
         return Padding(
           // هم‌تراز با بقیهٔ صفحه: فهرست با `Gaps.md` حاشیه دارد، این کادر
           // هم باید همان حاشیه را داشته باشد (قبلاً چسبیده به لبه بود).
@@ -244,24 +256,7 @@ class _CardRegNotes extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (note.isNotEmpty)
-                        Text(note, style: _cardRegNoteStyle),
-                      if (note.isNotEmpty && special.isNotEmpty)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Color(0x384EA1FF),
-                          ),
-                        ),
-                      if (special.isNotEmpty)
-                        Text(special, style: _cardRegNoteStyle),
-                    ],
-                  ),
+                  child: Text(note, style: _cardRegNoteStyle),
                 ),
               ],
             ),

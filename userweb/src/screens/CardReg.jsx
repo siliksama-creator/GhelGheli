@@ -13,10 +13,9 @@ export default function CardReg({ items, grants, token, reload, setMsg }) {
   // متنِ راهنما از پنل می‌آید؛ بدونِ این، عوض‌کردن در «متن‌های زنده»
   // تا رفرشِ کاملِ صفحه دیده نمی‌شد.
   useLive();
-  // جملهٔ دومِ کادر (خواستهٔ مالک، ۳ مهر ۱۴۰۵). دلیلِ متغیرِ جدا و
-  // نه نوشتنِ داخلِ JSX: اگر کلید خالی شود، همان یک متغیر خالی
-  // می‌ماند و سطر (با خطِ جداکننده‌اش) کلاً رندر نمی‌شود؛ وگرنه یک
-  // `<p>` خالی با خطِ جداکننده روی صفحه می‌ماند.
+  // شرطِ دومِ ثبتِ کارت (خواستهٔ مالک، ۳ مهر ۱۴۰۵؛ جابه‌جا‌شده ۴ مهر):
+  // «کارت‌های خاص … را پشتیبانیِ روبیکا ثبت می‌کند». متغیرِ جدا است تا
+  // اگر ادمین کلید را خالی کرد، همان یک سطر برود و نه چیزِ دیگری.
   const specialCardsNote = text('cardReg.specialCardsNote', 'کارت های خاص نقره ای طلایی پلاتینیوم و غیره فعلا در اپلیکیشن ثبت نمیشن و پشتیبانی روبیکا این کارت هارو ثبت میکنه');
   return (
     <>
@@ -33,6 +32,13 @@ export default function CardReg({ items, grants, token, reload, setMsg }) {
               </div>
               <p style={{ color:'#CBD5E1', fontSize:'11.5px', margin:'4px 0 0', lineHeight:1.45, fontWeight:'600' }}>{text('cardReg.lead', 'از کارت عکس بگیرید و کد را وارد کنید')}</p>
               <p style={{ color:'#FBBF24', fontSize:'11.5px', margin:'3px 0 0', lineHeight:1.45, fontWeight:'700' }}>{text('cardReg.minPointsNote', 'فقط کارت‌های ۵۰۰ امتیازی و بالاتر ثبت می‌شود.')}</p>
+              {/* شرطِ دومِ ثبت — خواستهٔ مالک (۴ مهر ۱۴۰۵): این جمله
+                  از کادرِ آبی پایین «برش خورد» و آمد زیرِ خطِ ۵۰۰
+                  امتیازی، چون هر دو شرطِ ثبتِ کارت‌اند و باید یک‌جا
+                  خوانده شوند. متن زنده است (از پنل عوض می‌شود). */}
+              {specialCardsNote
+                ? <p style={{ color:'#FBBF24', fontSize:'11.5px', margin:'3px 0 0', lineHeight:1.45, fontWeight:'700' }}>{specialCardsNote}</p>
+                : null}
             </div>
           </div>
           <PhotoCardBox token={token} setMsg={setMsg} onDone={reload} />
@@ -47,12 +53,7 @@ export default function CardReg({ items, grants, token, reload, setMsg }) {
             گاردِ `live-copy-parity` همین برابری را می‌سنجد. */}
         <div className="cardRegNote">
           <span aria-hidden="true">ⓘ</span>
-          <div className="cardRegNoteBody">
-            <p>{text('cardReg.duelEffectNote', 'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده و افکت اصلی کارتش ضعیف تر هستش دست رو ببازه با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه.')}</p>
-            {specialCardsNote
-              ? <p className="cardRegNoteAlt">{specialCardsNote}</p>
-              : null}
-          </div>
+          <p>{text('cardReg.duelEffectNote', 'کارت های قلقلی براساس قدرت بازیکن و درصد کمیاب بودن در بازی Duel card تاثیر میذارن این به این معنیه که ممکنه بازیکن افسانه ای مثل پله از بازیکن جدیدی بخاطر اینکه سبک کارتش کمیاب نبوده و افکت اصلی کارتش ضعیف تر هستش دست رو ببازه با احترام به تمامی بازیکن ها قدیمی و افسانه ای سیستم به این صورت عمل میکنه.')}</p>
         </div>
       </div>
       <Inventory items={items} grants={grants} token={token} reload={reload} />
