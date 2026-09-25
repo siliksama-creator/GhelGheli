@@ -241,6 +241,7 @@ require.cache[notifPath] = {
 const SVC_PATH = require.resolve('../src/services/inviteLeagueService');
 let svc = require(SVC_PATH);
 const fs = require('fs');
+const path = require('path');
 const serviceSource = fs.readFileSync(SVC_PATH, 'utf8');
 
 /** سرویس را با یک pool جعلیِ تازه بار می‌کند (کشِ require پاک می‌شود). */
@@ -519,8 +520,11 @@ console.log('\n══ ۶. تأییدِ پرداخت: هر چهار نوعِ جا
 console.log('\n══ ۷. اتصال‌ها: مسیرها، سرویس و متن‌های زنده ══');
 // ═══════════════════════════════════════════════════════════════════════════
 {
-  const backend = '/var/www/GhelGheli/backend';
-  const read = (rel) => fs.readFileSync(`${backend}/${rel}`, 'utf8');
+  // ⚠️ مسیر نباید مطلق باشد: همین تست در CI هم اجرا می‌شود و مخزن آنجا در
+  //    `/home/runner/work/...` است. مسیرِ مطلق یعنی «فقط روی این سرور سبز»،
+  //    که بدترین نوعِ سنجش است — دقیقاً همان چیزی که یک‌بار CI را قرمز کرد.
+  const backend = path.join(__dirname, '..');
+  const read = (rel) => fs.readFileSync(path.join(backend, rel), 'utf8');
   const serverSrc = read('src/server.js');
   const progression = read('src/routes/progression.js');
   const adminRoutes = read('src/routes/adminInviteLeague.js');
