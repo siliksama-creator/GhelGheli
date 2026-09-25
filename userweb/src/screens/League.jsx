@@ -223,10 +223,11 @@ function leagueTabs() {
 
 function LeagueTabs({ tab, setTab }) {
   return (
-    <div className="leagueTabs">
+    <div className="leagueTabs" data-tour="league:tabs">
       {leagueTabs().map(([id, label]) => (
         <button
           key={id}
+          data-tour={`league:tab:${id}`}
           className={tab === id ? 'on' : ''}
           aria-current={tab === id ? 'page' : undefined}
           onClick={() => setTab(id)}
@@ -245,6 +246,16 @@ export default function League({ token, openProfile }) {
   const load = useCallback(() => req(selectedLeagueId ? `/api/league/current?seasonId=${selectedLeagueId}` : '/api/league/current', 'GET', null, token), [token, selectedLeagueId]);
   const state = useAsync(load, [load]);
   const [tab, setTab] = useState('table');
+  // پلِ زیرتب برای تورِ آموزشِ صوتی: بخشِ «سکهٔ قلقلی» داخلِ تبِ صندوقِ
+  // همین صفحه است، پس تور فقط می‌تواند رویداد بفرستد.
+  useEffect(() => {
+    const onTour = (e) => {
+      const s = e.detail?.sub;
+      if (s === 'vault') setTab('vault');
+    };
+    window.addEventListener('gg:tour-sub', onTour);
+    return () => window.removeEventListener('gg:tour-sub', onTour);
+  }, []);
   // راهنمای سکه بارِ اول باز است: کاربر روی چیزی که نمی‌شناسد کلیک نمی‌کند،
   // پس اگر بسته شروع شود هرگز خوانده نمی‌شود. بعد از اولین بستن، انتخابش
   // را به خاطر می‌سپاریم تا هر بار جلوی چشمش نباشد.

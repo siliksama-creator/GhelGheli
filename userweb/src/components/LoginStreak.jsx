@@ -68,6 +68,7 @@ export default function LoginStreak({ token, initialData, setMsg, onClaimed }) {
 
   return (
     <section className={`streakCard${data.claimedToday ? ' is-done' : ' is-ready'}`}
+      data-tour="home:streak"
       aria-label="استریک ورود هفت روزه">
       <span className="streakAura one" aria-hidden="true" />
       <span className="streakAura two" aria-hidden="true" />

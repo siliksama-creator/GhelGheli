@@ -1,6 +1,6 @@
 {
  "note": "تولیدِ خودکار — دستی ویرایش نکنید؛ node scripts/genApiManifest.js",
- "count": 286,
+ "count": 289,
  "endpoints": [
   {
    "method": "GET",
@@ -1161,6 +1161,21 @@
    "method": "POST",
    "path": "/api/notifications/web-push/unsubscribe",
    "source": "routes/notifications.js"
+  },
+  {
+   "method": "GET",
+   "path": "/api/onboarding",
+   "source": "routes/onboarding.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/onboarding/reset",
+   "source": "routes/onboarding.js"
+  },
+  {
+   "method": "POST",
+   "path": "/api/onboarding/seen",
+   "source": "routes/onboarding.js"
   },
   {
    "method": "GET",

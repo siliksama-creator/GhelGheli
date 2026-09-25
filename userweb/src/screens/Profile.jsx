@@ -42,7 +42,16 @@ export default function Profile({ token, p, load, setMsg, onToken }) {
     } catch (e) { setMsg(e.message); } finally { setSaving(false); }
   }
   return (
-    <div className={profileBackgroundClass(p.cosmetics?.profileBackground)} style={{ maxWidth:'820px', margin:'0 auto', display:'flex', flexDirection:'column', gap:'16px', padding:'14px 12px 80px', borderRadius:'22px', ...profileBackgroundStyle(p.cosmetics?.profileBackground) }}>
+    <div data-tour="profile:top" className={profileBackgroundClass(p.cosmetics?.profileBackground)} style={{ maxWidth:'820px', margin:'0 auto', display:'flex', flexDirection:'column', gap:'16px', padding:'14px 12px 80px', borderRadius:'22px', ...profileBackgroundStyle(p.cosmetics?.profileBackground) }}>
+      {/* ── «دوباره ببین» (۴ مهر ۱۴۰۵) ──
+          تور یک بار بعدِ ورود می‌آید و پرچمش روی سرور می‌نشیند. بدونِ این
+          دکمه، تنها راهِ دیدنِ دوبارهٔ آموزش پاک‌کردنِ حساب بود. رویداد به
+          موتورِ تور می‌رسد و از بخشِ اول شروع می‌کند. */}
+      <button type="button" data-tour="profile:tourReplay"
+        onClick={() => window.dispatchEvent(new CustomEvent('gg:tour-replay'))}
+        style={{ alignSelf:'flex-start', background:'rgba(255,209,102,0.12)', border:'1px solid rgba(255,209,102,0.38)', color:'#FFD166', borderRadius:'13px', padding:'9px 13px', fontSize:'12.5px', fontWeight:800, cursor:'pointer' }}>
+        دوباره دیدن آموزش صوتی
+      </button>
       {(leagueHistory.data || []).length > 0 && (
         <section style={{ background:'linear-gradient(135deg, rgba(255,209,102,0.12), rgba(56,189,248,0.08))', border:'1px solid rgba(255,209,102,0.28)', borderRadius:'16px', padding:'14px' }}>
           <h3 style={{ color:'#FFD166', fontWeight:'900', margin:'0 0 10px' }}>سابقه لیگ من</h3>

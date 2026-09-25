@@ -40,7 +40,7 @@ function HeroHeader({ points, nickname, user, cosmetics, onOpenProfile, onOpenWa
   const missing = user ? Object.entries(requiredFields).filter(([k]) => !String(user[k]||'').trim()).map(([,v])=>v) : [];
   const done = Object.keys(requiredFields).length - missing.length;
   return (
-    <div style={{ padding:'10px 10px 10px', borderRadius:'20px', background:'linear-gradient(135deg, #1A2B45, #111D30, #0A1220)', border:'1.2px solid rgba(255,215,0,0.28)', boxShadow:'0 8px 18px rgba(255,215,0,0.08), 0 8px 16px rgba(0,0,0,0.4)' }}>
+    <div data-tour="home:hero" style={{ padding:'10px 10px 10px', borderRadius:'20px', background:'linear-gradient(135deg, #1A2B45, #111D30, #0A1220)', border:'1.2px solid rgba(255,215,0,0.28)', boxShadow:'0 8px 18px rgba(255,215,0,0.08), 0 8px 16px rgba(0,0,0,0.4)' }}>
       <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
         <div onClick={onOpenProfile} style={{ flex:1, display:'flex', gap:'8px', alignItems:'center', cursor:'pointer' }}>
           <CosmeticAvatarFrame frame={cosmetics?.frame} style={{width:46,height:46,padding:cosmetics?.frame?3:0}}>
@@ -108,7 +108,7 @@ export default function Home({ token, p, load, setMsg, openProfile, openWallet, 
           درخشش) ولی تمام‌عرض و بالاتر؛ مستقیم خودِ بازی را باز می‌کند.
           دوقلوی اندروید: _AnimatedQuickTile در dashboard_page.dart. */}
       {openTap && (
-        <button type="button" onClick={openTap} style={{ background:'linear-gradient(135deg, #84CC1626, #84CC160A)', border:'1.5px solid #84CC1699', borderRadius:'16px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', boxShadow:'0 4px 14px #84CC1633', textAlign:'right' }}>
+        <button type="button" onClick={openTap} data-tour="home:tapTile" style={{ background:'linear-gradient(135deg, #84CC1626, #84CC160A)', border:'1.5px solid #84CC1699', borderRadius:'16px', padding:'12px 14px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer', boxShadow:'0 4px 14px #84CC1633', textAlign:'right' }}>
           <img src="/games/tap/skin_1.webp" alt="" decoding="async" style={{ width:'40px', height:'40px', objectFit:'contain', flexShrink:0 }} />
           <span style={{ flex:1 }}>
             <b style={{ display:'block', color:'#FFF', fontSize:'13px', fontWeight:'900' }}>ضربه‌زن</b>
@@ -119,17 +119,17 @@ export default function Home({ token, p, load, setMsg, openProfile, openWallet, 
       )}
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'8px' }}>
-        <button onClick={openWheel} style={{ background:'linear-gradient(135deg, #F59E0B22, #F59E0B0A)', border:'1px solid #F59E0B55', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #F59E0B22' }}>
+        <button onClick={openWheel} data-tour="home:wheelTile" style={{ background:'linear-gradient(135deg, #F59E0B22, #F59E0B0A)', border:'1px solid #F59E0B55', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #F59E0B22' }}>
           <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#F59E0B22', display:'flex', alignItems:'center', justifyContent:'center' }}><img src="/pass/wheel_icon.webp" alt="" style={{ width:'26px', height:'26px' }} /></span>
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>گردونه</b>
           <small style={{ color:'#F59E0B', fontSize:'10px', fontWeight:'700' }}>گردونه شانس</small>
         </button>
-        <button onClick={openInvite} style={{ background:'linear-gradient(135deg, #84CC1622, #84CC160A)', border:'1px solid #84CC1655', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #84CC1622' }}>
+        <button onClick={openInvite} data-tour="home:inviteTile" style={{ background:'linear-gradient(135deg, #84CC1622, #84CC160A)', border:'1px solid #84CC1655', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #84CC1622' }}>
           <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#84CC1622', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px' }}><SvgIcon name="people" size={20} /></span>
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>دعوت و کسب درآمد</b>
           <small style={{ color:'#84CC16', fontSize:'10px', fontWeight:'700' }}>دوستان</small>
         </button>
-        <button onClick={openCardReg} style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>
+        <button onClick={openCardReg} data-tour="home:collection" style={{ background:'linear-gradient(135deg, #38BDF822, #38BDF80A)', border:'1px solid #38BDF855', borderRadius:'16px', padding:'12px 6px', display:'flex', flexDirection:'column', alignItems:'center', gap:'6px', cursor:'pointer', boxShadow:'0 4px 12px #38BDF822' }}>
           <span style={{ width:'40px', height:'40px', borderRadius:'50%', background:'#38BDF822', display:'flex', alignItems:'center', justifyContent:'center' }}><img src="/games/card_duel_glow.webp" alt="" width="30" height="30" style={{ objectFit:'contain' }} /></span>
           <b style={{ color:'#FFF', fontSize:'12px', fontWeight:'900' }}>کلکسیون</b>
           <small style={{ color:'#38BDF8', fontSize:'10px', fontWeight:'700' }}>{fa(inventory.length)} نوع</small>

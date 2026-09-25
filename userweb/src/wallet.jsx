@@ -124,7 +124,7 @@ export default function Wallet({ token, req, reloadProfile, setMsg }) {
   const canWithdraw = w.canWithdraw === true;
 
   return (
-    <section className="card wide walletPage">
+    <section className="card wide walletPage" data-tour="wallet:top">
       {/* ── کارت موجودی ── */}
       <div className="walletHero">
         <div className="walletHeroTop">

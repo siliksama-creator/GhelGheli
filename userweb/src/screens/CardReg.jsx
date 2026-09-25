@@ -19,7 +19,7 @@ export default function CardReg({ items, grants, token, reload, setMsg }) {
   const specialCardsNote = text('cardReg.specialCardsNote', 'کارت های خاص نقره ای طلایی پلاتینیوم و غیره فعلا در اپلیکیشن ثبت نمیشن و پشتیبانی روبیکا این کارت هارو ثبت میکنه');
   return (
     <>
-      <div style={{ padding:'12px 12px 0', marginBottom:'12px' }}>
+      <div data-tour="cardreg:top" style={{ padding:'12px 12px 0', marginBottom:'12px' }}>
         <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'16px', padding:'12px' }}>
           <div style={{ display:'flex', gap:'8px', alignItems:'flex-start', marginBottom:'8px' }}>
             <div style={{ width:'58px', height:'58px', borderRadius:'12px', background:'linear-gradient(135deg, rgba(16,185,129,0.22), rgba(56,189,248,0.12))', border:'1px solid rgba(16,185,129,0.35)', display:'flex', alignItems:'center', justifyContent:'center' }}>

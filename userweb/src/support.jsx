@@ -91,7 +91,7 @@ export default function Support({ token, api, req, asset }) {
   }
 
   return (
-    <section className="card wide">
+    <section className="card wide" data-tour="support:top">
       <div className="sectionHead">
         <div><h2>پشتیبانی و راهنمایی</h2><p>پاسخ به سوالات متداول و ثبت تیکت</p></div>
       </div>

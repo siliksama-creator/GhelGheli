@@ -256,6 +256,9 @@ DELETE FROM invite_league_seasons;
 --    ۱۴۰۵) — همان دام، بارِ هفتم. شمارندهٔ روزانهٔ کاربران است؛ در
 --    راه‌اندازیِ تازه معنایی ندارد و باید با بقیهٔ داده‌های کاربری پاک شود.
 DELETE FROM user_point_quota;
+-- پرچمِ آموزشِ صوتی (۴ مهر ۱۴۰۵): بدونِ این خط، کاربرِ ریست‌شده
+-- آموزش را دوباره نمی‌دید و جدول ردیفِ یتیم می‌گرفت.
+DELETE FROM user_onboarding_tour;
 
 -- ── ۳) کاربران، بجز حسابِ اصلیِ مدیر ──
 DELETE FROM users WHERE mobile <> '{ADMIN_MOBILE}';
@@ -419,6 +422,7 @@ def main():
                      "  union all select 'coin_vault_transactions', count(*) from coin_vault_transactions"
                      "  union all select 'user_coin_quota', count(*) from user_coin_quota"
                      "  union all select 'user_point_quota', count(*) from user_point_quota"
+                     "  union all select 'user_onboarding_tour', count(*) from user_onboarding_tour"
                      "  union all select 'card_box_purchases', count(*) from card_box_purchases"
                      ") x where x.n > 0".format(m=ADMIN_MOBILE)).strip()
     if leftovers:

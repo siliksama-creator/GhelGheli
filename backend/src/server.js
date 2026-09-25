@@ -632,6 +632,16 @@ app.use('/api', require('./routes/profile')({
   inviteLeague: require('./services/inviteLeagueService'),
   pointQuota: require('./services/pointQuotaService'),
 }));
+// ── آموزشِ صوتیِ قلقلی (۴ مهر ۱۴۰۵) ──
+//
+// روتِ جدا و نه کدِ داخلِ server.js، به همان دلیلِ بقیهٔ روت‌ها: بدنهٔ
+// server.js هر روز بزرگ‌تر می‌شود و مسیرِ تازه پایین‌تر از دید می‌ماند.
+// این روت فقط سه چیز می‌دهد: ترتیب/متنِ تور، ثبتِ «دیده شد»، و
+// «دوباره ببین»؛ صداها استاتیک زیر `/public/onboarding` سرو می‌شوند.
+app.use('/api', require('./routes/onboarding')({
+  auth, asyncHandler,
+  onboarding: require('./services/onboardingService'),
+}));
 app.use('/api', require('./routes/rewardsUser')({
   pool, auth, asyncHandler, validateUuid,
   rewardGroups,

@@ -326,7 +326,7 @@ export default function Shop({ token, reloadProfile }) {
       @media(max-width:410px){.shopPlan ul{grid-template-columns:1fr}.shopCarousel{grid-template-columns:1fr}}
     `}</style>
 
-    <section className="shopHero">
+    <section className="shopHero" data-tour="shop:top">
       <div className="shopHeroTop">
         <div><h2>فروشگاه قلقلی پلاس</h2><p>نمونه واقعی هر آیتم را ببین · پلاس از {money(data?.plus?.price ?? data?.plans?.find?.(p => p.billingCycle === 'monthly' || p.key === 'monthly')?.price ?? 0)} در ماه</p></div>
         <div className="shopWallet" title="موجودی قابل برداشت">کیف پول: {money(data.walletBalance)}</div>

@@ -442,7 +442,7 @@ export default function Games({ api, token, externalLaunch = null, initialActive
         ))}
       </div>
 
-      <div className={`gameStakeNotice ${mode === 0 ? 'practice' : mode === -1 ? 'lobby' : 'competitive'}`}>
+      <div data-tour="games:stakes" className={`gameStakeNotice ${mode === 0 ? 'practice' : mode === -1 ? 'lobby' : 'competitive'}`}>
         <span style={{ display:'flex' }}><SvgIcon name={mode === 0 ? 'robot' : mode === -1 ? 'key' : 'warning'} size={17} /></span>
         <div>
           <b>{mode === 0
@@ -669,7 +669,7 @@ export default function Games({ api, token, externalLaunch = null, initialActive
            با شبکهٔ دوستونیِ مربع: دو ردیف به‌جای سه، و هر کاشی مربع
            می‌ماند. `aspect-ratio:1` کار را به مرورگر می‌سپارد تا روی
            هر عرضی مربع بماند. */
-        <div className="gameTileGrid">
+        <div className="gameTileGrid" data-tour="games:grid">
           {GAMES.filter(g => g.id !== 'tap' && gameOn(g.id)).map(g => (
             <div
               key={g.id}

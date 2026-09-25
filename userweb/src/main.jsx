@@ -15,6 +15,9 @@ import { createRoot } from 'react-dom/client';
 // است که فاز ۲ رد کرد: یک رشته که «از پنل» به‌نظر می‌رسد ولی در پنلِ
 // دیگر هیچ معادلی ندارد و بعد فراموش می‌شود.
 import { API, req, fa } from './lib/api.js';
+// آموزشِ صوتیِ قلقلی: موتورِ تور در ریشهٔ اپ mount می‌شود تا در هر تبی
+// قابل اجرا باشد (پرچمِ «دیده شد» روی سرور است).
+import Tour from './tour/Tour.jsx';
 // متن‌ها و اعداد زنده (فاز ۲): این fetchِ بنَاییِ config همان چیزی است که
 // کشِ ماژول‌سطحِ liveConfig را پر می‌کند، پس هیچ صفحه‌ای برای دانستنِ یک
 // برچسب درخواستِ دوم نمی‌زند.
@@ -1008,6 +1011,7 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
       <nav className="mobileNav" aria-label="ناوبری اصلی">
         {orderByServer(NAV_TABS, t => (t[0] === 'club' ? 'social' : t[0])).map(([id, label, icon]) => (
           <button key={id} className={tab === id ? 'on' : ''}
+            data-tour={`nav:${id}`}
             aria-current={tab === id ? 'page' : undefined}
             onClick={() => setTab(id)}>
             <span className="navIcon"><UiIcon name={icon} size={20} /></span>
@@ -1192,6 +1196,14 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
           (نه داخلِ یک صفحه) تا در هر تبی از اولین ورود دیده شود —
           درسِ بازبینیِ ۲۲ سپتامبر: قبلاً داخلِ صفحهٔ چت‌وبازی بود و
           فقط آن‌جا دیده می‌شد. */}
+      {/* ── آموزشِ صوتیِ قلقلی (۴ مهر ۱۴۰۵) ──
+          خواستهٔ مالک: بعد از ورود، صدا شروع کند و انگشت روی همان بخش
+          تاچ کند. `tab` و `goTab` این‌جا داده می‌شوند تا تور بتواند
+          خودش بین تب‌ها برود. */}
+      {token ? (
+        <Tour token={token} tab={tab} goTab={(id) => setTab(id)} />
+      ) : null}
+
       {token ? (
         <Suspense fallback={null}>
           <WebPushPrompt token={token} />
@@ -1215,14 +1227,27 @@ function Club({ token, openProfile, meId, openGames = false, launchGame = null, 
   // با هر انتقالِ سوکت به تبِ بازی یکی زیاد می‌شود تا پنلِ قدیمی
   // (که سوکتش دیگر مالِ خودش نیست) هرگز دوباره mount نشود.
   const [growthGen, setGrowthGen] = useState(0);
+  // ── پلِ زیرتب برای تورِ آموزشِ صوتی (۴ مهر ۱۴۰۵) ────────────────────
+  // تور در ریشهٔ اپ است و به state داخلیِ این صفحه دسترسی ندارد؛ برای
+  // «ماموریت‌ها» و «گذر نبرد» باید همین صفحه خودش زیرتب را عوض کند.
+  // یک رویدادِ کوچک، جای بالا بردنِ state به ریشه (که هر رندرِ اپ را
+  // سنگین می‌کرد) انتخاب شد.
+  useEffect(() => {
+    const onTour = (e) => {
+      const s = e.detail?.sub;
+      if (s && ['chat', 'games', 'growth', 'pass'].includes(s)) setSub(s);
+    };
+    window.addEventListener('gg:tour-sub', onTour);
+    return () => window.removeEventListener('gg:tour-sub', onTour);
+  }, []);
   return (
     <div className="clubWrap">
-      <div className="clubTabs socialTripleTabs">
-        <button className={sub === 'chat' ? 'on' : ''}
+      <div className="clubTabs socialTripleTabs" data-tour="club:subtabs">
+        <button className={sub === 'chat' ? 'on' : ''} data-tour="club:tab:chat"
           onClick={() => setSub('chat')}><UiIcon name="support" size={17} /> چت</button>
-        <button className={sub === 'games' ? 'on' : ''}
+        <button className={sub === 'games' ? 'on' : ''} data-tour="club:tab:games"
           onClick={() => setSub('games')}><UiIcon name="game" size={17} /> بازی‌ها</button>
-        <button className={sub === 'growth' ? 'on' : ''}
+        <button className={sub === 'growth' ? 'on' : ''} data-tour="club:tab:growth"
           onClick={() => setSub('growth')}><UiIcon name="group" size={17} /> ماموریت</button>
         {/* گذر نبرد از این‌جا هم در دسترس است.
             دلیل: تنها راه ورودش یک آیکون کوچک در نوار بالا بود و عملاً
@@ -1233,6 +1258,7 @@ function Club({ token, openProfile, meId, openGames = false, launchGame = null, 
             هر رنگِ دیگری در آن گم می‌شد. دوقلوی اندروید: `_TabIcon` در
             `social_page.dart`. */}
         <button className={`${sub === 'pass' ? 'on' : ''} passTabBtn`}
+          data-tour="club:tab:pass"
           onClick={() => setSub('pass')}>
           <span className="passTabIcon">
             <UiIcon name="trophy" size={17} />
