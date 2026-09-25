@@ -155,7 +155,12 @@ export default function Tour({ token, tab, goTab }) {
       // «پخشِ خودکار رد شد» با «فایل خراب/۴۰۴» یکی نیست: اولی با یک لمسِ
       // کاربر حل می‌شود، دومی نه. برای همین دو حالتِ جدا نشان داده می‌شود.
       p.then(() => setPhase('playing'))
-        .catch(() => setPhase('waiting')); // پخشِ خودکار رد شد → دکمهٔ «پخش صدا»
+        .catch((e) => {
+          // تفکیکِ دو خطای کاملاً متفاوت: `NotAllowedError` یعنی سیاستِ
+          // پخشِ خودکار مرورگر (با یک لمسِ کاربر حل می‌شود)، هر چیزِ دیگر
+          // (NotSupportedError/۴۰۴/بلاکِ CORP) یعنی فایل بارگیری نشد.
+          setPhase(e && e.name === 'NotAllowedError' ? 'waiting' : 'error');
+        });
     } else {
       setPhase('playing');
     }
@@ -373,7 +378,11 @@ export default function Tour({ token, tab, goTab }) {
         preload="auto"
         playsInline
         onEnded={() => { if (phase === 'playing') setTimeout(() => { next(); }, ADVANCE_MS); }}
-        onError={() => { if (phase !== 'offer') setPhase('error'); }}
+        onError={() => {
+          // ۴ = MEDIA_ERR_SRC_NOT_SUPPORTED (فایل نرسید/بلاک شد) → پیامِ شبکه،
+          // نه پیامِ «پخشِ خودکار». `networkState === 3` هم یعنی «منبعی نیست».
+          if (phase !== 'offer') setPhase('error');
+        }}
       />
     </div>
   );
