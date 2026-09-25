@@ -61,12 +61,16 @@ export default function Tour({ token, tab, goTab }) {
   const [rect, setRect] = useState(null);
   const [phase, setPhase] = useState('offer'); // offer | playing | waiting | manual
   const [muted, setMuted] = useState(false);   // «بعداً» بدونِ صدا؟ (تنها برای قطعِ صدا)
+  const [bootKey, setBootKey] = useState(0);   // تلاشِ دوبارهٔ تورِ خودکار پسِ برگشت به خانه
 
   const audioRef = useRef(null);
   const elRef = useRef(null);
   const runRef = useRef(0);          // شناسهٔ اجرای جاری — برای لغوِ کارهای کهنه
+  const openRef = useRef(false);     // وسطِ تور، تغییرِ تب ناوبریِ خودِ تور است
+  const blockedRef = useRef(false);  // تورِ خودکار به‌خاطرِ اتاق/بازیِ مشترک عقب افتاد
   const tabRef = useRef(tab);
   tabRef.current = tab;
+  openRef.current = open;
 
   // ── اندازه‌گیریِ هدف ──────────────────────────────────────────────────
   const measure = useCallback(() => {
@@ -173,8 +177,12 @@ export default function Tour({ token, tab, goTab }) {
   }, [data, idx, finish, present]);
 
   // ── راه‌اندازی: کشیدنِ وضعیت از سرور ────────────────────────────────
+  // `bootKey` فقط وقتی بالا می‌رود که تورِ خودکار به‌خاطرِ «کاربر وسطِ اتاقِ
+  // مشترک است» عقب افتاده باشد؛ آن‌وقت با برگشتن به خانه از اول تلاش می‌کند.
   useEffect(() => {
     if (!token) return undefined;
+    // تغییرِ تب در میانهٔ تور، ناوبریِ خودِ تور است؛ بازخوانی و ری‌استارت نه.
+    if (openRef.current) return undefined;
     let alive = true;
     (async () => {
       const d = await req('/api/onboarding', 'GET', null, token).catch(() => null);
@@ -183,6 +191,10 @@ export default function Tour({ token, tab, goTab }) {
       if (!d.enabled) return;
       const forced = new URLSearchParams(window.location.search).get('tour') === '1';
       if (d.seen && !forced) return;
+      // تورِ خودکار فقط از «خانه» شروع می‌شود. اگر کاربر با لینکِ اتاقِ
+      // مشترک وارد شده باشد تبش club است؛ تور روی بازیِ در جریان نمی‌پرد و
+      // به‌محضِ برگشتن به خانه، خودش می‌آید. («دوباره ببین» و ?tour=1 آزادند.)
+      if (!forced && tabRef.current !== 'home') { blockedRef.current = true; return; }
       setOpen(true);
       setIdx(0);
       // اول صدا؛ اگر مرورگر اجازه نداد خودش کارتِ شروع را نشان می‌دهد.
@@ -215,7 +227,14 @@ export default function Tour({ token, tab, goTab }) {
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, bootKey]);
+
+  // ── عقب‌افتاده بود؟ با برگشت به خانه شروع کن ────────────────────────
+  useEffect(() => {
+    if (tab !== 'home' || !blockedRef.current || openRef.current) return;
+    blockedRef.current = false;
+    setBootKey(k => k + 1);
+  }, [tab]);
 
   // ── «دوباره ببین» از پروفایل ────────────────────────────────────────
   useEffect(() => {
