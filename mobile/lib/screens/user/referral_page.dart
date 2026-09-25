@@ -100,6 +100,10 @@ class _ReferralPageState extends State<ReferralPage> {
     final threshold = _int(d['withdrawalThreshold']);
     final spins = _int(d['spinsPerReferral']);
     final friends = (d['friends'] as List? ?? []).whereType<Map>().toList();
+    // دو تبِ معرف‌ها (۴ مهر ۱۴۰۵). همان دادهٔ صفحهٔ وب، از همان درخواستِ
+    // `/api/referrals` — تا «تعدادِ دعوت» در دو کلاینت هرگز دو عدد نباشد.
+    final inviteBoard = (d['inviteLeague'] as Map?)?.cast<String, dynamic>()
+        ?? const <String, dynamic>{};
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -249,6 +253,11 @@ class _ReferralPageState extends State<ReferralPage> {
 
           Gaps.vSm,
 
+          // ── دو تبِ معرف‌ها: تاپِ همهٔ زمان‌ها و لیگِ جاری ──
+          _InviteBoard(board: inviteBoard),
+
+          Gaps.vSm,
+
           // ── Rules (Compact Accordion/Box) ──
           _CompactRules(
             percent: percent,
@@ -374,6 +383,477 @@ class _CashIncomeCard extends StatelessWidget {
           style: const TextStyle(fontSize: 9.5, height: 1.45, color: Colors.white60)),
     ]),
   );
+}
+
+/// جدولِ معرف‌ها — دو تبِ «معرف‌های برتر تا کنون» و «لیگ معرف‌ها».
+///
+/// ── چرا داخلِ خودِ این صفحه و نه صفحهٔ جدا ────────────────────────────────
+///
+/// خواستهٔ مالک «یک تبِ تازه در قسمتِ دعوت از دوستان» بود، نه یک صفحهٔ
+/// تازهٔ جدا؛ کاربر باید کدِ دعوت و جدول را پشتِ سرِ هم ببیند. نام‌ها از
+/// متنِ زندهٔ سرور می‌آید (`inviteLeague.*`) تا بدونِ آپدیتِ اپ عوض شوند —
+/// همان قاعدهٔ «کلاینت کلمه نمی‌سازد».
+class _InviteBoard extends StatefulWidget {
+  const _InviteBoard({required this.board});
+
+  final Map<String, dynamic> board;
+
+  @override
+  State<_InviteBoard> createState() => _InviteBoardState();
+}
+
+class _InviteBoardState extends State<_InviteBoard> {
+  int _tab = 0;
+
+  List<Map<String, dynamic>> _rows(Object? raw) => (raw as List? ?? [])
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+
+  Map<String, dynamic>? _map(Object? raw) =>
+      raw is Map ? Map<String, dynamic>.from(raw) : null;
+
+  int _int(Object? v) =>
+      v is int ? v : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
+
+  /// «۲ روز و ۳ ساعت مانده» — سرشماریِ معکوسِ لیگ.
+  String _remaining(Object? endsAt) {
+    final t = DateTime.tryParse('${endsAt ?? ''}');
+    if (t == null) return '';
+    final minutes = t.difference(DateTime.now()).inMinutes;
+    if (minutes <= 0) return 'پایان یافته';
+    final days = minutes ~/ 1440;
+    final hours = (minutes % 1440) ~/ 60;
+    final mins = minutes % 60;
+    if (days > 0) return '${faNum(days)} روز و ${faNum(hours)} ساعت مانده';
+    if (hours > 0) return '${faNum(hours)} ساعت و ${faNum(mins)} دقیقه مانده';
+    return '${faNum(mins)} دقیقه مانده';
+  }
+
+  /// «۵۰۰٬۰۰۰ تومان + ۲٬۰۰۰ امتیاز» — همان ترتیبی که پنل ادمین نشان می‌دهد.
+  String _prize(Map<String, dynamic> p) {
+    final parts = <String>[];
+    if (_int(p['cash']) > 0) parts.add('${faNum(p['cash'])} تومان');
+    if (_int(p['points']) > 0) parts.add('${faNum(p['points'])} امتیاز');
+    if (_int(p['coins']) > 0) parts.add('${faNum(p['coins'])} سکه');
+    if (_int(p['spins']) > 0) parts.add('${faNum(p['spins'])} چرخش');
+    return parts.isEmpty ? '—' : parts.join(' + ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allTime = _map(widget.board['allTime']) ?? const <String, dynamic>{};
+    final league = _map(widget.board['league']);
+    final history = _rows(widget.board['history']);
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── نوارِ دو تب ──
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Row(
+              children: [
+                _BoardTab(
+                  label: liveText('inviteLeague.allTimeTitle', 'معرف‌های برتر تا کنون'),
+                  icon: Icons.emoji_events_rounded,
+                  on: _tab == 0,
+                  onTap: () => setState(() => _tab = 0),
+                ),
+                Gaps.hXs,
+                _BoardTab(
+                  label: liveText('inviteLeague.leagueTitle', 'لیگ معرف‌ها'),
+                  icon: Icons.sports_esports_rounded,
+                  on: _tab == 1,
+                  alert: league != null,
+                  onTap: () => setState(() => _tab = 1),
+                ),
+              ],
+            ),
+          ),
+          Gaps.vSm,
+
+          if (_tab == 0) ..._allTimePanel(allTime, theme),
+          if (_tab == 1) ..._leaguePanel(league, history, theme),
+        ],
+      ),
+    );
+  }
+
+  // ── تبِ ۱: تاپِ همهٔ زمان‌ها ─────────────────────────────────────────────
+  List<Widget> _allTimePanel(Map<String, dynamic> allTime, ThemeData theme) {
+    final rows = _rows(allTime['rows']);
+    final me = _map(allTime['me']);
+    final meInTop = allTime['meInTop'] == true;
+    return [
+      _boardHeader(
+        liveText('inviteLeague.allTimeTitle', 'معرف‌های برتر تا کنون'),
+        'رکورددارانِ معرفی از ابتدا تا امروز',
+        theme,
+      ),
+      if (rows.isEmpty)
+        _emptyBox('هنوز کسی کسی را دعوت نکرده. تو اولین نفر باش!', theme)
+      else ...[
+        ...rows.map((r) => _boardRow(r, me: me != null && me['userId'] == r['userId'])),
+        // «رنک هر فرد رو هم نشون بده حتی اگه تو تاپ ۱۰ نباشه» — ردیفِ خودِ
+        // کاربر با سه‌نقطه از تاپ جدا می‌شود تا معلوم باشد جای واقعی‌اش
+        // کجاست، نه نفرِ یازدهم.
+        if (me != null && !meInTop) ...[
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 2),
+              child: Text('• • •', style: TextStyle(color: Colors.white38, letterSpacing: 3)),
+            ),
+          ),
+          _boardRow(me, me: true),
+        ],
+      ],
+      Gaps.vXs,
+      Text(
+        liveText('inviteLeague.rulesNote',
+            'فقط دعوتِ معتبر شمرده می‌شود (کاربری که با کد شما ثبت‌نام کرده و فعال است). اگر دو نفر تعدادشان برابر شود، آن‌که زودتر به آن عدد رسیده بالاتر می‌ایستد.'),
+        style: const TextStyle(fontSize: 10, color: Colors.white54, height: 1.7),
+      ),
+    ];
+  }
+
+  // ── تبِ ۲: لیگِ معرف‌ها ──────────────────────────────────────────────────
+  List<Widget> _leaguePanel(
+    Map<String, dynamic>? league,
+    List<Map<String, dynamic>> history,
+    ThemeData theme,
+  ) {
+    if (league == null) {
+      return [
+        // تصمیمِ مالک: «اگه ادمین لیگ معرف راه ننداخت باید فعلاً لیگ ای برای
+        // معرف ها ساخته ننشده» — پس تب پنهان نمی‌شود، پیامِ روشن می‌دهد.
+        _emptyBox(
+          liveText('inviteLeague.emptyNote',
+              'هنوز لیگی برای معرف‌ها ساخته نشده است. هر وقت مدیر یک لیگ بسازد، همین‌جا برگزار می‌شود.'),
+          theme,
+        ),
+        if (history.isNotEmpty) ..._historyPanel(history),
+      ];
+    }
+    final rows = _rows(league['rows']);
+    final me = _map(league['me']);
+    final meInTop = league['meInTop'] == true;
+    final prizes = _rows(league['prizes']);
+    final minInvites = _int(league['minInvites']);
+    return [
+      _boardHeader(
+        (league['title'] ?? '').toString(),
+        _remaining(league['endsAt']),
+        theme,
+      ),
+      ...prizes.map((p) => Container(
+            margin: const EdgeInsets.only(bottom: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    (p['label'] ?? 'رتبهٔ ${faNum(p['rank'])}').toString(),
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Text(
+                  _prize(p),
+                  style: const TextStyle(
+                      fontSize: 11.5, fontWeight: FontWeight.w900, color: Color(0xFFFFD166)),
+                ),
+              ],
+            ),
+          )),
+      if (minInvites > 1)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            'برای ورود به جدولِ این لیگ حداقل ${faNum(minInvites)} دعوتِ معتبر لازم است.',
+            style: const TextStyle(fontSize: 10, color: Colors.white54),
+          ),
+        ),
+      if (rows.isEmpty)
+        _emptyBox('هنوز کسی به حداقلِ دعوتِ این لیگ نرسیده — جای اول خالیه!', theme)
+      else ...[
+        ...rows.map((r) => _boardRow(r, me: me != null && me['userId'] == r['userId'])),
+        if (me != null && !meInTop) ...[
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 2),
+              child: Text('• • •', style: TextStyle(color: Colors.white38, letterSpacing: 3)),
+            ),
+          ),
+          _boardRow(me, me: true),
+        ],
+      ],
+      Gaps.vXs,
+      Text(
+        liveText('inviteLeague.payoutNote',
+            'جایزه پس از پایانِ لیگ، بعد از تأییدِ مدیر به حسابت واریز می‌شود.'),
+        style: const TextStyle(fontSize: 10, color: Colors.white54, height: 1.7),
+      ),
+      ..._historyPanel(history),
+    ];
+  }
+
+  /// آرشیوِ لیگ‌های تمام‌شده — برندگان از اسنپ‌شاتِ پرداخت می‌آید.
+  List<Widget> _historyPanel(List<Map<String, dynamic>> history) {
+    return [
+      Gaps.vSm,
+      const Divider(height: 1, color: Colors.white12),
+      Gaps.vXs,
+      const Text('لیگ‌های تمام‌شده:',
+          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+      ...history.map((h) {
+        final top = _rows(h['top']);
+        return Padding(
+          padding: const EdgeInsets.only(top: 5),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text((h['title'] ?? '').toString(),
+                    style: const TextStyle(fontSize: 11, color: Colors.white70)),
+              ),
+              Text(
+                top.isEmpty
+                    ? 'بدون برنده'
+                    : top.map((t) => '${t['nickname']} (${faNum(t['invites'])})').join(' · '),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        );
+      }),
+    ];
+  }
+
+  Widget _boardHeader(String title, String sub, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Expanded(
+            child: Text(title.isEmpty ? 'لیگ معرف‌ها' : title,
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900)),
+          ),
+          if (sub.isNotEmpty)
+            Text(sub, style: const TextStyle(fontSize: 10.5, color: Colors.white60)),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyBox(String text, ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Gaps.md),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: theme.textTheme.bodySmall?.copyWith(color: Colors.white60, height: 1.8),
+      ),
+    );
+  }
+
+  /// یک ردیفِ جدول: رتبه، آواتار، نام، تعدادِ دعوت.
+  Widget _boardRow(Map<String, dynamic> row, {bool me = false}) {
+    final rank = _int(row['rank']);
+    final top = rank <= 3;
+    final medal = switch (rank) {
+      1 => const [Color(0xFFFFD166), Color(0xFFB88700)],
+      2 => const [Color(0xFFE2E8F0), Color(0xFF8A97A8)],
+      3 => const [Color(0xFFE39A5B), Color(0xFF8A5423)],
+      _ => const [Color(0x1FFFFFFF), Color(0x0FFFFFFF)],
+    };
+    final avatar = (row['avatarUrl'] ?? '').toString();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(11),
+        color: me
+            ? const Color(0xFF22E7A6).withValues(alpha: 0.12)
+            : top
+                ? const Color(0xFFFFD166).withValues(alpha: 0.09)
+                : Colors.white.withValues(alpha: 0.03),
+        border: Border.all(
+          color: me
+              ? const Color(0xFF22E7A6).withValues(alpha: 0.34)
+              : top
+                  ? const Color(0xFFFFD166).withValues(alpha: 0.26)
+                  : Colors.white.withValues(alpha: 0.07),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(9),
+              gradient: LinearGradient(colors: medal),
+            ),
+            child: Text(
+              faNum(rank),
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w900,
+                color: top ? const Color(0xFF241A00) : Colors.white,
+              ),
+            ),
+          ),
+          Gaps.hXs,
+          _BoardAvatar(url: avatar, name: (row['nickname'] ?? '?').toString()),
+          Gaps.hXs,
+          Expanded(
+            child: Text(
+              (row['nickname'] ?? 'کاربر').toString(),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+          Text(
+            '${faNum(row['invites'])} دعوت',
+            style: const TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF22E7A6)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// دکمهٔ یک تب — قرینهٔ `.refTabs` در وب.
+class _BoardTab extends StatelessWidget {
+  const _BoardTab({
+    required this.label,
+    required this.icon,
+    required this.on,
+    required this.onTap,
+    this.alert = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool on;
+  final VoidCallback onTap;
+
+  /// نقطهٔ سبزِ «لیگی در جریان است» — تا کاربر بفهمد آفرِ فعالی هست.
+  final bool alert;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            gradient: on
+                ? const LinearGradient(
+                    colors: [Color(0x3838BDF8), Color(0x3822E7A6)],
+                  )
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 14, color: on ? Colors.white : Colors.white54),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                    color: on ? Colors.white : Colors.white54,
+                  ),
+                ),
+              ),
+              if (alert) ...[
+                const SizedBox(width: 5),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF22E7A6),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// آواتارِ کوچکِ ردیفِ جدول — بدونِ وابستگیِ تازه به ویجت‌های دیگر.
+class _BoardAvatar extends StatelessWidget {
+  const _BoardAvatar({required this.url, required this.name});
+
+  final String url;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    if (url.isEmpty) return _initial();
+    return ClipOval(
+      child: Image.network(
+        url,
+        width: 26,
+        height: 26,
+        fit: BoxFit.cover,
+        // عکسِ حذف‌شده نباید ردیف را خراب کند؛ به همان حرفِ اول برمی‌گردیم.
+        errorBuilder: (_, __, ___) => _initial(),
+      ),
+    );
+  }
+
+  Widget _initial() => Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
+        child: Text(
+          // بدونِ وابستگی به پکیجِ characters: اولین حرفِ نام؛ برای حروفِ
+          // فارسی که در BMP هستند دقیقاً همان نتیجه را می‌دهد.
+          name.isEmpty ? '؟' : String.fromCharCode(name.runes.first),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+        ),
+      );
 }
 
 class _Stat extends StatelessWidget {

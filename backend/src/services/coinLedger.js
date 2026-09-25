@@ -40,6 +40,7 @@ const SOURCES = Object.freeze([
   'league_end',     // سکه‌هایی که با بسته‌شدنِ لیگ از شمارندهٔ نمایشی می‌رود
   'wheel',          // گردونهٔ شانس (اگر روزی سکه بدهد)
   'admin_adjust',   // دستِ مدیر
+  'invite_league',  // جایزهٔ لیگِ معرف‌ها (۴ مهر ۱۴۰۵)
   'other',
 ]);
 
@@ -51,6 +52,7 @@ const SOURCE_LABELS = Object.freeze({
   league_end: 'پایانِ لیگ',
   wheel: 'گردونهٔ شانس',
   admin_adjust: 'تنظیمِ مدیر',
+  invite_league: 'جایزهٔ لیگ معرف‌ها',
   other: 'سایر',
 });
 

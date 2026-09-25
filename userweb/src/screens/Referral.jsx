@@ -1,4 +1,18 @@
 // دعوت دوستان — کد اختصاصی، آمار، و اشتراک مستقیم در پیام‌رسان‌ها
+//
+// ── دو تبِ تازه (خواستهٔ مالک، ۴ مهر ۱۴۰۵) ─────────────────────────────────
+//
+//   «در قسمت دعوت از دوستان باید یک تب جدید ایجاد کنی که تاپ ۱۰ بیشترین
+//    دعوت‌کننده مشخص باشه و رنک هر فرد رو هم نشون بده حتی اگه تو تاپ ۱۰ نباشه
+//    … و اگه ادمین از پنل یه آفر مثل لیگ دعوت‌کنندگان قرار داد و کانفیگش کرد،
+//    داخل تب دعوت‌کنندگان لیگ معرف‌ها برگزار بشه.»
+//
+// تصمیمِ مالک برای اسم‌ها: «معرف‌های برتر تا کنون» برای فهرستِ همیشه‌زنده و
+// «لیگ معرف‌ها» برای آفرِ زمان‌دارِ ادمین. اگر ادمین آفری نساخته باشد، تبِ
+// لیگ پیامِ «ساخته نشده» می‌دهد — نه جدولِ خالی، نه پنهان‌کردنِ تب.
+//
+// هر دو جدول از یک درخواست می‌آیند (`/api/referrals` → `inviteLeague`)، پس
+// این صفحه هیچ‌وقت دو منبعِ حقیقتِ متفاوت برای «تعدادِ دعوت» ندارد.
 import React, { useCallback, useEffect, useState } from 'react';
 import { req } from '../lib/api.js';
 // جملهٔ «هر N دعوت = M چرخش…» از live_copy می‌آید؛ «۱» دیگر در فایل
@@ -8,10 +22,44 @@ import { SvgIcon } from '../components/IconAsset.jsx';
 
 const fa = n => new Intl.NumberFormat('fa-IR').format(Number(n || 0));
 
+/** «۲ روز و ۳ ساعت مانده» — برای سرشماریِ معکوسِ لیگ. */
+function remainingLabel(endsAt) {
+  if (!endsAt) return '';
+  const ms = new Date(endsAt).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return '';
+  if (ms <= 0) return 'پایان یافته';
+  const minutes = Math.floor(ms / 60000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  if (days > 0) return `${fa(days)} روز و ${fa(hours)} ساعت مانده`;
+  if (hours > 0) return `${fa(hours)} ساعت و ${fa(mins)} دقیقه مانده`;
+  return `${fa(mins)} دقیقه مانده`;
+}
+
+/** ردیفِ یک نفر در جدولِ معرف‌ها. */
+function BoardRow({ row, me }) {
+  const top = row.rank <= 3;
+  return (
+    <li className={`refBoardRow${top ? ' top' : ''}${me ? ' me' : ''}`}>
+      <span className={`refMedal${top ? ` m${row.rank}` : ''}`}>{fa(row.rank)}</span>
+      {row.avatarUrl
+        ? <img className="refAvatar" src={row.avatarUrl} alt="" loading="lazy" />
+        : <span className="refAvatar refAvatarEmpty" aria-hidden="true">{String(row.nickname || '؟').slice(0, 1)}</span>}
+      <span className="refBoardName">{row.nickname}</span>
+      <b className="refBoardValue">{fa(row.invites)} دعوت</b>
+    </li>
+  );
+}
+
 export default function Referral({ token, setMsg }) {
   useLive();
   const [d, setD] = useState(null);
   const [err, setErr] = useState('');
+  const [tab, setTab] = useState('top');
+  // سرشماریِ معکوس هر دقیقه تازه می‌شود؛ بدونِ آن، جملهٔ «۲ روز مانده»
+  // ساعت‌ها کهنه می‌ماند و کاربر فکر می‌کند لیگ تمام شده.
+  const [, setTick] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -23,6 +71,10 @@ export default function Referral({ token, setMsg }) {
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const t = window.setInterval(() => setTick(n => n + 1), 60000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const copy = async () => {
     try {
@@ -60,6 +112,15 @@ export default function Referral({ token, setMsg }) {
 
   if (err && !d) return <section className="card wide"><p className="hint">{err}</p></section>;
   if (!d) return <section className="card wide"><p className="hint">در حال بارگذاری…</p></section>;
+
+  const board = d.inviteLeague || {};
+  const allTime = board.allTime || { rows: [], me: null, meInTop: false };
+  const league = board.league || null;
+  const history = board.history || [];
+  // رتبهٔ من وقتی در تاپ ۱۰ هست در همان جدول دیده می‌شود؛ وگرنه ردیفِ
+  // جداگانه‌ای زیرِ جدول می‌آید («رنک هر فرد رو هم نشون بده حتی اگه تو تاپ
+  // ۱۰ نباشه»).
+  const showMyRow = (data) => data.me && !data.meInTop;
 
   return (
     <section className="card wide refPage">
@@ -113,6 +174,129 @@ export default function Referral({ token, setMsg }) {
         <div><b>{fa(d.totalEarned)}</b><span>امتیاز از دوستان</span></div>
         <div><b>{fa(d.dailySpins)}</b><span>چرخش روزانه</span></div>
       </div>
+
+      {/* ═══════════════ دو تبِ معرف‌ها ═══════════════ */}
+      <div className="refTabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'top'}
+          className={tab === 'top' ? 'on' : ''} onClick={() => setTab('top')}>
+          <SvgIcon name="trophy" size={16} />
+          {text('inviteLeague.allTimeTitle', <>معرف‌های برتر تا کنون</>)}
+        </button>
+        <button role="tab" aria-selected={tab === 'league'}
+          className={tab === 'league' ? 'on' : ''} onClick={() => setTab('league')}>
+          <SvgIcon name="game" size={16} />
+          {text('inviteLeague.leagueTitle', <>لیگ معرف‌ها</>)}
+          {league && <i className="refTabDot" aria-hidden="true" />}
+        </button>
+      </div>
+
+      {tab === 'top' && (
+        <div className="refBoard">
+          <div className="refBoardHead">
+            <b>{text('inviteLeague.allTimeTitle', <>معرف‌های برتر تا کنون</>)}</b>
+            <span className="refBoardSub">رکورددارانِ معرفی از ابتدا تا امروز</span>
+          </div>
+          {allTime.rows.length === 0 ? (
+            <p className="hint refEmpty">هنوز کسی کسی را دعوت نکرده. تو اولین نفر باش!</p>
+          ) : (
+            <ul className="refBoardList">
+              {allTime.rows.map((row, i) => (
+                <BoardRow key={row.userId || i} row={row} me={allTime.me?.userId === row.userId} />
+              ))}
+              {showMyRow(allTime) && (
+                <>
+                  <li className="refBoardGap" aria-hidden="true">•••</li>
+                  <BoardRow row={allTime.me} me />
+                </>
+              )}
+            </ul>
+          )}
+          <p className="hint" style={{ marginTop: 10 }}>
+            {text('inviteLeague.rulesNote',
+              <>فقط دعوتِ معتبر شمرده می‌شود (کاربری که با کد شما ثبت‌نام کرده و فعال است). اگر دو نفر تعدادشان برابر شود، آن‌که زودتر به آن عدد رسیده بالاتر می‌ایستد.</>)}
+          </p>
+          {allTime.me && (
+            <p className="hint">
+              {text('inviteLeague.myRankNote', <>رتبهٔ تو همیشه پایینِ جدول می‌آید؛ حتی وقتی بیرونِ ده نفرِ اول باشی.</>)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {tab === 'league' && (
+        <div className="refBoard">
+          {!league ? (
+            <p className="hint refEmpty">
+              {text('inviteLeague.emptyNote',
+                <>هنوز لیگی برای معرف‌ها ساخته نشده است. هر وقت مدیر یک لیگ بسازد، همین‌جا برگزار می‌شود.</>)}
+            </p>
+          ) : (
+            <>
+              <div className="refBoardHead">
+                <b>{league.title}</b>
+                <span className="refBoardSub">{remainingLabel(league.endsAt)}</span>
+              </div>
+              {league.prizes?.length > 0 && (
+                <ul className="refPrizes">
+                  {league.prizes.map((p, i) => (
+                    <li key={i}>
+                      <span>{p.label || `رتبهٔ ${fa(p.rank)}`}</span>
+                      <b>
+                        {[
+                          p.cash > 0 ? `${fa(p.cash)} تومان` : null,
+                          p.points > 0 ? `${fa(p.points)} امتیاز` : null,
+                          p.coins > 0 ? `${fa(p.coins)} سکه` : null,
+                          p.spins > 0 ? `${fa(p.spins)} چرخش` : null,
+                        ].filter(Boolean).join(' + ')}
+                      </b>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {Number(league.minInvites) > 1 && (
+                <p className="hint">برای ورود به جدولِ این لیگ حداقل {fa(league.minInvites)} دعوتِ معتبر لازم است.</p>
+              )}
+              {league.rows.length === 0 ? (
+                <p className="hint refEmpty">هنوز کسی به حداقلِ دعوتِ این لیگ نرسیده — جای اول خالیه!</p>
+              ) : (
+                <ul className="refBoardList">
+                  {league.rows.map((row, i) => (
+                    <BoardRow key={row.userId || i} row={row} me={league.me?.userId === row.userId} />
+                  ))}
+                  {showMyRow(league) && (
+                    <>
+                      <li className="refBoardGap" aria-hidden="true">•••</li>
+                      <BoardRow row={league.me} me />
+                    </>
+                  )}
+                </ul>
+              )}
+              <p className="hint" style={{ marginTop: 10 }}>
+                {text('inviteLeague.payoutNote',
+                  <>جایزه پس از پایانِ لیگ، بعد از تأییدِ مدیر به حسابت واریز می‌شود.</>)}
+              </p>
+            </>
+          )}
+
+          {history.length > 0 && (
+            <div className="refPast">
+              <b>لیگ‌های تمام‌شده:</b>
+              <ul>
+                {history.map((h, i) => (
+                  <li key={i}>
+                    <span>{h.title}</span>
+                    <b>
+                      {h.top?.length
+                        ? h.top.map(t => `${t.nickname} (${fa(t.invites)})`).join(' · ')
+                        : 'بدون برنده'}
+                    </b>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="refRulesBox">
         <b>مزایای معرفی دوستان:</b>

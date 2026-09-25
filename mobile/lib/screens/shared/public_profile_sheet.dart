@@ -66,6 +66,18 @@ class _PublicProfileBody extends StatelessWidget {
     final clubSlug = cos['club'] as String?;
     final bestRank = data['bestRank'];
     final totalPrize = (data['totalPrizeAmount'] as num?)?.toInt() ?? 0;
+    // ── آمارِ جوایزِ تازه (۴ مهر ۱۴۰۵) ────────────────────────────────────
+    // همان کلیدهای `/api/users/:id/public` در هر دو کلاینت؛ هیچ‌کدام در
+    // اپ جمع نمی‌شود (تاریخچهٔ لیگ فقط ۲۴ فصلِ آخر را دارد).
+    final leagueSeasons = (data['leagueSeasons'] as num?)?.toInt() ?? 0;
+    final leagueWins = (data['leagueWins'] as num?)?.toInt() ?? 0;
+    final leaguePodiums = (data['leaguePodiums'] as num?)?.toInt() ?? 0;
+    final lifetimePrizes = (data['lifetimeLeaguePrizes'] as num?)?.toInt() ?? 0;
+    final refMap = Map<String, dynamic>.from(data['referral'] as Map? ?? {});
+    final refInvited = (refMap['invited'] as num?)?.toInt() ?? 0;
+    final refPoints = (refMap['earnedPoints'] as num?)?.toInt() ?? 0;
+    final refCash = (refMap['earnedCash'] as num?)?.toInt() ?? 0;
+    final refRank = (refMap['rankAllTime'] as num?)?.toInt();
 
     return AnimatedProfileBackground(
       slug: cos['profileBackground'] as String?,
@@ -190,6 +202,42 @@ class _PublicProfileBody extends StatelessWidget {
               iconColor: const Color(0xFFFF8A3D),
               title: 'تعداد کل جوایز و تندیس‌ها',
               value: '${faNum(trophies.length + rewards.length)} جایزه',
+            ),
+
+            // ── بردهای لیگ و کمیسیونِ دعوت (خواستهٔ مالک، ۴ مهر ۱۴۰۵) ──
+            // «تمامی جوایز از جمله میزان برد در لیگ و میزان کمسیون از دعوت
+            //  از دوستان باید برای کاربر های مختلف دیده بشه.»
+            _StatCard(
+              icon: Icons.military_tech_rounded,
+              iconColor: const Color(0xFFFFD166),
+              title: leagueSeasons > 0
+                  ? 'قهرمانی لیگ از ${faNum(leagueSeasons)} فصل'
+                  : 'قهرمانی لیگ',
+              value: leagueWins > 0 ? '${faNum(leagueWins)} برد' : 'بدون برد',
+            ),
+            _StatCard(
+              icon: Icons.workspace_premium_rounded,
+              iconColor: const Color(0xFFE39A5B),
+              title: 'سکوی سه‌نما و جایزهٔ کلِ لیگ',
+              value: leaguePodiums > 0 || lifetimePrizes > 0
+                  ? '${faNum(leaguePodiums)} سکو · ${faNum(lifetimePrizes)} تومان'
+                  : 'بدون سکو',
+            ),
+            _StatCard(
+              icon: Icons.person_add_alt_1_rounded,
+              iconColor: const Color(0xFF38BDF8),
+              title: refRank != null
+                  ? 'دوستان دعوت‌شده · رتبه ${faNum(refRank)}'
+                  : 'دوستان دعوت‌شده',
+              value: '${faNum(refInvited)} نفر',
+            ),
+            _StatCard(
+              icon: Icons.handshake_rounded,
+              iconColor: const Color(0xFF22E7A6),
+              title: 'کمیسیون از دعوت دوستان',
+              value: refPoints > 0 || refCash > 0
+                  ? '${faNum(refPoints)} امتیاز · ${faNum(refCash)} تومان'
+                  : 'بدون کمیسیون',
             ),
           ],
         ),

@@ -241,6 +241,17 @@ DELETE FROM league_perk_awards;
 DELETE FROM league_perk_grants;
 DELETE FROM user_coin_quota;
 
+-- ⚠️ لیگِ معرف‌ها (مایگریشن ۱۰۱، ۴ مهر ۱۴۰۵) — همان دامِ «۴۵۷ فایل یتیم»،
+--    بارِ ششم. دو جدولِ تازهٔ وابسته به کاربر:
+--      • invite_league_payouts — ردیفِ پرداختِ هر برنده. به seasons ارجاع
+--        دارد (CASCADE)، پس باید **قبل از** آن پاک شود.
+--      • invite_league_seasons — `created_by` به کاربر ارجاع دارد و
+--        ON DELETE SET NULL است؛ بدونِ این خط، آفرِ بی‌صاحب در گزارش‌ها
+--        و در جدولِ کاربران می‌ماند. آفرها تنظیماتِ کمپین‌اند و در راه‌اندازیِ
+--        تازه دوباره از پنل ساخته می‌شوند.
+DELETE FROM invite_league_payouts;
+DELETE FROM invite_league_seasons;
+
 -- ── ۳) کاربران، بجز حسابِ اصلیِ مدیر ──
 DELETE FROM users WHERE mobile <> '{ADMIN_MOBILE}';
 

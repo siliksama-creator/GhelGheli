@@ -11,7 +11,7 @@ module.exports = ({
   gameEconomy, getGameRewardSettings, grants, level,
   loginStreak, pass, wheel, clubs,
   fieldCrypto, nicknamePolicy, bcrypt, changePasswordLimiter,
-  signUser, points, rewardGroups,
+  signUser, points, rewardGroups, inviteLeague,
 }) => {
   const router = express.Router();
 
@@ -338,6 +338,47 @@ router.get('/users/:id/public', auth, validateUuid('id'), asyncHandler(async (re
       WHERE user_id=$1 AND reward_type='physical'
       ORDER BY claimed_at DESC LIMIT 50`, [req.params.id]);
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // جوایز و آمارِ اقتصادیِ این کاربر (خواستهٔ مالک، ۴ مهر ۱۴۰۵)
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // «وقتی فردی روی پروفایل شخصی می‌ره تمامی جوایز از جمله میزان برد در لیگ
+  //  و میزان کمسیون از دعوت از دوستان باید برای کاربر های مختلف قابلِ دیدن
+  //  باشه.»
+  //
+  // تا امروز پروفایلِ عمومی فقط «تاریخچهٔ ۲۴ لیگِ آخر» را می‌داد و کسی که
+  // ۳۰ فصل بازی کرده بود، بردِ واقعی‌اش دیده نمی‌شد؛ کمیسیونِ دعوت هم
+  // اصلاً نبود. این دو کوئری، عددِ کاملِ عمرِ حساب را می‌دهد (نه ۲۴ ردیفِ
+  // آخر) — و مستقل از طولِ `LIMIT`ِ تاریخچه است.
+  const [leagueStats, referralStats] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(*)::int AS seasons,
+              COUNT(*) FILTER (WHERE rank = 1)::int AS wins,
+              COUNT(*) FILTER (WHERE rank <= 3)::int AS podiums,
+              COALESCE(SUM(prize_amount),0)::bigint AS prizes
+         FROM user_league_history WHERE user_id=$1`, [req.params.id]),
+    pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM users u
+           WHERE u.referred_by=$1 AND u.status='active') AS invited,
+         (SELECT COALESCE(SUM(e.earned_points),0)::int FROM referral_earnings e
+           WHERE e.referrer_id=$1) AS earned_points,
+         (SELECT COALESCE(SUM(c.commission_amount),0)::bigint
+            FROM purchase_referral_commissions c
+           WHERE c.referrer_id=$1) AS earned_cash`, [req.params.id]),
+  ]);
+  const ls = leagueStats.rows[0] || {};
+  const rs = referralStats.rows[0] || {};
+  // رتبهٔ کشوریِ معرفی — همان جدولی که تبِ «معرف‌های برتر تا کنون» نشان
+  // می‌دهد، تا پروفایل و آن تب دو عددِ متفاوت از یک واقعیت ندهند.
+  let inviteRank = null;
+  try {
+    const stand = await inviteLeague.standing(req.params.id);
+    inviteRank = stand ? stand.rank : null;
+  } catch (e) {
+    console.error('[profile] invite rank failed:', e.message);
+  }
+
   const cosmeticsMap = await shop.cosmeticsFor([req.params.id]);
   const cosmetics = cosmeticsMap.get(req.params.id) || {};
   // صفحهٔ پروفایلِ عمومی جزئیاتِ کاملِ لول را نشان می‌دهد (نوار
@@ -380,6 +421,23 @@ router.get('/users/:id/public', auth, validateUuid('id'), asyncHandler(async (re
     })),
     trophies: trophies.rows,
     bestRank: best,
+    // ── آمارِ تازه ──
+    // `leagueSeasons`/`leagueWins`/`leaguePodiums` عددِ کلِ عمرِ حساب‌اند،
+    // در برابرِ `leagueHistory` که فقط ۲۴ فصلِ آخر را دارد.
+    leagueSeasons: Number(ls.seasons || 0),
+    leagueWins: Number(ls.wins || 0),
+    leaguePodiums: Number(ls.podiums || 0),
+    lifetimeLeaguePrizes: Number(ls.prizes || 0),
+    referral: {
+      invited: Number(rs.invited || 0),
+      earnedPoints: Number(rs.earned_points || 0),
+      earnedCash: Number(rs.earned_cash || 0),
+      rankAllTime: inviteRank ? Number(inviteRank) : null,
+    },
+    // «چند مدل کارت» و «چند کارتِ ثبت‌شده» دو چیزِ متفاوت‌اند: یکی از
+    // پروفایلِ مجموعه حرف می‌زند، دیگری از تعدادِ کارت‌های فیزیکیِ ثبت‌شده.
+    cardModels: cards.rows.length,
+    cardsRegistered: cards.rows.reduce((a, c) => a + Number(c.registered_count || 0), 0),
     totalPrizeAmount: leagueHistory.rows
       .reduce((a, r) => a + Number(r.prize_amount || 0), 0),
     cosmetics,

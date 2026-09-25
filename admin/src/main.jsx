@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, Suspense, lazy, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  Activity, BarChart3, Bell, BookText, CircleDot, Coins, CreditCard, Gamepad2, Layers, LifeBuoy, Megaphone, MessageCircle, Package, ScanLine, Settings, Shield, ShieldCheck, Sigma, SlidersHorizontal, Smartphone, Store, Swords, Target, Trophy, Users, Wallet,
+  Activity, BarChart3, Bell, BookText, CircleDot, Coins, CreditCard, Gamepad2, Layers, LifeBuoy, Megaphone, MessageCircle, Package, ScanLine, Settings, Shield, ShieldCheck, Sigma, SlidersHorizontal, Smartphone, Store, Swords, Target, Trophy, UserPlus, Users, Wallet,
 } from 'lucide-react';
 
 import './theme.css';
@@ -31,6 +31,10 @@ import { Dashboard } from './pages/dashboard.jsx';
 const PhotoCardsPage = lazy(() => import('./pages/photo-cards.jsx').then(m => ({ default: m.PhotoCardsPage })));
 const PointsPage = lazy(() => import('./pages/points.jsx').then(m => ({ default: m.PointsPage })));
 const LeaguePage = lazy(() => import('./pages/league.jsx').then(m => ({ default: m.LeaguePage })));
+// «لیگ معرف‌ها» — آفرِ زمان‌دارِ بیشترین دعوت‌کننده. صفحهٔ مستقلی است چون
+// معیارش تعدادِ دعوت است، نه سکه؛ در گروهِ «ماموریت و درآمد» می‌آید کنارِ
+// «لیگ ماهانه» تا مدیر جای دیگری دنبالش نگردد.
+const InviteLeaguePage = lazy(() => import('./pages/invite-league.jsx').then(m => ({ default: m.InviteLeaguePage })));
 const WalletPage = lazy(() => import('./pages/wallet.jsx').then(m => ({ default: m.WalletPage })));
 const UsersPage = lazy(() => import('./pages/users.jsx').then(m => ({ default: m.UsersPage })));
 const ChatModerationPage = lazy(() => import('./pages/chat-moderation.jsx').then(m => ({ default: m.ChatModerationPage })));
@@ -173,6 +177,18 @@ const NAV = [
     'rewards'],
   ['league', 'لیگ ماهانه', Trophy, LeaguePage,
     'لیگ ماهانه: شروع و پایان فصل، جوایز نفرات برتر و تاریخچهٔ پرداخت‌ها.',
+    'rewards'],
+  // ── «لیگ معرف‌ها» — خواستهٔ مالک (۴ مهر ۱۴۰۵) ───────────────────────────
+  //
+  // «در قسمت دعوت از دوستان باید یک تب جدید ایجاد کنی … و اگه ادمین از
+  // پنل یه آفر مثل لیگ دعوت‌کنندگان قرار داد و کانفیگش کرد، داخل تب
+  // دعوت‌کنندگان لیگ معرف‌ها برگزار بشه.»
+  //
+  // همان یک آفرِ فعال، در تبِ «لیگ معرف‌ها»ی وب و اندروید به کاربران
+  // نشان داده می‌شود؛ پس صفحه‌اش هم بلافاصله بعدِ «لیگ ماهانه» می‌آید —
+  // دو لیگِ متفاوت که مدیر باید پشتِ‌سرِ هم ببیند.
+  ['invite-league', 'لیگ معرف‌ها', UserPlus, InviteLeaguePage,
+    'آفرِ زمان‌دارِ بیشترین دعوت‌کننده: بازه، حداقلِ دعوت و جایزهٔ دلخواهِ هر رتبه (امتیاز/سکه/چرخش/کیف پول) — بستنِ دوره و تأییدِ پرداخت هم همین‌جاست.',
     'rewards'],
   // ── «مود دوئل کارت» — اولین ردیفِ گروهِ بازی‌ها ───────────────────────
   //

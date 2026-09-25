@@ -8,7 +8,7 @@ module.exports = ({
   pool, auth, asyncHandler, referrals,
   pass, loginStreak, loginStreakLimiter, UUID_RE,
   cacheGet, cacheSet, getLeaderboard, level,
-  points, shop, coinVault,
+  points, shop, coinVault, inviteLeague,
 }) => {
   const router = express.Router();
 
@@ -45,8 +45,17 @@ router.post('/pass/claim-all', auth, asyncHandler(async (req, res) => {
 }));
 
 // ── معرفی دوستان ─────────────────────────────────────────────────────────
+//
+// چرا جدول‌های معرف‌ها **همین‌جا** می‌آیند و مسیرِ جدا ندارند: صفحهٔ دعوت
+// از دوستان یک درخواست می‌زند (وب و اندروید هر دو) و ساختِ مسیرِ دوم یعنی
+// دو حالتِ بارگذاری، دو خطا و دو جای ناهماهنگی. جدول‌های همهٔ زمان‌ها و
+// لیگِ جاری هم به همین داده وابسته‌اند (کدِ دعوت و تعدادِ دوستان).
 router.get('/referrals', auth, asyncHandler(async (req, res) => {
-  res.json(await referrals.summary(req.user.id));
+  const [summary, board] = await Promise.all([
+    referrals.summary(req.user.id),
+    inviteLeague.overview(req.user.id),
+  ]);
+  res.json({ ...summary, inviteLeague: board });
 }));
 
 // ── صندوق سکه ────────────────────────────────────────────────────────────

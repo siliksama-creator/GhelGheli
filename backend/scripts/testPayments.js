@@ -104,8 +104,45 @@ ok('مایگریشن ۰۶۸ منبع جدیدی به دفترکل اضافه ن�
 
 // هر منبعی که کد می‌سازد باید در CHECK دیتابیس باشد. این همان باگی است
 // که در دور ۱۷ گرفته شد و می‌توانست پولِ پرداخت‌شده را ببلعد.
-const sqlSources = (mig067.match(/CHECK \(source IN \(([\s\S]*?)\)\)/)[1]
-  .match(/'([a-z_]+)'/g) || []).map(s => s.replace(/'/g, ''));
+//
+// ── چرا فقط ۰۶۷ کافی نیست (۴ مهر ۱۴۰۵) ──────────────────────────────────
+//
+// فهرستِ منابعِ مجاز در CHECK فقط یک‌بار نوشته نشده: هر مایگریشنی که منبعِ
+// تازه‌ای بیاورد، `DROP CONSTRAINT` + `ADD CONSTRAINT` می‌زند و **کلِ**
+// فهرست را بازنویسی می‌کند. مایگریشن ۱۰۱ منبعِ `invite_league` را اضافه
+// کرد، ولی این تست فقط ۰۶۷ را می‌خواند؛ نتیجه این شد که سنجش، منبعِ تازهٔ
+// کاملاً معتبرِ کد را «یتیم» دید و قرمز شد — یعنی سنجشِ دروغِ منفی.
+//
+// حالا همهٔ مایگریشن‌های بعد از ۰۶۷ هم خوانده می‌شوند، ولی با یک قید: هر
+// فایلی که *واقعاً* CHECK کیف پول را بازنویسی می‌کند باید کامل باشد. اگر
+// فهرست را کامل ننویسد، این تست همان‌جا می‌گیرد (وگرنه یک CHECK ناقص
+// بی‌صدا همهٔ منابعِ قدیمی را می‌شکست).
+// ⚠️ لنگر مهم است: مایگریشن ۱۰۱ **دو** CHECK بازنویسی می‌کند — یکی برای
+// دفترکلِ امتیاز و یکی برای کیف پول — و اولیِ فایل امتیاز است. نسخهٔ اولِ
+// همین تابع اولین CHECK را برمی‌داشت و بعد لیستِ کیف پول را ناقص می‌دید
+// (۱۴ منبعِ «حذف‌شده»ی الکی). پس نامِ قید کیف پول لنگر می‌شود.
+function walletCheckSources(text) {
+  const anchored = text.match(
+    /wallet_transactions_source_check[\s\S]{0,200}?CHECK \(source IN \(([\s\S]*?)\)\)/);
+  const m = anchored || text.match(/CHECK \(source IN \(([\s\S]*?)\)\)/);
+  if (!m) return null;
+  return (m[1].match(/'([a-z_]+)'/g) || []).map((x) => x.replace(/'/g, ''));
+}
+
+// ۰۶۷ مرجع است (کامل‌ترین فهرست)، و هر بازنویسیِ بعدی روی همان سوار می‌شود.
+const sqlSources = walletCheckSources(mig067) || [];
+const laterMigrations = ['101_invite_league.sql'];
+for (const file of laterMigrations) {
+  const text = R(`migrations/${file}`);
+  const sources = walletCheckSources(text);
+  if (!sources) continue;
+  // بازنویسی باید همهٔ منابعِ قبلی را نگه دارد، نه اینکه فهرستِ کوتاه‌تری بگذارد.
+  const dropped = sqlSources.filter((s) => !sources.includes(s));
+  ok(`${file} هنگامِ افزودنِ منبع، منابعِ قبلی را نگه داشته`
+    + (dropped.length ? ` — حذف‌شده: ${dropped.join(',')}` : ''),
+  dropped.length === 0);
+  for (const s of sources) if (!sqlSources.includes(s)) sqlSources.push(s);
+}
 const orphans = jsSources.filter(s => !sqlSources.includes(s));
 ok(`همهٔ ${jsSources.length} منبع فعال در CHECK دیتابیس هستند`
   + (orphans.length ? ` — یتیم: ${orphans.join(',')}` : ''), orphans.length === 0);

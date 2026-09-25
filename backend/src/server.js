@@ -629,6 +629,7 @@ app.use('/api', require('./routes/profile')({
   loginStreak, pass, wheel, clubs,
   fieldCrypto, nicknamePolicy, bcrypt, changePasswordLimiter,
   signUser, points, rewardGroups,
+  inviteLeague: require('./services/inviteLeagueService'),
 }));
 app.use('/api', require('./routes/rewardsUser')({
   pool, auth, asyncHandler, validateUuid,
@@ -657,6 +658,7 @@ app.use('/api', require('./routes/progression')({
   pass, loginStreak, loginStreakLimiter, UUID_RE,
   cacheGet, cacheSet, getLeaderboard, level,
   points, shop, coinVault: require('./services/coinVaultService'),
+  inviteLeague: require('./services/inviteLeagueService'),
 }));
 app.use('/api', require('./routes/chat')({
   pool, auth, asyncHandler, validateUuid,
@@ -764,6 +766,17 @@ app.use('/api', require('./routes/adminLeague')({
   closeActiveSeason, leagueApprove, walletService, createNotification,
   defaultPrizeTable, seedCarryoverFromLatestClosed,
   leagueCountdown,
+}));
+
+// ── لیگِ معرف‌ها — آفرِ زمان‌دار برای دعوت‌کنندگان (۴ مهر ۱۴۰۵) ───────────
+//
+// جدا از adminLeague نگه داشته شده: آن یکی لیگِ سکه‌محورِ ماهانه است و
+// قواعدش (امتیازِ سکه، جدولِ جایزه، اسکارِ پایان فصل) هیچ ربطی به «چند
+// نفر را دعوت کرده» ندارد. قاطی‌کردنشان یعنی هر تغییرِ یکی، ریسکِ شکستنِ
+// دیگری — همان درسی که `testLeaguePerks` برایش نوشته شد.
+app.use('/api', require('./routes/adminInviteLeague')({
+  pool, adminAuth, requireRole, asyncHandler, audit, validateUuid,
+  inviteLeague: require('./services/inviteLeagueService'),
 }));
 
 // User administration and point-ledger inspection.

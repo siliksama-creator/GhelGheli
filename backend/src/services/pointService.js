@@ -47,6 +47,8 @@ const SOURCES = Object.freeze([
   'card_box',
   // امتیازِ جایزهٔ غیرنقدیِ لیگ (دورِ ۲۶). CHECK متناظر در مایگریشن ۰۷۲.
   'league_perk',
+  // امتیازِ جایزهٔ لیگِ معرف‌ها (۴ مهر ۱۴۰۵). CHECK متناظر در مایگریشن ۱۰۱.
+  'invite_league',
   'other',
 ]);
 

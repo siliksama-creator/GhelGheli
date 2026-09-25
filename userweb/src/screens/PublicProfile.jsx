@@ -28,6 +28,20 @@ export default function PublicProfile({ token, userId, close }) {
 
   const u = state.data;
   const cos = u?.cosmetics || {};
+  // ── آمارِ تازهٔ جوایز (۴ مهر ۱۴۰۵) ──────────────────────────────────────
+  //
+  // همهٔ این عددها از سرور می‌آید. عمداً هیچ‌کدام در کلاینت جمع نمی‌شود:
+  // `leagueHistory` فقط ۲۴ فصلِ آخر است، پس جمع‌زدنِ آن روی کلاینت عددی
+  // کمتر از واقعیت می‌داد — همان باگی که برای کاربرِ قدیمی «۳ برد» را
+  // «۱ برد» نشان می‌داد.
+  const leagueSeasons = Number(u?.leagueSeasons || 0);
+  const leagueWins = Number(u?.leagueWins || 0);
+  const leaguePodiums = Number(u?.leaguePodiums || 0);
+  const lifetimePrizes = Number(u?.lifetimeLeaguePrizes || 0);
+  const ref = u?.referral || {};
+  const refInvited = Number(ref.invited || 0);
+  const refPoints = Number(ref.earnedPoints || 0);
+  const refCash = Number(ref.earnedCash || 0);
 
   useEffect(() => {
     if (!u) return;
@@ -95,6 +109,37 @@ export default function PublicProfile({ token, userId, close }) {
               <div><b>{fa(u.lifetime_points)}</b><span>مجموع امتیازات کل</span></div>
               <div><b>{fa(u.totalPrizeAmount || 0)} تومان</b><span>جوایز نقدی کسب‌شده</span></div>
               <div><b>{fa((u.trophies?.length || 0) + (u.rewards?.length || 0))} جایزه</b><span>کل جوایز و تندیس‌ها</span></div>
+              {/* ── بردهای لیگ و کمیسیونِ دعوت (خواستهٔ مالک، ۴ مهر ۱۴۰۵) ──
+                  «تمامی جوایز از جمله میزان برد در لیگ و میزان کمسیون از
+                  دعوت از دوستان باید برای کاربر های مختلف دیده بشه.» */}
+              <div>
+                <b>{leagueWins > 0 ? `${fa(leagueWins)} قهرمانی` : 'بدون قهرمانی'}</b>
+                <span>
+                  {leagueSeasons > 0
+                    ? `از ${fa(leagueSeasons)} فصل لیگ (${fa(leaguePodiums)} سکوی سه‌نما)`
+                    : 'هنوز فصلِ کاملی نداشته'}
+                </span>
+              </div>
+              <div>
+                <b>{fa(lifetimePrizes)} تومان</b>
+                <span>مجموع جایزهٔ لیگ در تمام فصل‌ها</span>
+              </div>
+              <div>
+                <b>{fa(refInvited)} نفر</b>
+                <span>
+                  {ref.rankAllTime
+                    ? `دعوت‌شده · رتبهٔ ${fa(ref.rankAllTime)} معرف‌ها`
+                    : 'دعوت‌شده با کد اختصاصی'}
+                </span>
+              </div>
+              <div>
+                <b>
+                  {refPoints > 0 || refCash > 0
+                    ? `${fa(refPoints)} امتیاز + ${fa(refCash)} تومان`
+                    : 'بدون کمیسیون'}
+                </b>
+                <span>کمیسیون از دعوت دوستان</span>
+              </div>
             </div>
 
             {/* ── Tabs ── */}
@@ -158,6 +203,20 @@ export default function PublicProfile({ token, userId, close }) {
               {tab === 'league' && (
                 u.leagueHistory?.length ? (
                   <div className="ppLeague">
+                    {/* عددِ کاملِ عمرِ حساب، بالای جدولِ ۲۴ فصلِ آخر — وگرنه
+                        کاربرِ قدیمی فکر می‌کند فقط همین ۲۴ فصل را بازی کرده. */}
+                    {(leagueSeasons > 0 || lifetimePrizes > 0) && (
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:'6px', marginBottom:'8px' }}>
+                        <span className="ppPrizeTag">شرکت در {fa(leagueSeasons)} فصل</span>
+                        <span className="ppPrizeTag">{fa(leagueWins)} قهرمانی</span>
+                        <span className="ppPrizeTag">{fa(leaguePodiums)} سکوی سه‌نما</span>
+                        {lifetimePrizes > 0 && (
+                          <span className="ppPrizeTag">
+                            مجموع جایزه: {fa(lifetimePrizes)} تومان
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {u.leagueHistory.map((h, i) => (
                       <div className="ppLeagueRow" key={i}>
                         {medal(h.rank) && <span className="ppMedal"><SvgIcon name={medal(h.rank)} size={15} /></span>}
