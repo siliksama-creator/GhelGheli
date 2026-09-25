@@ -1230,7 +1230,6 @@ class _PitchPainter extends CustomPainter {
   static const _kMouth = Color(0xFF2A1B06);
 
   Path _bodyPath(double s) {
-    Offset p(double a, double b) => Offset(a * s, b * s);
     return Path()
       ..moveTo(0, -0.709 * s)
       ..cubicTo(0.173 * s, -0.709 * s, 0.300 * s, -0.606 * s, 0.346 * s, -0.456 * s)
