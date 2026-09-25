@@ -300,7 +300,10 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
       const versionCode = Number(String(req.body?.versionCode || '').replace(/[^0-9]/g, '')) || null;
       const notes = String(req.body?.notes || '').trim().slice(0, 500);
       const setUpdateUrl = String(req.body?.setUpdateUrl ?? 'true') !== 'false';
-      const promoteMin = String(req.body?.promoteMinVersion ?? 'true') !== 'false';
+      // پیش‌فرض «نه» — دستورِ مالک (۴ مهر ۱۴۰۵): انتشارِ APK نباید
+      // به‌خودی‌خود به‌روزرسانیِ اجباری بسازد. پنل مقدارش را صریح می‌فرستد؛
+      // فراخوانِ تازه/CLI که نفرستد، «حداقلِ نسخه» را بالا نمی‌برد.
+      const promoteMin = String(req.body?.promoteMinVersion ?? 'false') === 'true';
       const forceUpdate = String(req.body?.forceUpdate ?? 'false') === 'true';
       const minVersion = sanitizeVersion(req.body?.minVersion) || version;
 

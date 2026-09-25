@@ -55,6 +55,41 @@ ok('seed ON CONFLICT DO NOTHING دارد (قابل اجرای دوباره)', /O
 ok('PATCH پرچم features را پاک نمی‌کند',
   /features: featureFlags\.normalizeFeatures/.test(routeSrc));
 
+// ── انتشارِ APK نباید به‌خودی‌خود اجبار بسازد (دستورِ مالک) ─────────────
+//
+// «لطفا apk رو موقع انتشار فورس اپدیت نکن.» اگر کسی پیش‌فرضِ
+// `promoteMinVersion` را دوباره «true» کند، هر انتشار همهٔ کاربرانِ قدیمی را
+// زیرِ «حداقلِ نسخه» می‌برد. پس هر سه لایه‌ی ورودِ انتشار بررسی می‌شوند:
+// CLI، endpointِ پنل و تیکِ خودِ صفحهٔ پنل.
+const pubSrc = fs.readFileSync(path.join(root, 'scripts', 'publishApk.js'), 'utf8');
+const apkRouteSrc = fs.readFileSync(path.join(root, 'src', 'routes', 'adminApk.js'), 'utf8');
+const releasePage = fs.readFileSync(
+  path.join(root, '..', 'admin', 'src', 'pages', 'app-release.jsx'), 'utf8');
+ok('CLI: ارتقای حداقلِ نسخه فقط با --min صریح',
+  /promoteMinVersion=\$\{has\('--min'\)/.test(pubSrc));
+ok('CLI: دیگر با --no-min معکوس نمی‌شود',
+  !/promoteMinVersion=\$\{has\('--no-min'\)/.test(pubSrc));
+ok('پنل (endpoint): پیش‌فرضِ promoteMin «نه» است',
+  /promoteMinVersion \?\? 'false'/.test(apkRouteSrc));
+ok('صفحهٔ انتشار: تیکِ حداقلِ نسخه پیش‌فرض خاموش',
+  /const \[promoteMin, setPromoteMin\] = useState\(false\)/.test(releasePage));
+
+// ── متنِ ورود: تا وقتی OTP خاموش است «شماره» پیشنهاد نمی‌شود ────────────
+//
+// سه سطحِ ورود باید یک متن بدهند (وب، اپ، و قلقلیِ ghelghelishop.com که در
+// همین مخزن نیست ولی متنش از همین‌ها کپی می‌شود — پس همین دو کافی است).
+const authFiles = [
+  ['وب', path.join(root, '..', 'userweb', 'src', 'screens', 'Auth.jsx')],
+  ['اندروید', path.join(root, '..', 'mobile', 'lib', 'screens', 'auth', 'auth_screen.dart')],
+];
+for (const [label, file] of authFiles) {
+  const src = fs.readFileSync(file, 'utf8');
+  ok(`${label}: متنِ «نام کاربری یا شمارهٔ حساب» حذف شده`,
+    !/شمارهٔ حساب|شماره حساب/.test(src));
+  ok(`${label}: زیرنویسِ ورود «نام کاربری و رمز عبور» است`,
+    /ورود با نام کاربری و رمز عبور/.test(src));
+}
+
 // ── در فهرست npm test هست؟ ──────────────────────────────────────────────
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 ok('testClientConfig در npm test فهرست شده',

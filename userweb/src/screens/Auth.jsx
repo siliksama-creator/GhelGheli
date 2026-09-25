@@ -140,7 +140,7 @@ export default function Auth({ done }) {
               ? 'شماره + نام مستعار + کد معرف؛ بدون رمز عبور'
               : (loginOtp
                 ? (step === 'code' ? `کد به شمارهٔ ${cleanMobile()} ارسال شد` : 'فقط شماره موبایل و کد یک‌بارمصرف')
-                : 'تا فعال‌شدن پیامک، ورود با کد غیرفعال است؛ این فرم ویژهٔ حساب‌های دارای رمز عبور است')}
+                : 'ورود با نام کاربری و رمز عبور')}
           </p>
         </div>
 
@@ -195,7 +195,7 @@ export default function Auth({ done }) {
             )
           ) : (
             <>
-              <input placeholder="نام کاربری یا شمارهٔ حساب" value={admin.mobile}
+              <input placeholder="نام کاربری" value={admin.mobile}
                 autoComplete="username" style={inputStyle}
                 onChange={e => setAdmin({ ...admin, mobile: e.target.value })} />
               <input placeholder="رمز عبور" type="password" value={admin.password}

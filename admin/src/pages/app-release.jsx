@@ -39,7 +39,9 @@ export function AppReleasePage({ request, token, isSuperAdmin, onNavigate }) {
   const [versionCode, setVersionCode] = useState('');
   const [notes, setNotes] = useState('');
   const [setUpdateUrl, setSetUpdateUrl] = useState(true);
-  const [promoteMin, setPromoteMin] = useState(true);
+  // خاموش به‌صورت پیش‌فرض: انتشارِ معمولی حقِ انتخاب را از کاربر نمی‌گیرد.
+  // دستورِ مالک: «لطفا apk رو موقع انتشار فورس اپدیت نکن.»
+  const [promoteMin, setPromoteMin] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(false);
   const [minVersion, setMinVersion] = useState('');
   const [progress, setProgress] = useState(0);
@@ -279,7 +281,7 @@ export function AppReleasePage({ request, token, isSuperAdmin, onNavigate }) {
             <label className="checkbox-row">
               <input type="checkbox" checked={promoteMin} disabled={!isSuperAdmin}
                 onChange={(e) => setPromoteMin(e.target.checked)} />
-              حداقلِ نسخه هم بالا برود (دیالوگِ «نسخهٔ تازه» به کاربر نشان داده شود)
+              حداقلِ نسخه هم بالا برود (کاربرانِ قدیمی‌تر وادار به به‌روزرسانی می‌شوند)
             </label>
             {promoteMin && (
               <div className="card-grid cols-2">

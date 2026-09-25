@@ -466,7 +466,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (_tab == _Tab.login && !_smsEnabled) {
       return [
         Text(
-          'سامانهٔ پیامک هنوز فعال نشده است؛ ورود با رمز ویژهٔ حساب‌های دارای رمزِ قبلی و حساب مدیر است.',
+          'ورود با نام کاربری و رمز عبور',
           textAlign: TextAlign.center,
           style: Theme.of(context)
               .textTheme
@@ -478,7 +478,7 @@ class _AuthScreenState extends State<AuthScreen> {
           controller: _adminMobile,
           style: const TextStyle(color: Colors.white),
           decoration:
-              _fieldDecoration(icon: Icons.person_rounded, label: 'نام کاربری یا شمارهٔ حساب'),
+              _fieldDecoration(icon: Icons.person_rounded, label: 'نام کاربری'),
         ),
         Gaps.vSm,
         TextFormField(
@@ -670,7 +670,7 @@ class _AuthScreenState extends State<AuthScreen> {
             controller: _adminMobile,
             style: const TextStyle(color: Colors.white),
             decoration: _fieldDecoration(
-                icon: Icons.shield_rounded, label: 'نام کاربری یا شمارهٔ حساب'),
+                icon: Icons.shield_rounded, label: 'نام کاربری'),
           ),
           Gaps.vSm,
           TextFormField(
