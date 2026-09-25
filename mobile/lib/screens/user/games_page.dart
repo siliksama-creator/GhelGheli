@@ -205,10 +205,26 @@ class _GamesHubPageState extends State<GamesHubPage> {
     );
   }
 
+  /// ── چرا موازی شد ────────────────────────────────────────────────────────
+  ///
+  /// این تابع سه چیزِ **مستقل** می‌خواهد: پروفایل و اقتصاد (`bootstrap`)،
+  /// متنِ زنده و سطوحِ ورودی (`config`) و لولِ کاربر (`level`). قبلاً پشتِ
+  /// سرِ هم می‌رفتند و روی 4G هر رفت‌وبرگشت ~۳۰۰ میلی‌ثانیه است، پس کاربر تا
+  /// حدود یک ثانیه فقط منتظرِ صفِ خودمان می‌ماند — بی‌آنکه سرور کاری کند.
+  ///
+  /// حالا هر سه هم‌زمان می‌روند و خطای هر کدام **جدا** مهار می‌شود: شکستِ
+  /// یکی بقیه را نمی‌بَرد (همان قرارِ قبلی، منتها حالا واقعاً مستقل است).
   Future<void> _loadLevel() async {
-    try {
-      final boot = await widget.api.get('/api/bootstrap');
-      if (!mounted || boot is! Map) return;
+    final results = await Future.wait<dynamic>([
+      widget.api.get('/api/bootstrap').catchError((_) => null),
+      widget.api.get('/api/config').catchError((_) => null),
+      widget.api.get('/api/level').catchError((_) => null),
+    ]);
+    if (!mounted) return;
+    final boot = results[0];
+    final cfgResult = results[1];
+    final levelResult = results[2];
+    if (boot is Map) {
       final m = Map<String, dynamic>.from(boot);
       setState(() {
         if (m['user'] is Map) _user = Map<String, dynamic>.from(m['user']);
@@ -219,8 +235,8 @@ class _GamesHubPageState extends State<GamesHubPage> {
           _gamePoints = Map<String, dynamic>.from(m['gamePoints']);
         }
       });
+      final cfg = cfgResult;
       try {
-        final cfg = await widget.api.get('/api/config');
         // این صفحه هم `/api/config` را خودش می‌گیرد؛ همان بدنه را به منبع
         // می‌دهیم تا «منبعِ یکتا» شعارِ معماری نماند: بیِ این خط، متنِ
         // زندهٔ این صفحه تا باری که home_shell config را می‌گیرد (یا تا
@@ -265,10 +281,10 @@ class _GamesHubPageState extends State<GamesHubPage> {
           });
         }
       } catch (_) {}
-      final d = await widget.api.get('/api/level');
-      if (!mounted || d is! Map) return;
-      setState(() => _level = Map<String, dynamic>.from(d));
-    } catch (_) {}
+    }
+    if (levelResult is Map) {
+      setState(() => _level = Map<String, dynamic>.from(levelResult));
+    }
   }
 
   bool _gameEnabled(String id) {
