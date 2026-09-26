@@ -195,7 +195,8 @@ class TourOverlayState extends State<TourOverlay> {
   }
 
   Future<void> _bootForced() async {
-    final d = await fetchTour(widget.api);
+    final res = await fetchTour(widget.api);
+    final d = res.data;
     if (!mounted || d == null) return;
     setState(() => _data = d);
     unawaited(start(fromStep: 0));
@@ -211,10 +212,14 @@ class TourOverlayState extends State<TourOverlay> {
     if (widget.api.token == null) return;
     if (!retry && _autoStarted) return;
     _autoStarted = true;
-    final d = await fetchTour(widget.api);
+    final res = await fetchTour(widget.api);
     if (!mounted) return;
+    final d = res.data;
     if (d == null) {
-      if (!retry) {
+      // تلاشِ دوباره فقط وقتی ارزش دارد که خطا گذرا بوده باشد. اگر سرور
+      // جوابِ قطعی داده (۴۰۴/۴۰۳/طرحِ عوض‌شده)، تکرارش فقط ترافیک و
+      // لاگِ الکی است — همان چیزی که تستِ «فقط یک بار» گرفت.
+      if (!retry && res.retryable) {
         _retryTimer?.cancel();
         _retryTimer = Timer(const Duration(seconds: 6), () {
           if (mounted && _data == null) unawaited(_boot(retry: true));

@@ -127,14 +127,39 @@ class TourBus extends ChangeNotifier {
   }
 }
 
+/// نتیجهٔ خواندنِ وضعیت — با این تفکیک که «ارزشِ تلاشِ دوباره دارد یا نه».
+///
+/// چرا جدا از خودِ داده: تلاشِ دوباره فقط برای خطاهای **گذرا** معنا دارد.
+/// اگر سرور بگوید ۴۰۴ (مثلاً روت هنوز مستقر نشده) یا ۴۰۳، دفعهٔ دوم هم
+/// همان جواب را می‌دهد؛ تلاشِ دوباره فقط ترافیک و لاگِ الکی است.
+///
+/// این تفکیک از یک شکستِ واقعیِ تست آمد: تستِ «هر صفحه فقط یک بار داده
+/// می‌گیرد» دید که `/api/onboarding` دو بار صدا زده می‌شود — چون شبیه‌سازِ
+/// تست ۴۰۴ می‌داد و ما بی‌قید تلاش می‌کردیم.
+class TourFetch {
+  const TourFetch({this.data, this.retryable = false});
+
+  final TourData? data;
+
+  /// خطا گذرا بود (تایم‌اوت/قطعِ شبکه/۵xx/۴۲۹)؟ فقط این‌جا تلاشِ دوباره.
+  final bool retryable;
+}
+
 /// گرفتنِ وضعیتِ تور از سرور. خطا هرگز پرتاب نمی‌شود — تور تجربهٔ اصلی نیست.
-Future<TourData?> fetchTour(ApiClient api) async {
+Future<TourFetch> fetchTour(ApiClient api) async {
   try {
     final raw = await api.get('/api/onboarding');
-    return TourData.fromJson(raw);
+    final data = TourData.fromJson(raw);
+    if (data == null) {
+      // سرور جواب داد ولی شکلی نداد که بشود با آن کار کرد (بدنهٔ ۴۰۴ یا
+      // طرحِ عوض‌شده). تلاشِ دوباره بی‌فایده است.
+      debugPrint('[tour] پاسخِ سرور برای آموزش قابلِ استفاده نبود');
+      return const TourFetch();
+    }
+    return TourFetch(data: data);
   } catch (e) {
     debugPrint('[tour] خواندنِ وضعیتِ آموزش ناموفق: $e');
-    return null;
+    return TourFetch(retryable: isTransient(e));
   }
 }
 

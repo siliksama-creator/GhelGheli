@@ -251,6 +251,8 @@ check('تور کلیک نمی‌کند (حلقه و انگشت لمس را نم�
 check('اندروید: خواندنِ ناموفقِ وضعیت یک بار دوباره تلاش می‌شود',
   OV.includes('_retryTimer') && OV.includes('_boot(retry: true)')
   && OV.includes('_retryTimer?.cancel()'));
+check('اندروید: تلاشِ دوباره فقط برای خطای گذرا (`isTransient`)',
+  SVC2.includes('isTransient(e)') && OV.includes('res.retryable'));
 
 check('تورِ خودکارِ اندروید هم فقط از خانه شروع می‌شود',
   OV.includes('_pendingAuto') && OV.includes('widget.currentIndex != 0'));

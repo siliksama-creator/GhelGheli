@@ -429,9 +429,22 @@ export default function Tour({ token, tab, goTab }) {
   // برمی‌گرداند: 'started' | 'seen' | 'blocked' | 'off' | 'error' — تا
   // تنها جایی که ارزشِ تلاشِ دوباره دارد (`error`) از بقیه جدا باشد.
   const load = useCallback(async (forced) => {
-    if (!token) return 'error';
-    const d = await req('/api/onboarding', 'GET', null, token).catch(() => null);
-    if (!d?.steps?.length) return 'error';
+    if (!token) return 'fatal';
+    let failure = null;
+    const d = await req('/api/onboarding', 'GET', null, token).catch((e) => {
+      failure = e;
+      return null;
+    });
+    if (!d?.steps?.length) {
+      // «گذرا» = قطعِ شبکه/۵xx/۴۲۹. ۴۰۴ یا ۴۰۳ جوابِ قطعیِ سرور است؛
+      // تلاشِ دوباره فقط ترافیک است — و همان چیزی بود که تستِ «هر صفحه فقط
+      // یک بار داده می‌گیرد» در اندروید گرفت.
+      const st = failure?.status;
+      const transient = failure
+        ? (failure.offline === true || !st || st === 0 || st === 429 || st >= 500)
+        : false;
+      return transient ? 'error' : 'fatal';
+    }
     setData(d);
     if (!d.enabled) return 'off';
     const q = new URLSearchParams(window.location.search).get('tour') === '1';
