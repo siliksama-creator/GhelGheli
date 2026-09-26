@@ -143,8 +143,8 @@ class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
       }
       // صندوقِ کارت را خودِ ویجتِ `CardBox` تحویل می‌گیرد (با رونماییِ
       // کارت‌ها)؛ اینجا دخالت کنیم هم پیام تکراری می‌شود هم رونمایی.
-      if (order is Map && order['purchase_kind'] == 'card_box') return;
-      if (order is Map && order['status'] == 'paid' && result.status == 'ok') {
+      if (order['purchase_kind'] == 'card_box') return;
+      if (order['status'] == 'paid' && result.status == 'ok') {
         final kind = '${order['purchase_kind'] ?? ''}';
         // لحظه فقط بعد از paid. باز شدنِ درگاه این مسیر را صدا نمی‌زند.
         if (kind == 'plus_monthly' || kind == 'plus_annual') {
