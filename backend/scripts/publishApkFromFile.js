@@ -14,6 +14,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const BACKEND = path.resolve(__dirname, '..');
+const srcArg = path.resolve(process.argv[2] || '');
 process.chdir(BACKEND);
 require('dotenv').config({ path: path.join(BACKEND, '.env') });
 
@@ -90,11 +91,11 @@ async function prune(keepName) {
 }
 
 async function main() {
-  const src = path.resolve(process.argv[2] || '');
+  const src = srcArg;
   const version = sanitizeVersion(process.argv[3]);
   const versionCode = Number(String(process.argv[4] || '').replace(/[^0-9]/g, '')) || null;
   const notes = String(process.argv[5] || 'رفع ذخیرهٔ کلکسیونی، کلاس جعبه، افکت کارت، و آهنگ جایزه').slice(0, 500);
-  if (!src || !fs.existsSync(src)) fail('مسیرِ APK معتبر نیست');
+  if (!src || !fs.existsSync(src)) fail(`مسیرِ APK معتبر نیست: ${src || '(خالی)'}`);
   if (!version || !versionCode) fail('نسخه و کدِ نسخه لازم است');
 
   const info = await inspectApk(src);

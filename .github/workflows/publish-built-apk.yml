@@ -40,8 +40,8 @@ jobs:
       - name: Publish without force-update
         run: |
           set -euo pipefail
-          APK=$(find apk-in -name '*.apk' -type f | head -1)
-          test -n "$APK"
+          APK=$(find "$GITHUB_WORKSPACE/apk-in" -name '*.apk' -type f | head -1)
+          test -f "$APK"
           node /var/www/GhelGheli/backend/scripts/publishApkFromFile.js \
             "$APK" \
             "${{ inputs.version }}" \
