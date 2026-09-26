@@ -52,6 +52,14 @@ class _TourAdapter implements HttpClientAdapter {
   /// فهرست با نقشهٔ `TourPlan` و با سرویسِ سرور را قفل می‌کند). این‌جا
   /// عنوان/متن ساختگی‌اند چون آن‌ها دادهٔ سرورند و کلاینت از خودش متن
   /// نمی‌سازد؛ چیزی که مهم است شکل و شمارشان است.
+  /// رقمِ فارسی — همان کاری که `faNum` در اپ می‌کند.
+  ///
+  /// چرا لازم شد: نسخهٔ اولِ این تست در دادهٔ آزمایشی رقمِ لاتین می‌ساخت
+  /// (`بخش 1`) ولی در انتظار رقمِ فارسی نوشته بود (`بخش ۱`)؛ نتیجه سه
+  /// شکست بود که ربطی به اپ نداشت. حالا هر دو طرف فارسی‌اند.
+  static String _fa(int n) =>
+      '$n'.split('').map((d) => '۰۱۲۳۴۵۶۷۸۹'[int.parse(d)]).join();
+
   static final String _onboarding = () {
     const ids = <String>[
       'home', 'daily', 'tap', 'wheel', 'cards', 'league', 'club', 'invite',
@@ -60,8 +68,8 @@ class _TourAdapter implements HttpClientAdapter {
     ];
     final steps = <String>[];
     for (var i = 0; i < ids.length; i++) {
-      steps.add('{"id":"${ids[i]}","title":"بخش ${i + 1}",'
-          '"text":"متن آزمایشی ${i + 1}","audioUrl":'
+      steps.add('{"id":"${ids[i]}","title":"بخش ${_fa(i + 1)}",'
+          '"text":"متن آزمایشی ${_fa(i + 1)}","audioUrl":'
           '"/api/onboarding/audio/${ids[i]}.mp3","audioReady":true}');
     }
     return '{"enabled":true,"seen":false,"version":1,"steps":['
@@ -199,8 +207,12 @@ void main() {
     expect(seenPosts, isNotEmpty, reason: 'پرچمِ «دیده شد» به سرور نرفت');
     expect(seenPosts.first.contains('skipped'), isTrue,
         reason: 'پرچمِ رد کردن با skipped ثبت نشد: ${seenPosts.first}');
-    expect(seenPosts.first.contains('"version":1'), isTrue,
+    // `options.data` در دایو بسته به مرحلهٔ pipeline یا Map است یا رشتهٔ
+    // JSON؛ پس بودنِ کلیدها سنجیده می‌شود، نه شکلِ دقیقشان.
+    expect(seenPosts.first.contains('version'), isTrue,
         reason: 'نسخهٔ تور در ثبتِ پرچم نیست: ${seenPosts.first}');
+    expect(seenPosts.first.contains('true'), isTrue,
+        reason: 'skipped باید true باشد: ${seenPosts.first}');
     expect(tester.takeException(), isNull);
   });
 
