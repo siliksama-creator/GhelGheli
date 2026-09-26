@@ -157,7 +157,6 @@ class TourOverlay extends StatefulWidget {
 class TourOverlayState extends State<TourOverlay> {
   TourData? _data;
   bool _open = false;
-  bool _busy = false; // وسطِ گذارِ یک بخش؛ جلوی دوباره‌کاری را می‌گیرد
   int _index = 0;
 
   /// مرحلهٔ فعلی: 'door' (روی درِ ورودی) یا 'target' (روی خودِ بخش).
@@ -303,7 +302,6 @@ class TourOverlayState extends State<TourOverlay> {
 
     setState(() {
       _index = i;
-      _busy = true;
       _phase = 'entering';
       _stage = 'target';
       _targetRect = null;
@@ -351,7 +349,6 @@ class TourOverlayState extends State<TourOverlay> {
     setState(() {
       _targetRect = rect;
       _stage = 'target';
-      _busy = false;
     });
     if (rect != null) {
       // سفرِ انگشت از در به هدف: همین چند صد میلی‌ثانیه «راهِ رسیدن» را
