@@ -22,7 +22,11 @@ import '../../widgets/reward_moment.dart';
 
 class ShopPage extends StatefulWidget {
   final ApiClient api;
-  const ShopPage({super.key, required this.api});
+
+  /// بعد از خریدِ واقعاً تمام‌شده، خانه و پروفایل روزهای پلاس را تازه کنند.
+  final Future<void> Function()? onAccountChanged;
+
+  const ShopPage({super.key, required this.api, this.onAccountChanged});
 
   @override
   State<ShopPage> createState() => _ShopPageState();
@@ -91,7 +95,13 @@ class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
     // بازگشت از مرورگرِ درگاه: ایونتِ دیپ‌لینک همیشه به اپ نمی‌رسد
     // (ریدایرکتِ خودکار، مرورگر را ترک نمی‌کند)، پس با هر بازگشت به اپ،
     // وضعیتِ خرید/پلاس را تازه می‌کنیم تا «غیرفعال»ِ کهنه نماند.
-    if (state == AppLifecycleState.resumed) unawaited(_reload());
+    // بازگشت از مرورگر همیشه دیپ‌لینک ندارد. فروشگاه و روزهای پلاسِ خانه
+    // باید همان لحظه تازه شوند، نه بعد از بستن و باز کردنِ اپ.
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_reload());
+      final refresh = widget.onAccountChanged;
+      if (refresh != null) unawaited(refresh());
+    }
   }
 
   void _onLiveConfig() {
@@ -106,17 +116,63 @@ class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
     if (result != null) DeepLinks.instance.republishPayment(result);
   }
 
+  Future<Map<String, dynamic>?> _readPaidOrder(String orderId) async {
+    final response = await widget.api.get(
+        '/api/payments/zarinpal/order/${Uri.encodeComponent(orderId)}',
+        fresh: true);
+    final order = response is Map ? response['order'] : null;
+    return order is Map ? Map<String, dynamic>.from(order) : null;
+  }
+
   Future<void> _handlePaymentReturn(PendingPaymentReturn result) async {
     try {
-      final response = await widget.api.get('/api/payments/zarinpal/order/${Uri.encodeComponent(result.orderId)}', fresh: true);
-      final order = response is Map ? response['order'] : null;
+      var order = await _readPaidOrder(result.orderId);
+      // کال‌بک گاهی چند لحظه بعد از برگشت تحویل را تمام می‌کند.
+      if (result.status == 'ok' && (order == null || order['status'] != 'paid')) {
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+        if (!mounted) return;
+        order = await _readPaidOrder(result.orderId);
+      }
       if (!mounted) return;
+      if (order == null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(result.status == 'ok'
+                ? 'نتیجهٔ پرداخت در حال بررسی است.'
+                : 'پرداخت لغو شد.')));
+        return;
+      }
       // صندوقِ کارت را خودِ ویجتِ `CardBox` تحویل می‌گیرد (با رونماییِ
       // کارت‌ها)؛ اینجا دخالت کنیم هم پیام تکراری می‌شود هم رونمایی.
       if (order is Map && order['purchase_kind'] == 'card_box') return;
       if (order is Map && order['status'] == 'paid' && result.status == 'ok') {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پرداخت با موفقیت انجام شد و خرید تحویل شد.')));
+        final kind = '${order['purchase_kind'] ?? ''}';
+        // لحظه فقط بعد از paid. باز شدنِ درگاه این مسیر را صدا نمی‌زند.
+        if (kind == 'plus_monthly' || kind == 'plus_annual') {
+          RewardMoment.moment(
+            context,
+            RewardMomentData(
+              source: RewardSource.shop,
+              note: kind == 'plus_annual' ? 'پلاس سالانه' : 'پلاس ماهانه',
+            ),
+          );
+        } else if (kind == 'shop_item') {
+          RewardMoment.moment(
+            context,
+            const RewardMomentData(
+              source: RewardSource.shop,
+              note: 'خرید فروشگاه انجام شد',
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('پرداخت با موفقیت انجام شد و خرید تحویل شد.')));
+        }
+        final refresh = widget.onAccountChanged;
+        if (refresh != null) unawaited(refresh());
         await _reload();
+      } else if (result.status == 'ok') {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('نتیجهٔ پرداخت در حال بررسی است.')));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('پرداخت انجام نشد یا لغو شد.')));
       }
@@ -242,6 +298,10 @@ class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
             .showSnackBar(SnackBar(content: Text(success)));
       }
       if (moment != null && !deferred) RewardMoment.moment(context, moment);
+      if (!deferred) {
+        final refresh = widget.onAccountChanged;
+        if (refresh != null) unawaited(refresh());
+      }
       await _reload();
       return result;
     } catch (error) {

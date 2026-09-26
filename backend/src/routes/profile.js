@@ -32,11 +32,15 @@ router.get('/profile', auth, asyncHandler(async (req, res) => {
     [req.user.id]);
   const leaguePayouts = await pool.query(`SELECT p.*, s.month_year FROM league_payouts p JOIN league_seasons s ON s.id=p.league_season_id WHERE p.user_id=$1 ORDER BY p.created_at DESC LIMIT 20`, [req.user.id]);
   const profileCosmetics = await shop.cosmeticsFor([req.user.id]);
+  // روزهای باقی‌ماندهٔ پلاس از پایانِ انباشته. شکستش نباید پروفایل را ببندد.
+  let plusBrief = null;
+  try { plusBrief = await shop.plusStatus(req.user.id); } catch { plusBrief = null; }
   res.json({
     user: safeUser(req.user),
     inventory: inv.rows,
     leaguePayouts: leaguePayouts.rows,
     cosmetics: profileCosmetics.get(req.user.id) || null,
+    plus: plusBrief,
   });
 }));
 
@@ -122,6 +126,11 @@ router.get('/bootstrap', auth, asyncHandler(async (req, res) => {
     myCosmetics = m.get(req.user.id) || null;
   } catch { /* ظاهر یک زینت است؛ نباید بوت‌استرپ را بشکند */ }
 
+  // خانه و پروفایل باید دقیقاً بگویند چند روز از پلاس مانده. منبع همان
+  // `expires_at` انباشته است، نه طولِ پلنی که خریده شده.
+  let plusBrief = null;
+  try { plusBrief = await shop.plusStatus(req.user.id); } catch { plusBrief = null; }
+
   let passBrief = null;
   try {
     const st = await pass.status(req.user.id);
@@ -149,6 +158,7 @@ router.get('/bootstrap', auth, asyncHandler(async (req, res) => {
     loginStreak: streakState,
     pass: passBrief,
     cosmetics: myCosmetics,
+    plus: plusBrief,
     // لولِ خودِ کاربر — صفحهٔ بازی‌ها و هدرِ داشبورد از همین می‌خوانند،
     // پس هیچ درخواستِ اضافه‌ای لازم نیست.
     level: await level.statusFor(req.user.id),

@@ -1,6 +1,6 @@
 // 1:1 با اندروید profile_page.dart — پروفایل خصوصی دقیقاً مثل اپ
 import React, { useCallback, useState } from 'react';
-import { req, avatars, asset, avatarUrl, fa } from '../lib/api.js';
+import { req, avatars, asset, avatarUrl, fa, plusRemainingText } from '../lib/api.js';
 // «۱۰ مدل اختصاصی» دیگر عددِ داخل فایل نیست: تعداد از /api/config و
 // جمله از live_copy می‌آید، پس افزودن آواتارِ تازه متن را به‌روز می‌کند.
 import { text, avatarCount, useLive } from '../lib/liveConfig.js';
@@ -77,6 +77,9 @@ export default function Profile({ token, p, load, setMsg, onToken }) {
           </CosmeticAvatarFrame>
           <div><h2 style={{ color:'#FFF', fontWeight:'900', margin:'0 0 4px' }}>پروفایل من</h2>
             <DisplayName name={u.nickname || u.first_name || 'کاربر'} cosmetics={p.cosmetics} level={p.level?.level} showTitle />
+            {plusRemainingText(p.plus) && (
+              <div style={{ marginTop:'6px', color:'#FFD166', fontWeight:'900', fontSize:'12.5px' }}>★ {plusRemainingText(p.plus)}</div>
+            )}
           </div>
         </div>
         <p style={{ color:'#D7DEE8', fontSize:'11px', margin:'0 0 12px' }}>این اطلاعات فقط برای مدیر است. در چت فقط نام مستعار و عکس دیده می‌شود.</p>

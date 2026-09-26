@@ -32,6 +32,9 @@ class DashboardPage extends StatefulWidget {
   /// در کلکسیون، خانه همان عدد کهنه را نشان ندهد.
   final List<Map<String, dynamic>> pendingGrants;
 
+  /// با هر خریدِ موفق پوسته این را زیاد می‌کند تا روزهای پلاس کهنه نماند.
+  final int accountTick;
+
   const DashboardPage({
     super.key,
     required this.api,
@@ -43,6 +46,7 @@ class DashboardPage extends StatefulWidget {
     this.onOpenInventory,
     this.onOpenTap,
     this.pendingGrants = const [],
+    this.accountTick = 0,
   });
 
   @override
@@ -70,6 +74,12 @@ class _DashboardPageState extends State<DashboardPage> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(covariant DashboardPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.accountTick != oldWidget.accountTick) unawaited(_load());
+  }
+
   /// آخرین اسنپ‌شات را بدونِ هیچ درخواستی رسم می‌کند.
   void _paintCached() {
     final cached = widget.api.cachedSnapshot('/api/bootstrap');
@@ -86,6 +96,7 @@ class _DashboardPageState extends State<DashboardPage> {
         if (m['loginStreak'] != null) 'loginStreak': m['loginStreak'],
         if (m['cosmetics'] != null) 'cosmetics': m['cosmetics'],
         if (m['pendingGrants'] != null) 'pendingGrants': m['pendingGrants'],
+        if (m['plus'] != null) 'plus': m['plus'],
       };
       _error = null;
       _loading = false;
@@ -115,6 +126,7 @@ class _DashboardPageState extends State<DashboardPage> {
           if (m['loginStreak'] != null) 'loginStreak': m['loginStreak'],
           if (m['cosmetics'] != null) 'cosmetics': m['cosmetics'],
           if (m['pendingGrants'] != null) 'pendingGrants': m['pendingGrants'],
+          if (m['plus'] != null) 'plus': m['plus'],
         };
         _error = null;
         _loading = false;
@@ -192,6 +204,9 @@ class _DashboardPageState extends State<DashboardPage> {
             nickname: user?['nickname'] ?? 'قهرمان',
             user: user is Map ? Map<String, dynamic>.from(user) : null,
             cosmetics: _data?['cosmetics'] as Map<String, dynamic>?,
+            plus: _data?['plus'] is Map
+                ? Map<String, dynamic>.from(_data!['plus'] as Map)
+                : null,
             onOpenProfile: widget.onOpenProfile,
             onOpenWallet: widget.onOpenWallet,
           )),

@@ -156,6 +156,9 @@ class _HomeShellState extends State<HomeShell>
   List<Map<String, dynamic>> _inventory = const [];
   List<Map<String, dynamic>> _pendingGrants = const [];
 
+  /// بعد از خریدِ موفق زیاد می‌شود تا خانه و پروفایل روزهای پلاس را دوباره بخوانند.
+  int _accountTick = 0;
+
   /// ── برنامه‌های پیشنهادی ───────────────────────────────────────────────
   ///
   /// خواستهٔ مالک (۲۶ شهریور): «یک قسمت برنامهٔ پیشنهادی در قسمت (بیشتر)
@@ -323,6 +326,12 @@ class _HomeShellState extends State<HomeShell>
     }
   }
 
+  void _refreshProfileConfig() {
+    if (_pageCache.containsKey(6)) {
+      _pageCache[6] = _buildPage(6);
+    }
+  }
+
   /// تنها جایی که یک صفحه واقعاً ساخته می‌شود.
   ///
   /// `switch` و نه ساختنِ کلِ لیست و برداشتنِ عنصرِ i-ام: آن کار همان
@@ -334,6 +343,7 @@ class _HomeShellState extends State<HomeShell>
         return DashboardPage(
           api: widget.api,
           reloadProfile: _loadProfile,
+          accountTick: _accountTick,
           onOpenProfile: () => setState(() => _index = 6),
           onOpenWallet: () => setState(() => _index = _walletIndex),
           onOpenWheel: () => setState(() => _index = wheelIndex),
@@ -374,7 +384,11 @@ class _HomeShellState extends State<HomeShell>
       case 5:
         return SupportPage(api: widget.api);
       case 6:
-        return ProfilePage(api: widget.api, reloadProfile: _loadProfile);
+        return ProfilePage(
+          api: widget.api,
+          reloadProfile: _loadProfile,
+          accountTick: _accountTick,
+        );
       // ۷ به بعد در نوار پایین نیستند: از آیکون گردونه در نوار بالا و از
       // میان‌برهای داشبورد و شیتِ «بیشتر» باز می‌شوند.
       case wheelIndex:
@@ -396,7 +410,7 @@ class _HomeShellState extends State<HomeShell>
       case referralIndex:
         return ReferralPage(api: widget.api);
       case shopIndex:
-        return ShopPage(api: widget.api);
+        return ShopPage(api: widget.api, onAccountChanged: _loadProfile);
       case passIndex:
         return PassPage(
           api: widget.api,
@@ -427,6 +441,7 @@ class _HomeShellState extends State<HomeShell>
         return DashboardPage(
           api: widget.api,
           reloadProfile: _loadProfile,
+          accountTick: _accountTick,
           pendingGrants: _pendingGrants,
         );
     }
@@ -930,6 +945,9 @@ class _HomeShellState extends State<HomeShell>
         if (inv is List || pg is List) {
           _refreshCardRegPageConfig();
         }
+        _accountTick++;
+        _refreshDashboardConfig();
+        _refreshProfileConfig();
         final p = m['pass'];
         if (p is Map) {
           _passClaimable = (p['claimable'] as num?)?.toInt() ?? 0;

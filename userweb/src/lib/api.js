@@ -194,6 +194,35 @@ export const fa = n => {
 };
 
 /**
+ * جملهٔ دقیقِ روزهای باقی‌ماندهٔ پلاس.
+ *
+ * از `expiresAt` حساب می‌شود تا خریدِ دوباره — که سرور به انتهای اشتراک
+ * فعلی می‌چسباند — همان جمع را نشان بدهد، نه طولِ پلن را. اگر پلاس فعال
+ * نباشد رشتهٔ خالی برمی‌گردد و خانه/پروفایل خط را پنهان می‌کنند.
+ */
+export function plusRemainingText(plus) {
+  if (!plus || typeof plus !== 'object') return '';
+  const end = Date.parse(plus.expiresAt || plus.expires_at || '');
+  const ms = Number.isFinite(end) ? end - Date.now() : NaN;
+  const active = plus.active === true || (Number.isFinite(ms) && ms > 0);
+  if (!active && !(Number.isFinite(ms) && ms > 0)) return '';
+  if (Number.isFinite(ms) && ms > 0) {
+    const days = Math.floor(ms / 86400000);
+    const hours = Math.floor((ms % 86400000) / 3600000);
+    if (days > 0 && hours > 0) return `${fa(days)} روز و ${fa(hours)} ساعت از پلاس مانده`;
+    if (days > 0) return `${fa(days)} روز از پلاس مانده`;
+    if (hours > 0) return `${fa(hours)} ساعت از پلاس مانده`;
+    return 'کمتر از یک ساعت از پلاس مانده';
+  }
+  const days = Number(plus.daysLeft) || 0;
+  const hours = Number(plus.hoursLeft) || 0;
+  if (days > 0 && hours > 0) return `${fa(days)} روز و ${fa(hours)} ساعت از پلاس مانده`;
+  if (days > 0) return `${fa(days)} روز از پلاس مانده`;
+  if (hours > 0) return `${fa(hours)} ساعت از پلاس مانده`;
+  return 'پلاس فعال است';
+}
+
+/**
  * URL for a stored avatar key.
  *
  * The database stores keys like `avatar_1_football.png` and the server

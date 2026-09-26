@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
@@ -17,8 +19,16 @@ import '../../tour/tour_service.dart';
 class ProfilePage extends StatefulWidget {
   final ApiClient api;
   final Future<void> Function() reloadProfile;
-  const ProfilePage(
-      {super.key, required this.api, required this.reloadProfile});
+
+  /// با هر خریدِ موفق پوسته این را زیاد می‌کند تا روزهای پلاس کهنه نماند.
+  final int accountTick;
+
+  const ProfilePage({
+    super.key,
+    required this.api,
+    required this.reloadProfile,
+    this.accountTick = 0,
+  });
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -41,12 +51,32 @@ class _ProfilePageState extends State<ProfilePage> {
   List _myClubs = const [];
   List _leagueHistory = const [];
   Map<String, dynamic> _cosmetics = const {};
+  Map<String, dynamic> _plus = const {};
 
   @override
   void initState() {
     super.initState();
     _load();
     _loadLeagueHistory();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfilePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.accountTick != oldWidget.accountTick) unawaited(_refreshPlus());
+  }
+
+  /// فقط وضعیتِ پلاس را تازه می‌کند. بارگذاریِ کامل فرم را بازنویسی می‌کرد
+  /// و ویرایشِ ذخیره‌نشدهٔ پروفایل را پاک می‌کرد.
+  Future<void> _refreshPlus() async {
+    try {
+      final profile = await widget.api.get('/api/profile');
+      if (!mounted || profile is! Map) return;
+      final plus = profile['plus'];
+      setState(() {
+        _plus = plus is Map ? Map<String, dynamic>.from(plus) : const {};
+      });
+    } catch (_) {}
   }
 
   @override
@@ -96,6 +126,9 @@ class _ProfilePageState extends State<ProfilePage> {
         _myClubs = clubs is List ? clubs : const [];
         _cosmetics = profile['cosmetics'] is Map
             ? Map<String, dynamic>.from(profile['cosmetics'] as Map)
+            : <String, dynamic>{};
+        _plus = profile['plus'] is Map
+            ? Map<String, dynamic>.from(profile['plus'] as Map)
             : <String, dynamic>{};
         _loaded = true;
       });
@@ -273,6 +306,17 @@ class _ProfilePageState extends State<ProfilePage> {
                           showTitle: true,
                           style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900),
                         ),
+                        if (plusRemainingLabel(_plus).isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '★  ${plusRemainingLabel(_plus)}',
+                            style: const TextStyle(
+                              color: Color(0xFFFFD166),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 2),
                         const Text('اطلاعات شخصی فقط برای مدیریت جهت واریز جوایز محفوظ است.',
                             style: TextStyle(fontSize: 10.5, color: Colors.white60)),

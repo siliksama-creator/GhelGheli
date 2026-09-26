@@ -1,7 +1,7 @@
 name: ghelgheli_mobile
 description: اپلیکیشن فارسی وفاداری کارت‌های فوتبالی قلقلی
 publish_to: 'none'
-version: 1.1.37+2039
+version: 1.1.38+2040
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

@@ -127,6 +127,23 @@ function planView(plan, cfg = plusPlansConfig()) {
 }
 
 /**
+ * روز و ساعتِ باقی‌مانده تا `expires_at`.
+ *
+ * عدد از همان پایانِ انباشته می‌آید، نه از طولِ پلن. کسی که ۲۰ روز دارد
+ * و ماهانه می‌خرد باید ۵۰ ببیند؛ `deliverPlus` دورهٔ جدید را به انتهای
+ * اشتراکِ فعال می‌چسباند و این تابع همان تاریخ را می‌خواند.
+ */
+function plusClock(expiresAt, now = Date.now()) {
+  const end = expiresAt ? new Date(expiresAt).getTime() : NaN;
+  const ms = end - now;
+  if (!Number.isFinite(ms) || ms <= 0) return { daysLeft: 0, hoursLeft: 0 };
+  return {
+    daysLeft: Math.floor(ms / 86400000),
+    hoursLeft: Math.floor((ms % 86400000) / 3600000),
+  };
+}
+
+/**
  * @param {string} userId
  * @param {object} [client]
  * @param {object|null} [preloadedUser]
@@ -158,12 +175,18 @@ async function plusStatus(userId, client = pool, preloadedUser = undefined) {
   const annual = activeRows.find((r) => r.plan === 'plus_annual');
   const latest = activeRows[0];
   const active = activeRows.length > 0;
+  const expiresAt = latest?.expires_at || null;
+  const clock = plusClock(expiresAt);
   return {
     active,
     tier: annual ? 'annual' : active ? 'monthly' : null,
     plan: annual?.plan || latest?.plan || null,
     startedAt: annual?.starts_at || latest?.starts_at || null,
-    expiresAt: latest?.expires_at || null,
+    // دیرترینِ `expires_at` فعال. خریدِ دوباره قبل از پایان، دوره را به
+    // همین تاریخ می‌چسباند؛ پس این همان تعدادِ روزِ باقی‌مانده است.
+    expiresAt,
+    daysLeft: clock.daysLeft,
+    hoursLeft: clock.hoursLeft,
     adFree: active,
     premiumPass: active,
     clubSwitchesRemaining: Number(user.rows[0]?.annual_club_switches || 0),
@@ -272,9 +295,8 @@ async function catalogue(userId, shape) {
       ...plus,
       price: plansCfg.monthly.price,
       days: plansCfg.monthly.days,
-      daysLeft: plus.expiresAt
-        ? Math.max(0, Math.ceil((new Date(plus.expiresAt) - Date.now()) / 86400000))
-        : 0,
+      // `daysLeft`/`hoursLeft` از `plusStatus` می‌آیند (پایانِ انباشته)،
+      // نه سقفِ گردشدهٔ طولِ پلن. خانه و پروفایل همان عدد را نشان می‌دهند.
       benefits: [...plansCfg.benefits],
       perks: [...plansCfg.benefits],
       annualBenefits: [...plansCfg.annualBenefits],

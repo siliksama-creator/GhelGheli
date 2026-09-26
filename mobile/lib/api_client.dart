@@ -766,6 +766,42 @@ String faNum(Object? value) {
   return s;
 }
 
+/// جملهٔ دقیقِ روزهای باقی‌ماندهٔ پلاس. خالی یعنی پلاس فعال نیست.
+///
+/// از `expiresAt` حساب می‌شود تا خریدِ دوباره — که سرور به انتهای اشتراک
+/// فعلی می‌چسباند — همان جمع را نشان بدهد، نه طولِ پلن را.
+String plusRemainingLabel(Object? plus) {
+  if (plus is! Map) return '';
+  final raw = plus['expiresAt'] ?? plus['expires_at'];
+  DateTime? end;
+  if (raw is DateTime) {
+    end = raw.toLocal();
+  } else if (raw != null && '$raw'.isNotEmpty) {
+    end = DateTime.tryParse('$raw')?.toLocal();
+  }
+  final now = DateTime.now();
+  if (end != null && end.isAfter(now)) {
+    final left = end.difference(now);
+    final days = left.inDays;
+    final hours = left.inHours % 24;
+    if (days > 0 && hours > 0) {
+      return '${faNum(days)} روز و ${faNum(hours)} ساعت از پلاس مانده';
+    }
+    if (days > 0) return '${faNum(days)} روز از پلاس مانده';
+    if (left.inHours > 0) return '${faNum(left.inHours)} ساعت از پلاس مانده';
+    return 'کمتر از یک ساعت از پلاس مانده';
+  }
+  if (plus['active'] != true) return '';
+  final days = (plus['daysLeft'] as num?)?.toInt() ?? 0;
+  final hours = (plus['hoursLeft'] as num?)?.toInt() ?? 0;
+  if (days > 0 && hours > 0) {
+    return '${faNum(days)} روز و ${faNum(hours)} ساعت از پلاس مانده';
+  }
+  if (days > 0) return '${faNum(days)} روز از پلاس مانده';
+  if (hours > 0) return '${faNum(hours)} ساعت از پلاس مانده';
+  return 'پلاس فعال است';
+}
+
 String fullAssetUrl(Object? value) {
   final s = (value ?? '').toString();
   if (s.isEmpty) return '';

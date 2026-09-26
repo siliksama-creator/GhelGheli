@@ -13,6 +13,7 @@ class HeroHeader extends StatelessWidget {
   final String nickname;
   final Map<String, dynamic>? user;
   final Map<String, dynamic>? cosmetics;
+  final Map<String, dynamic>? plus;
   final VoidCallback? onOpenProfile;
   final VoidCallback? onOpenWallet;
 
@@ -22,6 +23,7 @@ class HeroHeader extends StatelessWidget {
     required this.nickname,
     this.user,
     this.cosmetics,
+    this.plus,
     this.onOpenProfile,
     this.onOpenWallet,
   });
@@ -48,6 +50,7 @@ class HeroHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final missing = _missing;
     final done = _required.length - missing.length;
+    final plusText = plusRemainingLabel(plus);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
@@ -193,6 +196,18 @@ class HeroHeader extends StatelessWidget {
               ),
             ],
           ),
+
+          if (plusText.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              '★  $plusText',
+              style: const TextStyle(
+                color: Color(0xFFFFD166),
+                fontWeight: FontWeight.w900,
+                fontSize: 12.5,
+              ),
+            ),
+          ],
 
           // ── ورودی کیف پول ──
           if (onOpenWallet != null) ...[

@@ -1,6 +1,6 @@
 // 1:1 با اندروید dashboard_page.dart — داشبورد دقیقاً مثل اپ
 import React from 'react';
-import { fa, avatarUrl } from '../lib/api.js';
+import { fa, avatarUrl, plusRemainingText } from '../lib/api.js';
 import LoginStreak from '../components/LoginStreak.jsx';
 import { CosmeticAvatarFrame, DisplayName } from '../components/Cosmetics.jsx';
 import CachedImg from '../components/CachedImg.jsx';
@@ -35,10 +35,11 @@ export function isNewCard(item) {
 }
 const SORTS = [['recent', 'تازه‌ترین'], ['value', 'باارزش‌ترین'], ['name', 'الفبا']];
 
-function HeroHeader({ points, nickname, user, cosmetics, onOpenProfile, onOpenWallet }) {
+function HeroHeader({ points, nickname, user, cosmetics, plus, onOpenProfile, onOpenWallet }) {
   const requiredFields = { first_name:'نام', last_name:'نام خانوادگی', age:'سن', province:'استان', city:'شهر', bank_account:'شماره کارت' };
   const missing = user ? Object.entries(requiredFields).filter(([k]) => !String(user[k]||'').trim()).map(([,v])=>v) : [];
   const done = Object.keys(requiredFields).length - missing.length;
+  const plusText = plusRemainingText(plus);
   return (
     <div data-tour="home:hero" style={{ padding:'10px 10px 10px', borderRadius:'20px', background:'linear-gradient(135deg, #1A2B45, #111D30, #0A1220)', border:'1.2px solid rgba(255,215,0,0.28)', boxShadow:'0 8px 18px rgba(255,215,0,0.08), 0 8px 16px rgba(0,0,0,0.4)' }}>
       <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
@@ -66,6 +67,12 @@ function HeroHeader({ points, nickname, user, cosmetics, onOpenProfile, onOpenWa
           <span style={{ flex:1, color:'rgba(255,255,255,0.7)', fontSize:'10.5px', fontWeight:'600' }}>کیف پول من</span>
           <span style={{ color: asInt(user?.wallet_balance)>0 ? '#FFD36B' : '#FFF', fontWeight:'900', fontSize:'14px' }}>{fa(user?.wallet_balance||0)} <span style={{ fontSize:'9.5px', color:'rgba(255,211,107,0.8)' }}>تومان</span></span>
           <span style={{ background:'rgba(255,211,107,0.18)', color:'#FFD36B', padding:'2px 8px', borderRadius:'99px', fontSize:'9.5px', fontWeight:'800' }}>{asInt(user?.wallet_balance)>0?'برداشت':'مشاهده'} ‹</span>
+        </div>
+      )}
+      {plusText && (
+        <div style={{ marginTop:'8px', display:'flex', alignItems:'center', gap:'6px', color:'#FFD166', fontWeight:'900', fontSize:'12.5px' }}>
+          <span style={{ textShadow:'0 0 10px rgba(255,209,102,0.85)' }}>★</span>
+          <span>{plusText}</span>
         </div>
       )}
       {missing.length>0 && (
@@ -98,7 +105,7 @@ export default function Home({ token, p, load, setMsg, openProfile, openWallet, 
         </button>
       )}
 
-      <HeroHeader points={asInt(u.current_points)} nickname={u.nickname||u.mobile||'قهرمان'} user={u} cosmetics={p.cosmetics} onOpenProfile={openProfile} onOpenWallet={openWallet} />
+      <HeroHeader points={asInt(u.current_points)} nickname={u.nickname||u.mobile||'قهرمان'} user={u} cosmetics={p.cosmetics} plus={p.plus} onOpenProfile={openProfile} onOpenWallet={openWallet} />
 
       <LoginStreak token={token} initialData={p.loginStreak} setMsg={setMsg} onClaimed={load} />
 

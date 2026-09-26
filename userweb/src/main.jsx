@@ -31,6 +31,7 @@ import { LoadingView, ErrorView } from './components/states.jsx';
 import SplashScreen, { SPLASH_STAGES, SPLASH_MIN_MS } from './components/SplashScreen.jsx';
 import { UiIcon } from './components/IconAsset.jsx';
 import RewardMomentHost from './components/RewardMoment.jsx';
+import { rewardMoment } from './lib/rewardMoment.js';
 import { CardBoxReveal } from './components/CardBoxReveal.jsx';
 // راهنمای اسکرول — یک پیاده‌سازیِ واحد در وب/ادمین و آینهٔ آن در اندروید.
 // خواستهٔ مالک (۲۹ شهریور): «هر تبی که کاربرا نیاز دارن به اسکرول کنن،
@@ -699,6 +700,9 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
   // خریداری‌شده از درگاه برای رونمایی (null = چیزی برای نمایش نیست).
   const [payResult, setPayResult] = useState(null);
   const [payBox, setPayBox] = useState(null);
+  // لحظهٔ پلاس فقط بعد از verify. اثرِ پرداخت ممکن است قبل از mount شدنِ
+  // میزبانِ جشن تمام شود؛ این note نگه داشته می‌شود تا میزبان حاضر باشد.
+  const [paidMoment, setPaidMoment] = useState('');
   const [payRevealed, setPayRevealed] = useState(0);
   const [publicUser, setPublicUser] = useState(null);
   const [loadError, setLoadError] = useState(null);
@@ -806,6 +810,7 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
         // جدا نمی‌زنیم و بعد از claim هم همین load امتیاز هدر را تازه می‌کند.
         loginStreak: boot.loginStreak || null,
         cosmetics: boot.cosmetics || null,
+        plus: boot.plus || null,
         level: boot.level || null,
         // بدون این، بنر خانه و دکمهٔ باز کردن صندوق در کلکسیون همیشه
         // خالی می‌ماند — سرور می‌فرستاد و کلاینت دور می‌ریخت.
@@ -863,16 +868,29 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
     // برای نمایشِ نتیجهٔ واقعیِ سفارش است، نه اعتماد به query string.
     (async () => {
       try {
-        const d = orderId
-          ? await req(`/api/payments/zarinpal/order/${encodeURIComponent(orderId)}`, 'GET', null, token)
-          : null;
+        const read = () => req(`/api/payments/zarinpal/order/${encodeURIComponent(orderId)}`, 'GET', null, token);
+        let d = orderId ? await read() : null;
+        // کال‌بک گاهی چند لحظه بعد از لندینگ تحویل را تمام می‌کند. یک بار
+        // دیگر می‌خوانیم تا جشنِ پلاس به‌خاطرِ یک pendingِ گذرا گم نشود.
+        if (status === 'ok' && orderId && d?.order?.status !== 'paid') {
+          await new Promise((r) => setTimeout(r, 1500));
+          d = await read();
+        }
         const paid = d?.order?.status === 'paid' && status === 'ok';
-        setMsg(paid ? 'پرداخت با موفقیت انجام شد و خریدت تحویل شد.' : 'پرداخت انجام نشد یا لغو شد.');
+        setMsg(paid
+          ? 'پرداخت با موفقیت انجام شد و خریدت تحویل شد.'
+          : (status === 'ok' ? 'نتیجهٔ پرداخت در حال بررسی است؛ صفحه را تازه کن.' : 'پرداخت انجام نشد یا لغو شد.'));
         if (orderId) setPayResult({ ok: paid, orderId });
+        const kind = d?.order?.purchase_kind;
+        // لحظه فقط بعد از وضعیتِ paid. باز شدنِ درگاه این را روشن نمی‌کند.
+        if (paid && kind === 'plus_annual') setPaidMoment('پلاس سالانه');
+        else if (paid && kind === 'plus_monthly') setPaidMoment('پلاس ماهانه');
+        else if (paid && kind === 'shop_item') setPaidMoment('خرید فروشگاه انجام شد');
+        if (paid) load();
         // صندوقِ درگاهی هم باید رونمایی شود، مثل خریدِ کیف‌پولی — وگرنه
         // خریدار هرگز نمی‌بیند چه کارت‌هایی گرفته است.
         const box = d?.order?.box;
-        if (paid && d?.order?.purchase_kind === 'card_box' && box?.cards?.length) setPayBox(box);
+        if (paid && kind === 'card_box' && box?.cards?.length) setPayBox(box);
       } catch {
         setMsg(status === 'ok' ? 'نتیجهٔ پرداخت در حال بررسی است؛ صفحه را تازه کن.' : 'پرداخت انجام نشد یا لغو شد.');
       } finally {
@@ -881,6 +899,12 @@ function Portal({ token, logout, cfg, onToken, onBootSettled }) {
       }
     })();
   }, [token]);
+
+  useEffect(() => {
+    if (!paidMoment || !p) return;
+    rewardMoment({ source: 'shop', note: paidMoment });
+    setPaidMoment('');
+  }, [paidMoment, p]);
 
   // ── رونمایی تدریجی صندوقِ درگاهی ──
   // همان ضرباهنگ خرید مستقیم (هر کارت ~۳۰۰ms) تا هر دو مسیر یک حس بدهند.

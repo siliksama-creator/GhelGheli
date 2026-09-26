@@ -182,6 +182,10 @@ export default function Shop({ token, reloadProfile }) {
     setBusy(key); setNotice('');
     try {
       const result = await request();
+      // درگاه باز شده ولی پول هنوز پرداخت نشده. لحظهٔ «پلاس فعال شد»
+      // اینجا دروغ است؛ بعد از verify، بازگشتِ `?pay=result` جشن را نشان
+      // می‌دهد. تسویهٔ کامل از کیف پول `deferred` ندارد و همین‌جا جشن می‌گیرد.
+      if (result?.deferred) return;
       if (success) setNotice(success);
       if (moment) rewardMoment({ source: 'shop', ...(typeof moment === 'function' ? moment(result) : moment) });
       await load(); await reloadProfile?.();
@@ -200,7 +204,9 @@ export default function Shop({ token, reloadProfile }) {
     if (order?.settled === true) return order;
     if (!order?.startPayUrl) throw new Error('آدرس درگاه زرین‌پال دریافت نشد');
     window.location.assign(order.startPayUrl);
-    return order;
+    // سفارشِ pending را موفق حساب نکن. `act` با این پرچم لحظه و پیامِ
+    // موفقیت را تا تأییدِ پرداخت عقب می‌اندازد.
+    return { deferred: true };
   };
 
   // ── خرید: کیف پول + باقی‌مانده از بازار (هیبرید) ───────────────
