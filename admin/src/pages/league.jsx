@@ -57,6 +57,7 @@ const emptyForm = () => ({
   title: '', leagueType: 'monthly',
   startsAt: '', endsAt: '', startTime: '00:00:00', endTime: '23:59:59',
   countdownEnabled: true, plusOnly: false, minPointsEntry: 0,
+  showPrizeList: false,
 });
 
 function makeRows(count) {
@@ -121,6 +122,7 @@ export function LeaguePage({ request }) {
       countdownEnabled: false,
       plusOnly: Boolean(sn.plus_only),
       minPointsEntry: Number(sn.min_points_entry || 0),
+      showPrizeList: sn.show_prize_list === true,
     });
     // ── جوایزِ همان لیگ ──
     //
@@ -164,7 +166,7 @@ export function LeaguePage({ request }) {
       try {
         await request('/api/admin/league/current/prizes', {
           method: 'PATCH',
-          body: { seasonId: editingId, prizeRows: rows },
+          body: { seasonId: editingId, prizeRows: rows, showPrizeList: form.showPrizeList },
         });
         notify('جوایزِ این لیگ ذخیره شد');
         load(); loadSeasons();
@@ -194,6 +196,7 @@ export function LeaguePage({ request }) {
           countdownEnabled: form.countdownEnabled,
           plusOnly: form.plusOnly,
           minPointsEntry: Number(form.minPointsEntry) || 0,
+          showPrizeList: form.showPrizeList,
           prizeRows: rows,
         },
       });
@@ -411,6 +414,17 @@ export function LeaguePage({ request }) {
           background: 'rgba(255,255,255,.045)', border: '1px solid rgba(255,255,255,.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <b>جوایزِ رتبه‌ها</b>
+            <label className="lgCheck" style={{ marginInlineStart: 8 }}>
+              <input type="checkbox" checked={!!form.showPrizeList}
+                onChange={(e) => setField({ showPrizeList: e.target.checked })} />
+              <span>نمایش لیست جوایز</span>
+            </label>
+          </div>
+          <p className="lgHint" style={{ margin: '6px 0 0' }}>
+            اگر این تیک هنگام ساخت لیگ بخورد، تا وقتی هنوز کسی در این لیگ سکه نبرده،
+            فهرست جایزهٔ هر رتبه در وب و اندروید دیده می‌شود. بدون تیک، همان پیامِ «هنوز کسی سکه نبرده» می‌ماند.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
             <label className="lgHint" style={{ margin: 0 }}>تعداد رتبه‌های جایزه‌دار:</label>
             <Input type="number" min="1" max={MAX_PRIZE_RANK} value={rows.length}
               style={{ width: 84 }}

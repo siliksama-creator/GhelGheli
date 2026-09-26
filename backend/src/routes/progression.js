@@ -115,6 +115,10 @@ router.get('/league/current', auth, asyncHandler(async (req, res) => {
         season: fresh.season,
         activeLeagues: fresh.activeLeagues,
         previousWinners: fresh.previousWinners,
+        // فهرستِ جوایز فقط وقتی مدیر تیک زده باشد پر است. کشِ ۶۰ثانیه‌ای
+        // بعد از ذخیرهٔ پنل پاک می‌شود تا تیکِ تازه معطل نماند.
+        prizeList: fresh.prizeList || [],
+        showPrizeList: fresh.showPrizeList === true,
         entries: fresh.entries.map(e => ({
           ...e,
           cosmetics: cos.get(e.user_id) || null,

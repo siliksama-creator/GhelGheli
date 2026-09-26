@@ -318,6 +318,14 @@ router.patch('/admin/league/current/prizes', adminAuth, requireRole(), asyncHand
   if (perkTable !== null) {
     await pool.query('UPDATE league_seasons SET perk_table=$1, updated_at=NOW() WHERE id=$2', [JSON.stringify(perkTable), season.id]);
   }
+  // تیکِ نمایشِ فهرست. نبودنِ کلید یعنی «دست نزن» تا پنلِ قدیمی آن را خاموش نکند.
+  if (req.body.showPrizeList !== undefined) {
+    const showPrizeList = req.body.showPrizeList === true || req.body.showPrizeList === 'true';
+    await pool.query(
+      'UPDATE league_seasons SET show_prize_list=$1, updated_at=NOW() WHERE id=$2',
+      [showPrizeList, season.id]);
+  }
+  try { await cacheDelPrefix('lb:league:'); } catch { /* کش اختیاری است */ }
   await pool.query(`INSERT INTO app_settings(key,value,updated_by_admin_id,updated_at) VALUES('league_winner_count',$1,$2,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_by_admin_id=EXCLUDED.updated_by_admin_id, updated_at=NOW()`, [JSON.stringify(winnerCount), req.admin.id]);
   await audit(req.admin.id,'update_league_prizes','league_seasons',season.id,null,{...req.body,winnerCount}); res.json({
     message: 'جدول جوایز لیگ ذخیره شد',
@@ -448,6 +456,7 @@ router.post('/admin/league/seasons', adminAuth, requireRole(), asyncHandler(asyn
   const minPoints = Number.isFinite(parseFaNumber(req.body.minPointsEntry))
     ? Math.max(0, Math.trunc(parseFaNumber(req.body.minPointsEntry))) : 0;
   const plusOnly = req.body.plusOnly === true || req.body.plusOnly === 'true';
+  const showPrizeList = req.body.showPrizeList === true || req.body.showPrizeList === 'true';
 
   // ── سقفِ لیگِ هم‌زمان ──
   //
@@ -504,14 +513,17 @@ router.post('/admin/league/seasons', adminAuth, requireRole(), asyncHandler(asyn
   const { rows } = await pool.query(
     `INSERT INTO league_seasons
        (month_year, title, league_type, starts_at, ends_at, status,
-        prize_table, perk_table, manual_dates, min_points_entry, plus_only)
-     VALUES ($1,$2,$3,$4,$5,'active',$6,$7,TRUE,$8,$9)
+        prize_table, perk_table, manual_dates, min_points_entry, plus_only,
+        show_prize_list)
+     VALUES ($1,$2,$3,$4,$5,'active',$6,$7,TRUE,$8,$9,$10)
      RETURNING *`,
     [monthYear, title, leagueType, startsAt, endsAt,
-      JSON.stringify(prizeTable), JSON.stringify(perkTable), minPoints, plusOnly]);
+      JSON.stringify(prizeTable), JSON.stringify(perkTable), minPoints, plusOnly,
+      showPrizeList]);
 
   await audit(req.admin.id, 'league_create', 'league_seasons', rows[0].id, null,
-    { title, leagueType, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() });
+    { title, leagueType, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), showPrizeList });
+  try { await cacheDelPrefix('lb:league:'); } catch { /* کش اختیاری است */ }
 
   // ── انتقالِ درصدیِ سکه از لیگِ بستهٔ قبلیِ همین نوع (خواستهٔ مالک) ──
   //

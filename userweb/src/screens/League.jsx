@@ -237,6 +237,46 @@ function LeagueTabs({ tab, setTab }) {
   );
 }
 
+function prizeLine(row) {
+  const value = Number(row?.value || 0);
+  const label = String(row?.label || '').trim();
+  let base = '';
+  if (row?.kind === 'cash') base = `${fa(value)} تومان`;
+  else if (row?.kind === 'points') base = `${fa(value)} امتیاز`;
+  else if (row?.kind === 'plus_days') base = `${fa(value)} روز قلقلی پلاس`;
+  else if (row?.kind === 'card_box') base = `${fa(value)} صندوق کارت`;
+  else if (row?.kind === 'shop_item') base = label || 'آیتم فروشگاه';
+  else base = label || 'جایزه';
+  if (label && row?.kind !== 'shop_item' && label !== base) return `${base} · ${label}`;
+  return base;
+}
+
+function nobodyHasCoins(d) {
+  const entries = d?.entries || [];
+  if (Number(d?.myEntry?.coins || 0) > 0) return false;
+  return entries.every((e) => Number(e?.coins || 0) <= 0);
+}
+
+/** فهرست جوایز رتبه‌ها — فقط وقتی مدیر تیک زده و هنوز کسی سکه نبرده. */
+function PrizeSchedule({ data }) {
+  const prizes = Array.isArray(data?.prizeList) ? data.prizeList : [];
+  if (data?.showPrizeList !== true || !prizes.length || !nobodyHasCoins(data)) return null;
+  return (
+    <div style={{ margin: '0 0 12px', padding: '12px', borderRadius: '16px', background: 'rgba(255,209,102,0.08)', border: '1px solid rgba(255,209,102,0.35)' }}>
+      <b style={{ display: 'block', color: '#FFD166', fontSize: '14px', marginBottom: '4px' }}>جوایز رتبه‌ها</b>
+      <span style={{ display: 'block', color: 'rgba(255,255,255,0.62)', fontSize: '12px', lineHeight: 1.6, marginBottom: '8px' }}>
+        تا وقتی کسی در این لیگ سکه نبرده، جایزهٔ هر رتبه این است.
+      </span>
+      {prizes.map((p, i) => (
+        <div key={`${p.rank}-${p.kind}-${i}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '7px 10px', borderRadius: '11px', background: 'rgba(255,255,255,0.04)', marginBottom: '4px' }}>
+          <span style={{ color: '#FFD166', fontWeight: 900, fontSize: '13px', flexShrink: 0 }}>رتبه {fa(p.rank)}</span>
+          <span style={{ color: '#FFF', fontWeight: 800, fontSize: '13px', textAlign: 'left' }}>{prizeLine(p)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function League({ token, openProfile }) {
   const [selectedLeagueId, setSelectedLeagueId] = useState(null);
   // اقتصادِ بازی‌ها (نرخِ سکه، درصدِ انتقال بین لیگ‌ها) — از همان کشِ مشترک؛
@@ -410,6 +450,8 @@ export default function League({ token, openProfile }) {
             </div>
 
             <CoinGuide open={guideOpen} onToggle={toggleGuide} economy={economy} />
+
+            <PrizeSchedule data={d} />
 
             {/* سکوی سه‌نفره فقط وقتی معنا دارد که سه نفر باشند؛ زیرِ آن،
                 ردیفِ تک‌سطری تا همهٔ نفرات با «جایگاه شما» هم‌تراز بمانند. */}

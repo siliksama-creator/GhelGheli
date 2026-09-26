@@ -391,15 +391,68 @@ async function addLeaguePoints(client, userId, points) {
     );
   }
 }
+/**
+ * فهرستِ عمومیِ جوایز — فقط اگر مدیر هنگامِ ساختِ لیگ تیک زده باشد.
+ * رتبه‌های خالی (نقدیِ صفر) حذف می‌شوند تا جدولِ پیش‌فرضِ ۱۰تاییِ خالی
+ * به کاربر نشان داده نشود.
+ */
+async function publicPrizeList(season) {
+  if (!season || season.show_prize_list !== true) return [];
+  const rows = [];
+  for (const p of season.prize_table || []) {
+    const amount = Number(p.amount || 0);
+    if (amount > 0) {
+      rows.push({ rank: Number(p.rank), kind: 'cash', value: amount, label: p.label || null });
+    }
+  }
+  for (const p of season.perk_table || []) {
+    const value = Number(p.value || 0);
+    const kind = String(p.kind || '');
+    if (value <= 0 && kind !== 'shop_item') continue;
+    rows.push({
+      rank: Number(p.rank),
+      kind,
+      value,
+      label: p.label || null,
+      itemSlug: p.itemSlug || p.item_slug || null,
+    });
+  }
+  const slugs = [...new Set(rows
+    .filter((r) => r.kind === 'shop_item' && r.itemSlug && !r.label)
+    .map((r) => r.itemSlug))];
+  if (slugs.length) {
+    const { rows: items } = await pool.query(
+      'SELECT slug, name FROM shop_items WHERE slug = ANY($1::text[])', [slugs]);
+    const names = new Map(items.map((i) => [i.slug, i.name]));
+    for (const r of rows) {
+      if (r.kind === 'shop_item' && !r.label && names.has(r.itemSlug)) {
+        r.label = names.get(r.itemSlug);
+      }
+    }
+  }
+  return rows
+    .filter((r) => Number.isInteger(r.rank) && r.rank > 0)
+    .sort((a, b) => a.rank - b.rank || String(a.kind).localeCompare(String(b.kind)))
+    .slice(0, 50)
+    .map(({ rank, kind, value, label }) => ({ rank, kind, value, label: label || null }));
+}
+
+function stripPrivatePrizeFields(season) {
+  if (season && Object.prototype.hasOwnProperty.call(season, 'perk_table')) {
+    delete season.perk_table;
+  }
+}
+
 async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
+  const seasonCols = 'id, title, league_type, month_year, starts_at, ends_at, status, prize_table, perk_table, show_prize_list, min_points_entry, plus_only';
   const { rows: activeSeasons } = await pool.query(
-    "SELECT id, title, league_type, month_year, starts_at, ends_at, status, prize_table, min_points_entry, plus_only FROM league_seasons WHERE status='active' AND starts_at <= NOW() AND ends_at > NOW() ORDER BY starts_at ASC"
+    `SELECT ${seasonCols} FROM league_seasons WHERE status='active' AND starts_at <= NOW() AND ends_at > NOW() ORDER BY starts_at ASC`
   );
   let season = null;
   if (seasonId) {
     season = activeSeasons.find(s => s.id === seasonId);
     if (!season) {
-      const sRow = await pool.query("SELECT id, title, league_type, month_year, starts_at, ends_at, status, prize_table, min_points_entry, plus_only FROM league_seasons WHERE id=$1", [seasonId]);
+      const sRow = await pool.query(`SELECT ${seasonCols} FROM league_seasons WHERE id=$1`, [seasonId]);
       season = sRow.rows[0] || null;
     }
   }
@@ -474,12 +527,18 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
     }
   }
 
+  const prizeList = await publicPrizeList(season);
+  stripPrivatePrizeFields(season);
+  for (const s of activeSeasons) stripPrivatePrizeFields(s);
+
   return {
     season,
     activeLeagues: activeSeasons.length ? activeSeasons : (season ? [season] : []),
     entries: rows,
     previousWinners: prevWinners,
     myEntry,
+    prizeList,
+    showPrizeList: season?.show_prize_list === true,
   };
 }
 /**
