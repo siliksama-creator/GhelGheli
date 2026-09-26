@@ -46,6 +46,10 @@ enum AppUpdatePhase {
   /// فرمانِ نصب به اندروید فرستاده شده.
   installing,
 
+  /// اندروید هنوز اجازهٔ نصب را به خودِ قلقلی نداده. صفحهٔ تک‌کلید باز
+  /// می‌شود و بعد از برگشت، نصب خودش ادامه پیدا می‌کند.
+  needsPermission,
+
   /// نصب‌کننده باز شد (بعدش سیستم کار را دست می‌گیرد).
   done,
 
@@ -141,16 +145,24 @@ typedef AppUpdateDownload = Future<void> Function({
 /// نصب‌کنندهٔ تزریق‌پذیر — در تولید کانالِ بومی، در تست یک تابعِ جعلی.
 typedef AppUpdateInstall = Future<void> Function(String apkPath);
 
+/// کانالِ بومی این را برمی‌گرداند وقتی اجازهٔ نصب هنوز داده نشده.
+/// تست‌ها هم می‌توانند همین را پرتاب کنند تا مرحلهٔ اجازه سنجیده شود.
+class InstallPermissionNeeded implements Exception {
+  const InstallPermissionNeeded();
+}
+
 class AppUpdater extends ValueNotifier<AppUpdateSnapshot> {
   AppUpdater({
     Dio? dio,
     Directory? targetDir,
     AppUpdateDownload? download,
     AppUpdateInstall? install,
+    Future<void> Function()? openSettings,
   })  : _dio = dio,
         _targetDir = targetDir,
         _download = download,
         _install = install,
+        _openSettings = openSettings,
         super(const AppUpdateSnapshot());
 
   static const MethodChannel _channel = MethodChannel('ghelgheli/update');
@@ -159,6 +171,7 @@ class AppUpdater extends ValueNotifier<AppUpdateSnapshot> {
   final Directory? _targetDir;
   final AppUpdateDownload? _download;
   final AppUpdateInstall? _install;
+  final Future<void> Function()? _openSettings;
 
   CancelToken? _cancelToken;
   bool _started = false;
@@ -334,16 +347,31 @@ class AppUpdater extends ValueNotifier<AppUpdateSnapshot> {
     }
   }
 
-  /// فرستادنِ فرمانِ نصب به اندروید. از مرحلهٔ `readyToInstall` (شلیکِ
-  /// خودکار) و `done` (کاربری که از نصب‌کننده برگشته و دوباره «نصب» را
-  /// می‌زند) کار می‌کند — از هر مرحلهٔ دیگری نادیده گرفته می‌شود تا دو
-  /// نصب‌کننده باز نشود.
+  /// صفحهٔ تک‌کلیدِ «اجازهٔ نصب برای قلقلی». از دیالوگ صدا زده می‌شود
+  /// تا کاربر وسطِ فهرستِ تنظیمات دنبال منبعِ ناشناس نگردد.
+  Future<void> openInstallSettings() async {
+    if (_disposed) return;
+    try {
+      if (_openSettings != null) {
+        await _openSettings();
+      } else {
+        await _channel.invokeMethod<String>('openInstallSettings');
+      }
+    } catch (_) {
+      // باز نشدنِ تنظیمات نصب را خراب نمی‌کند؛ دکمهٔ صفحه می‌ماند.
+    }
+  }
+
+  /// فرستادنِ فرمانِ نصب. از `readyToInstall`، `done` و `needsPermission`
+  /// قبول می‌شود. اگر اندروید هنوز اجازه نداده باشد، مرحله
+  /// `needsPermission` می‌شود و نصب‌کنندهٔ گیج‌کننده باز نمی‌شود.
   Future<void> install() async {
     final path = _apkPath;
     final phase = value.phase;
     if (path == null ||
         (phase != AppUpdatePhase.readyToInstall &&
-            phase != AppUpdatePhase.done)) {
+            phase != AppUpdatePhase.done &&
+            phase != AppUpdatePhase.needsPermission)) {
       return;
     }
     if (_disposed) return;
@@ -357,10 +385,21 @@ class AppUpdater extends ValueNotifier<AppUpdateSnapshot> {
       if (_install != null) {
         await _install(path);
       } else {
-        await _channel.invokeMethod<String>('installApk', {'path': path});
+        final status =
+            await _channel.invokeMethod<String>('installApk', {'path': path});
+        if (status == 'needs-permission') {
+          throw const InstallPermissionNeeded();
+        }
       }
       _set(AppUpdateSnapshot(
         phase: AppUpdatePhase.done,
+        progress: 1,
+        receivedBytes: value.receivedBytes,
+        totalBytes: value.totalBytes,
+      ));
+    } on InstallPermissionNeeded {
+      _set(AppUpdateSnapshot(
+        phase: AppUpdatePhase.needsPermission,
         progress: 1,
         receivedBytes: value.receivedBytes,
         totalBytes: value.totalBytes,

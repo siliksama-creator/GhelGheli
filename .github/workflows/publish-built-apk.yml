@@ -45,4 +45,5 @@ jobs:
           node /var/www/GhelGheli/backend/scripts/publishApkFromFile.js \
             "$APK" \
             "${{ inputs.version }}" \
-            "${{ inputs.version_code }}"
+            "${{ inputs.version_code }}" \
+            "نصب آپدیت از خود اپ، بدون گشتن در تنظیمات منبع ناشناس"

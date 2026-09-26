@@ -20,8 +20,9 @@
 #      (`res/xml/gg_file_paths.xml`) — از اندروید ۷ به بعد، دادنِ مسیرِ
 #      خامِ فایل (`file://`) به اپِ دیگر ممنوع است و نصب با
 #      FileUriExposedException می‌میرد.
-#   ۳. فایلِ `UpdateInstaller.kt` کنارِ MainActivity: شنوندهٔ کانال و
-#      سازندهٔ Intentِ نصب.
+#   ۳. فایلِ `UpdateInstaller.kt` و `InstallResultReceiver.kt` کنارِ
+#      MainActivity: اجازهٔ تک‌کلید، جلسهٔ PackageInstaller، و برگهٔ
+#      تأییدِ سیستم. قالب‌ها در tool/*.kt.in هستند.
 #   ۴. قلاب در `MainActivity.configureFlutterEngine` که شنونده را ثبت می‌کند.
 #
 # ترتیبِ اجرا مهم است: این اسکریپت باید *بعد* از `patch_android.sh` اجرا
@@ -75,6 +76,20 @@ if 'ggFileProvider' not in src:
 else:
     print('FileProvider already present: ggFileProvider')
 
+receiver_block = """
+        <receiver
+            android:name=".InstallResultReceiver"
+            android:exported="false" />
+"""
+if 'InstallResultReceiver' not in src:
+    close = src.find('</application>')
+    if close == -1:
+        raise SystemExit('ERROR: no </application> found for install receiver')
+    src = src[:close] + receiver_block + src[close:]
+    print('added InstallResultReceiver')
+else:
+    print('InstallResultReceiver already present')
+
 manifest_path.write_text(src, encoding='utf-8')
 
 # ── ۳) فایلِ مسیرهای FileProvider ────────────────────────────────────
@@ -113,67 +128,14 @@ if pkg_line is None:
     raise SystemExit('ERROR: package line not found in MainActivity.kt')
 package = pkg_line.split('package ', 1)[1].strip()
 
-installer = pkg_dir / 'UpdateInstaller.kt'
-installer.write_text(
-    f"""package {package}
+def write_kotlin(name):
+    src_path = Path('tool') / f'{name}.kt.in'
+    body = src_path.read_text(encoding='utf-8').replace('__PACKAGE__', package)
+    (pkg_dir / f'{name}.kt').write_text(body, encoding='utf-8')
+    print(f'wrote {name}.kt in package {package}')
 
-import android.app.Activity
-import android.content.Intent
-import androidx.core.content.FileProvider
-import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodChannel
-import java.io.File
-
-// نصب‌کنندهٔ داخل‌اپی — تزریق‌شده با tool/patch_update_install.sh.
-//
-// سمتِ دارت (`lib/services/app_updater.dart`) بعد از دانلود و بررسیِ
-// sha256، متدِ `installApk` را با مسیرِ فایل صدا می‌زند. این‌جا همان فایل
-// با FileProvider به URIی امن تبدیل و نصب‌کنندهٔ سیستم باز می‌شود.
-//
-// اگر کاربر هنوز «نصبِ برنامه‌های ناشناس» را برای قلقلی مجاز نکرده باشد،
-// خودِ اندروید صفحهٔ اجازه را نشان می‌دهد؛ بعد از اجازه، کاربر با دکمهٔ
-// «نصب»ِ همان دیالوگ دوباره شلیک می‌کند (مرحلهٔ done هم install را قبول
-// می‌کند، دقیقاً برای همین برگشت).
-object UpdateInstaller {{
-    fun register(activity: Activity, engine: FlutterEngine) {{
-        MethodChannel(
-            engine.dartExecutor.binaryMessenger, "ghelgheli/update")
-            .setMethodCallHandler {{ call, result ->
-                if (call.method == "installApk") {{
-                    val path = call.argument<String>("path")
-                    if (path.isNullOrEmpty() || !File(path).exists()) {{
-                        result.error(
-                            "not-found", "APK file not found", null)
-                        return@setMethodCallHandler
-                    }}
-                    try {{
-                        val uri = FileProvider.getUriForFile(
-                            activity,
-                            activity.packageName + ".ggFileProvider",
-                            File(path))
-                        val intent = Intent(Intent.ACTION_VIEW).apply {{
-                            setDataAndType(
-                                uri,
-                                "application/vnd.android.package-archive")
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            addFlags(
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }}
-                        activity.startActivity(intent)
-                        result.success("ok")
-                    }} catch (e: Exception) {{
-                        result.error(
-                            "install-failed", e.message, null)
-                    }}
-                }} else {{
-                    result.notImplemented()
-                }}
-            }}
-    }}
-}}
-""",
-    encoding='utf-8')
-print(f'wrote UpdateInstaller.kt in package {package}')
+write_kotlin('UpdateInstaller')
+write_kotlin('InstallResultReceiver')
 
 # ── ۵) قلاب در MainActivity ───────────────────────────────────────────
 main_src = mains[0].read_text(encoding='utf-8')
@@ -220,6 +182,15 @@ grep -q 'ggFileProvider' "$MANIFEST" \
 [ -f android/app/src/main/kotlin/ir/ghelghelishop/ghelgheli/UpdateInstaller.kt ] \
   && echo "  OK   UpdateInstaller.kt" \
   || { echo "  FAIL UpdateInstaller.kt is missing"; exit 1; }
+[ -f android/app/src/main/kotlin/ir/ghelghelishop/ghelgheli/InstallResultReceiver.kt ] \
+  && echo "  OK   InstallResultReceiver.kt" \
+  || { echo "  FAIL InstallResultReceiver.kt is missing"; exit 1; }
+grep -q 'InstallResultReceiver' "$MANIFEST" \
+  && echo "  OK   install receiver in manifest" \
+  || { echo "  FAIL install receiver is missing — confirmation sheet never opens"; exit 1; }
+grep -q 'needs-permission' android/app/src/main/kotlin/ir/ghelghelishop/ghelgheli/UpdateInstaller.kt \
+  && echo "  OK   permission handoff" \
+  || { echo "  FAIL installer still dumps the user into the generic package view"; exit 1; }
 grep -Rqs 'UpdateInstaller.register' android/app/src/main/kotlin \
   && echo "  OK   MainActivity hook" \
   || { echo "  FAIL MainActivity hook is missing — channel never answers"; exit 1; }

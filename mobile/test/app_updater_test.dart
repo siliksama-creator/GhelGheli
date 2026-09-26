@@ -190,6 +190,29 @@ void main() {
       expect(bad.value.errorCode, 'install');
     });
 
+    test('نبودِ اجازه، نصب را به صفحهٔ تک‌کلید می‌برد نه به خطا', () async {
+      final dir = await _tempDir();
+      addTearDown(() => dir.deleteSync(recursive: true));
+      var calls = 0;
+      final updater = AppUpdater(
+        targetDir: dir,
+        download: _fakeDownload([9, 9]),
+        install: (_) async {
+          calls++;
+          throw const InstallPermissionNeeded();
+        },
+      );
+      addTearDown(updater.dispose);
+      await updater.start(_info);
+      await updater.install();
+      expect(updater.value.phase, AppUpdatePhase.needsPermission);
+      expect(calls, 1);
+      // برگشت از صفحهٔ اجازه: دوباره نصب صدا زده می‌شود.
+      await updater.install();
+      expect(calls, 2);
+      expect(updater.value.phase, AppUpdatePhase.needsPermission);
+    });
+
     test('نصب از مرحلهٔ نامرتبط نادیده گرفته می‌شود', () async {
       final dir = await _tempDir();
       addTearDown(() => dir.deleteSync(recursive: true));

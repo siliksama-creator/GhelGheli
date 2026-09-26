@@ -100,6 +100,12 @@ cat > "$RULES" <<'RULES_EOF'
 # از طریق Intent و FileProvider کار می‌کند.
 -keep class androidx.core.content.FileProvider { *; }
 
+# ── نصب‌کنندهٔ داخل‌اپی ──
+# گیرنده فقط از مانیفست صدا زده می‌شود. اگر R8 حذفش کند، برگهٔ
+# به‌روزرسانی هرگز باز نمی‌شود و کاربر فکر می‌کند نصب گیر کرده.
+-keep class ir.ghelghelishop.ghelgheli.InstallResultReceiver { *; }
+-keep class ir.ghelghelishop.ghelgheli.UpdateInstaller { *; }
+
 # ── مدل‌های سریال‌شونده ──
 # هر کلاسی که با بازتاب از JSON ساخته می‌شود باید نامش بماند.
 -keepattributes Signature

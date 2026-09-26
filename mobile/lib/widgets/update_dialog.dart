@@ -22,9 +22,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../api_client.dart';
-import '../../core/app_config.dart';
-import '../../services/app_updater.dart';
+import '../api_client.dart';
+import '../core/app_config.dart';
+import '../services/app_updater.dart';
 
 /// نمایشِ دیالوگِ آپدیت. `info` از `app.release` ساخته می‌شود.
 Future<void> showAppUpdateDialog({
@@ -48,7 +48,7 @@ class _AppUpdateDialog extends StatefulWidget {
 }
 
 class _AppUpdateDialogState extends State<_AppUpdateDialog>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AppUpdater _updater = AppUpdater();
   late final AnimationController _shimmer;
 
@@ -59,6 +59,10 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog>
   /// مرورگرِ اضطراری هم فقط یک بارِ خودکار باز می‌شود.
   bool _browserFired = false;
 
+  /// صفحهٔ اجازه فقط یک بارِ خودکار باز می‌شود. اگر کاربر برگشت و هنوز
+  /// اجازه نداده، دوباره هلش نمی‌دهیم؛ دکمه روی صفحه می‌ماند.
+  bool _settingsOpened = false;
+
   @override
   void initState() {
     super.initState();
@@ -67,13 +71,22 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat();
+    WidgetsBinding.instance.addObserver(this);
     _updater.addListener(_onUpdate);
     // دانلودِ خودکار: بدونِ منتظرِ لمسِ کاربر ماندن.
     unawaited(_updater.start(widget.info));
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    if (_updater.value.phase != AppUpdatePhase.needsPermission) return;
+    unawaited(_updater.install());
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _updater.removeListener(_onUpdate);
     // dispose هم دانلودِ نیمه‌کاره را لغو می‌کند.
     _updater.dispose();
@@ -86,6 +99,10 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog>
     if (snap.phase == AppUpdatePhase.readyToInstall && !_installFired) {
       _installFired = true;
       unawaited(_updater.install());
+    } else if (snap.phase == AppUpdatePhase.needsPermission &&
+        !_settingsOpened) {
+      _settingsOpened = true;
+      unawaited(_updater.openInstallSettings());
     } else if (snap.phase == AppUpdatePhase.error &&
         snap.errorCode == 'missing-plugin' &&
         !_browserFired) {
@@ -238,6 +255,27 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog>
             ],
           ],
         );
+      case AppUpdatePhase.needsPermission:
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 16),
+            Text(
+              liveText(
+                'update.allowInstall',
+                'اندروید یک‌بار باید اجازهٔ نصب را به خودِ قلقلی بدهد. صفحهٔ بعد فقط یک کلید است؛ روشن کن و برگرد. نصب خودش ادامه پیدا می‌کند.',
+              ),
+              style: theme.textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => unawaited(_updater.openInstallSettings()),
+              child: Text(liveText('update.allowButton', 'ادامهٔ نصب')),
+            ),
+          ],
+        );
       case AppUpdatePhase.readyToInstall:
       case AppUpdatePhase.installing:
       case AppUpdatePhase.done:
@@ -256,7 +294,8 @@ class _AppUpdateDialogState extends State<_AppUpdateDialog>
             const SizedBox(height: 8),
             Text(
               liveText(
-                  'update.installing', 'در حال باز کردن نصب‌کننده…'),
+                  'update.installing',
+                  'در حال نصب… اگر اندروید دکمهٔ به‌روزرسانی را نشان داد، همان را بزن.'),
               style: theme.textTheme.bodySmall,
               textAlign: TextAlign.center,
             ),
