@@ -26,7 +26,6 @@
 // تور گیر نمی‌کند: پرده می‌ماند، کارت وسطِ قاب می‌نشیند و صدا پخش می‌شود.
 // هیچ‌جای این فایل `throw` ندارد — آموزش هرگز نباید اپ را متوقف کند.
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -56,7 +55,7 @@ class TourPlan {
     'cards': TourPlan('cardreg', <String>['cardreg:top', 'nav:cardreg']),
     'league': TourPlan('league', <String>['league:tabs', 'nav:league']),
     'club': TourPlan('club', <String>['club:subtabs'], sub: 'chat'),
-    'invite': TourPlan('invite', <String>['invite:top', 'more:invite']),
+    'invite': TourPlan('invite', <String>['invite:top', 'more:invite', 'nav:more']),
     // هر بخش **باید** دستِ‌کم یک لنگرِ موجود داشته باشد؛ وگرنه تور به
     // «کارتِ وسطِ قاب» می‌افتد و کاربر نمی‌بیند منظور کدام قسمت است.
     // `nav:x` لنگرِ هندسی است (جای همان تب در نوار پایین).
@@ -73,10 +72,10 @@ class TourPlan {
     // (ترتیبِ `segments` در `league_page.dart`).
     'coins': TourPlan('league',
         <String>['league:tabs#2/4', 'league:tabs', 'nav:league']),
-    'shop': TourPlan('shop', <String>['shop:top', 'more:shop']),
-    'wallet': TourPlan('wallet', <String>['wallet:top', 'more:wallet']),
-    'profile': TourPlan('profile', <String>['profile:top', 'more:profile']),
-    'support': TourPlan('support', <String>['support:top', 'more:support']),
+    'shop': TourPlan('shop', <String>['shop:top', 'more:shop', 'nav:more']),
+    'wallet': TourPlan('wallet', <String>['wallet:top', 'more:wallet', 'nav:more']),
+    'profile': TourPlan('profile', <String>['profile:top', 'more:profile', 'nav:more']),
+    'support': TourPlan('support', <String>['support:top', 'more:support', 'nav:more']),
     'outro': TourPlan('home', <String>['home:hero', 'nav:home']),
   };
 
@@ -95,6 +94,20 @@ const Duration _settleMs = Duration(milliseconds: 620);
 /// تستِ ویجت هم قطعی باشد).
 const int _anchorTries = 36;
 const Duration _anchorPollMs = Duration(milliseconds: 90);
+
+/// سقفِ کادرِ تمرکز — هاله باید روی «یک تکه» بنشیند، نه روی کلِ صفحه.
+///
+/// چرا لازم شد (۵ مهر ۱۴۰۵): لنگرِ بعضی بخش‌ها در وب و اندروید **کلِ
+/// صفحه** است (مثلِ «کیف پول» و «دعوت دوستان» که روی `<section>`ِ تمام‌صفحه
+/// نشسته‌اند). هاله هم‌اندازهٔ قاب می‌شد، «سوراخ» برابرِ قاب می‌شد، چهار
+/// پنلِ سایه همگی صفر می‌شدند و کارت جای نشستن نداشت → تور عملاً غیب
+/// می‌شد. حالا فقط **بالای** آن تکه هاله می‌گیرد (جایی که عنوان است).
+const double _focusMaxW = 0.92; // از عرضِ قاب
+const double _focusMaxH = 0.46; // از ارتفاعِ قاب
+const double _focusMin = 44;    // کوچک‌تر از این دیگر چیزی نشان نمی‌دهد
+/// چند تلاشِ نخست فقط لنگرهای اصلی دیده می‌شوند (تا صفحه برسد)؛ بعد از آن
+/// جانشینِ همیشه‌حاضرِ `nav:…` هم آزاد است تا هاله هرگز گم نشود.
+const int _coreTries = 16; // ۱۶ × ۹۰ms ≈ ۱٫۴ ثانیه
 
 /// پخشِ صدا با همان محافظِ `game_audio.dart`: صدا هرگز چیزی را نمی‌شکند.
 AudioPlayer? _safePlayer() {
@@ -359,7 +372,11 @@ class TourOverlayState extends State<TourOverlay> {
     if (anchors.isEmpty) return null;
     for (var i = 0; i < _anchorTries; i++) {
       if (!mounted || run != _run) return null;
+      // تا `_coreTries` فقط لنگرهای اصلی دیده می‌شوند تا صفحه برسد؛ بعد از
+      // آن جانشینِ همیشه‌حاضرِ `nav:…` هم آزاد است تا هاله هرگز گم نشود.
+      final allowFallback = i >= _coreTries;
       for (final id in anchors) {
+        if (!allowFallback && id.startsWith('nav:')) continue;
         final r = _rectOfId(id);
         if (r != null) return r;
       }
@@ -422,10 +439,14 @@ class TourOverlayState extends State<TourOverlay> {
     await _show(_index + 1);
   }
 
-  /// «پخش دوباره» = همین بخش از اول، با همان انیمیشنِ ورود.
-  Future<void> _replay() async {
-    if (_busy) return;
-    await _show(_index);
+  /// دکمهٔ صدا: فقط صدای همین بخش را از نو پخش می‌کند — **بدون** پیمودنِ
+  /// دوبارهٔ مسیرِ ورود. (نسخهٔ قبلی همین دکمه کلِ بخش را از اول اجرا
+  /// می‌کرد: در ← سفر ← هدف؛ برای شنیدنِ دوبارهٔ یک جمله، چهار ثانیه
+  /// انیمیشنِ بی‌ربط بود.)
+  void _playCurrent() {
+    final d = _data;
+    if (d == null || _index >= d.steps.length) return;
+    unawaited(_play(d.steps[_index]));
   }
 
   void _toggleMute() {
@@ -523,8 +544,10 @@ class TourOverlayState extends State<TourOverlay> {
     final mq = MediaQuery.of(context);
     final frame = Rect.fromLTWH(0, mq.padding.top, mq.size.width,
         mq.size.height - mq.padding.top - mq.padding.bottom);
+    // لنگر می‌تواند کلِ صفحه باشد («کیف پول»، «دعوت دوستان»): پیش از هر
+    // چیز به اندازهٔ یک تکه کوچک می‌شود تا سوراخ از قاب بزرگ‌تر نشود.
     final hole = _stage == 'door' ? _doorRect : _targetRect;
-    final Rect? ring = _clampTo(frame, hole);
+    final Rect? ring = _clampTo(frame, _limitFocus(hole, frame));
 
     return Positioned.fill(
       child: Directionality(
@@ -588,12 +611,17 @@ class TourOverlayState extends State<TourOverlay> {
     );
   }
 
+  /// سایه: تیره‌کردنِ ملایم، **بدون تارکردن**.
+  ///
+  /// چرا تار نیست (خواستهٔ مالک، ۵ مهر ۱۴۰۵): «تار شدنِ نقاطی که توضیح
+  /// نمیده باعث گیج شدن آموزش شده.» تار، نقشهٔ اپ را از چشم می‌اندازد و
+  /// کاربر نمی‌فهمد این بخش کجای برنامه است؛ تیره‌کردن همان سلسله‌مراتب را
+  /// می‌دهد و زمینه را نگه می‌دارد. سودِ جنبی: `BackdropFilter` روی اندروید
+  /// از گران‌ترین کارهاست — حذفش چهار لایهٔ ترکیبِ زنده را از هر فریم
+  /// برمی‌دارد (تور روی گوشی‌های ضعیف هم روان می‌ماند).
   Widget _panel(Rect r) => Positioned.fromRect(
         rect: r,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 3.2, sigmaY: 3.2),
-          child: const ColoredBox(color: Color(0xA6060F1E)),
-        ),
+        child: const ColoredBox(color: Color(0x8C060F1E)),
       );
 
   /// انگشت: روی در می‌نشیند و تاچ می‌کند، بعد به سمتِ هدف سفر می‌کند.
@@ -628,6 +656,24 @@ class TourOverlayState extends State<TourOverlay> {
         ),
       ),
     );
+  }
+
+  /// کادرِ تمرکز را به اندازهٔ «یک تکه» کوچک می‌کند (فقط بالای آن نگه
+  /// داشته می‌شود — جایی که عنوان و خلاصه است).
+  ///
+  /// لنگرِ بعضی بخش‌ها کلِ صفحه است؛ هالهٔ هم‌اندازهٔ قاب یعنی سوراخ = کلِ
+  /// قاب، یعنی نه سایه می‌ماند و نه جا برای کارت — همان «غیب شدنِ» تور.
+  Rect? _limitFocus(Rect? r, Rect frame) {
+    if (r == null) return null;
+    final maxW = frame.width * _focusMaxW < _focusMin
+        ? _focusMin
+        : frame.width * _focusMaxW;
+    final maxH = frame.height * _focusMaxH < _focusMin
+        ? _focusMin
+        : frame.height * _focusMaxH;
+    final w = r.width > maxW ? maxW : (r.width < _focusMin ? _focusMin : r.width);
+    final h = r.height > maxH ? maxH : (r.height < _focusMin ? _focusMin : r.height);
+    return Rect.fromLTWH(r.left, r.top, w, h);
   }
 
   Widget _card(TourStep step, Rect frame, Rect? ring, int total) {
@@ -728,14 +774,16 @@ class TourOverlayState extends State<TourOverlay> {
           Row(
             children: <Widget>[
               Expanded(
+                child: _secondary(
+                    (_phase == 'playing' || _phase == 'error')
+                        ? 'پخش دوباره'
+                        : 'پخش صدا',
+                    _playCurrent),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
                 child: _secondary(_muted ? 'صدا خاموش' : 'صدا روشن', _toggleMute),
               ),
-              if (_phase == 'playing' || _phase == 'manual' || _phase == 'error') ...<Widget>[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _secondary('پخش دوباره', () => unawaited(_replay())),
-                ),
-              ],
             ],
           ),
         ],
@@ -756,7 +804,7 @@ class TourOverlayState extends State<TourOverlay> {
   String? _hint() {
     switch (_phase) {
       case 'offer':
-        return 'برای شروعِ پخشِ صدا یک‌بار بزن؛ بعدش خودش جلو می‌رود.';
+        return 'برای شنیدنِ صدا «پخش صدا» را بزن؛ بعدش خودش جلو می‌رود.';
       case 'waiting':
         return 'پخشِ صدا شروع نشد؛ یک‌بار «پخش صدا» را بزن.';
       case 'manual':
@@ -796,11 +844,17 @@ class TourOverlayState extends State<TourOverlay> {
         ),
       );
 
+  /// دکمهٔ اصلی **همیشه** «بعدی» است.
+  ///
+  /// چرا (خواستهٔ مالک، ۵ مهر ۱۴۰۵): «تور آنلوردینگ در موبایل دکمهٔ بعدی
+  /// نداشت.» پیش از این نقشِ این دکمه با فاز عوض می‌شد و در فازهای `offer` و
+  /// `waiting` می‌شد «شروع آموزش»/«پخش صدا» — یعنی اگر پخشِ خودکار رد می‌شد
+  /// یا فایلِ صدا نمی‌آمد، **هیچ راهی برای رفتن به بخشِ بعد نبود** و کاربر
+  /// همان‌جا گیر می‌کرد. حالا پیشروی همیشه در دست است و صدا ابزارِ جداگانهٔ
+  /// خودش را دارد.
   Widget _primary() {
     final isLast = (_data?.steps.length ?? 1) - 1 == _index;
-    final label = _phase == 'offer'
-        ? 'شروع آموزش'
-        : (_phase == 'waiting' ? 'پخش صدا' : (isLast ? 'پایان' : 'بعدی'));
+    final label = isLast ? 'پایان' : 'بعدی';
     return SizedBox(
       height: 44,
       child: DecoratedBox(
@@ -816,14 +870,7 @@ class TourOverlayState extends State<TourOverlay> {
             foregroundColor: const Color(0xFF1A1205),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
           ),
-          onPressed: () {
-            if (_phase == 'offer' || _phase == 'waiting') {
-              final d = _data;
-              if (d != null && _index < d.steps.length) unawaited(_play(d.steps[_index]));
-            } else {
-              unawaited(_next());
-            }
-          },
+          onPressed: () => unawaited(_next()),
           child: Text(label,
               style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900)),
         ),

@@ -45,17 +45,17 @@ export const TOUR_UI = Object.freeze({
   // می‌کند، نه از کاشیِ خانه) — پس همان مسیرِ واقعی نشان داده می‌شود.
   invite: {
     nav: { tab: 'invite' }, enter: ['more:invite'],
-    anchors: ['invite:top', 'more:invite', 'home:inviteTile'],
+    anchors: ['invite:top', 'more:invite', 'home:inviteTile', 'nav:more'],
   },
   duel: { nav: { tab: 'club', sub: 'games' }, anchors: ['games:grid', 'club:tab:games'] },
   cap: { nav: { tab: 'club', sub: 'games' }, anchors: ['games:stakes', 'games:grid'] },
   missions: { nav: { tab: 'club', sub: 'growth' }, anchors: ['club:tab:growth', 'club:subtabs'] },
   pass: { nav: { tab: 'club', sub: 'pass' }, anchors: ['club:tab:pass', 'club:subtabs'] },
   coins: { nav: { tab: 'league', sub: 'vault' }, anchors: ['league:tab:vault', 'league:tabs'] },
-  shop: { nav: { tab: 'shop' }, enter: ['more:shop'], anchors: ['shop:top', 'more:shop'] },
-  wallet: { nav: { tab: 'wallet' }, enter: ['more:wallet'], anchors: ['wallet:top', 'more:wallet'] },
-  profile: { nav: { tab: 'profile' }, enter: ['more:profile'], anchors: ['profile:top', 'more:profile'] },
-  support: { nav: { tab: 'support' }, enter: ['more:support'], anchors: ['support:top', 'more:support'] },
+  shop: { nav: { tab: 'shop' }, enter: ['more:shop'], anchors: ['shop:top', 'more:shop', 'nav:more'] },
+  wallet: { nav: { tab: 'wallet' }, enter: ['more:wallet'], anchors: ['wallet:top', 'more:wallet', 'nav:more'] },
+  profile: { nav: { tab: 'profile' }, enter: ['more:profile'], anchors: ['profile:top', 'more:profile', 'nav:more'] },
+  support: { nav: { tab: 'support' }, enter: ['more:support'], anchors: ['support:top', 'more:support', 'nav:more'] },
   outro: { nav: { tab: 'home' }, anchors: ['home:hero', 'nav:home'] },
 });
 

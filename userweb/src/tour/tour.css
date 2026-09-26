@@ -33,11 +33,17 @@
    از قاب بیرون می‌زد — همان دسته باگی که یک بار دیدیم. */
 .tourRoot *, .tourRoot *::before, .tourRoot *::after { box-sizing: border-box; }
 
+/* ── سایه: تیره‌کردنِ ملایم، **بدون تارکردن** ──────────────────────────
+   چرا تار نیست (خواستهٔ مالک، ۵ مهر ۱۴۰۵): «تار شدنِ نقاطی که توضیح
+   نمیده باعث گیج شدن آموزش شده.» تارکردن، زمینه را می‌خواند و چشم مدام
+   بینِ «کجای اپم؟» و «کجا را نشان می‌دهد؟» پَر می‌زند. تیره‌کردنِ ساده
+   همان سلسله‌مراتب را می‌دهد (این بخش روشن‌تر است) ولی نقشهٔ اپ سر جایش
+   می‌ماند — کاربر هم‌زمان هم بخش را می‌بیند و هم می‌فهمد کجاست.
+   سودِ جنبی: `backdrop-filter` روی موبایل از گران‌ترین کارهاست؛ حذفش
+   چهار لایهٔ ترکیبِ زنده را از هر فریم برمی‌دارد. */
 .tourShade {
   position: absolute;
-  background: rgba(2, 6, 23, 0.62);
-  -webkit-backdrop-filter: blur(3.2px) saturate(0.75);
-  backdrop-filter: blur(3.2px) saturate(0.75);
+  background: rgba(2, 6, 23, 0.55);
   transition: top .28s ease, left .28s ease, width .28s ease, height .28s ease;
 }
 .tourShadeFull { inset: 0; }
@@ -46,11 +52,14 @@
 .tourBlock { position: absolute; background: transparent; }
 
 /* هالهٔ دورِ بخشِ جاری — نبضِ آرام تا چشم همان‌جا بماند. */
+/* هاله: چون دیگر خبری از تارکردن نیست، هاله خودش باید تمرکز را بسازد —
+   کلفت‌تر و با یک «هالهٔ دور» ی روشن‌تر که روی سایه هم دیده شود. */
 .tourRing {
   position: absolute;
   border-radius: 18px;
-  border: 2px solid rgba(255, 209, 102, 0.95);
-  box-shadow: 0 0 0 4px rgba(255, 209, 102, 0.18), 0 10px 34px rgba(255, 209, 102, 0.22);
+  border: 2.6px solid rgba(255, 209, 102, 0.98);
+  background: rgba(255, 209, 102, 0.07);
+  box-shadow: 0 0 0 5px rgba(255, 209, 102, 0.22), 0 12px 40px rgba(255, 209, 102, 0.30);
   animation: tourPulse 1.9s ease-in-out infinite;
   pointer-events: none;
 }

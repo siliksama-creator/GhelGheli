@@ -72,28 +72,59 @@ const NAV_SETTLE = 560; // فرصتِ بازشدنِ صفحه/زیرتب/شیت�
 const MAX_WAIT = 3400;  // حداکثر انتظار برای ظهورِ لنگر
 const DOOR_MS = 1500;   // مکثِ مرحلهٔ «در»: انگشت می‌نشیند و تاچ می‌کند
 const ENTER_MS = 1650;  // مکثِ سفرِ انگشت از در به هدف
+// ── سقفِ کادرِ تمرکز ────────────────────────────────────────────────────
+// چرا لازم شد (۵ مهر ۱۴۰۵): لنگرِ بعضی بخش‌ها **کلِ صفحه** است —
+// `wallet:top` روی `<section class="card wide walletPage">` و `invite:top`
+// روی `<section class="refPage">` نشسته‌اند. هاله به اندازهٔ کلِ قاب
+// می‌شد، «سوراخ» برابرِ قاب می‌شد، چهار پنلِ سایه همگی صفر می‌شدند و کارت
+// دیگر جایی برای نشستن نداشت → تور عملاً غیب می‌شد («وقتی می‌خواد دوستان و
+// کیف پول رو توضیح بده کلا غیب میشه»).
+//
+// اصلاح: هاله فقط **بالای** آن تکه را می‌گیرد (جایی که عنوان و خلاصه است)،
+// نه همه‌اش را. همان قاعده‌ای که خودِ پروژه برای لنگرها نوشته بود:
+// «هاله روی خودِ تکه، نه کلِ صفحه».
+const FOCUS_MAX_W = 0.92; // از عرضِ قاب
+const FOCUS_MAX_H = 0.46; // از ارتفاعِ قاب
+const FOCUS_MIN = 44;     // کوچک‌تر از این دیگر چیزی نشان نمی‌دهد
+// فرصتِ ویژه برای لنگرِ اصلی پیش از پذیرشِ جانشین (`nav:…`).
+// بدون آن، جانشینی که همیشه در DOM است (مثلِ `nav:more`) در همان نخستین
+// تیک برنده می‌شد و لنگرِ دقیق — که شاید یک چانکِ lazy عقبش باشد — هرگز
+// نمی‌رسید.
+const CORE_GRACE = 1400;
 
 /** انتظار برای ظاهر شدنِ یکی از چند انتخابگر؛ آخرین موردِ دیده‌شدنی برنده است. */
-function waitForAny(selectors, timeout = MAX_WAIT) {
-  const sel = selectors.filter(Boolean).join(',');
-  if (!sel) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const started = Date.now();
-    const tick = () => {
-      let list = [];
-      try { list = document.querySelectorAll(sel); } catch { list = []; }
-      // از آخر به اول: اگر انتخابگر هم روی والد و هم روی فرزند نشسته باشد،
-      // فرزند (که دیرتر در DOM می‌آید) دقیق‌تر است.
-      for (let i = list.length - 1; i >= 0; i -= 1) {
-        const r = list[i].getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) return resolve(list[i]);
-      }
-      if (Date.now() - started > timeout) return resolve(null);
-      setTimeout(tick, 90);
-    };
-    tick();
-  });
-}
+function waitForAny(selectors, timeout = MAX_WAIT, core = -1, grace = 0) {
+    const list = selectors.filter(Boolean);
+    if (!list.length) return Promise.resolve(null);
+    const coreN = core < 0 ? list.length : Math.min(core, list.length);
+    return new Promise((resolve) => {
+      const started = Date.now();
+      const tick = () => {
+        // به **ترتیبِ خودِ فهرست** (یعنی ترتیبِ اولویتِ طراح)، نه ترتیبِ
+        // سند. نسخهٔ قبلی همهٔ انتخابگرها را با ویرگول می‌چسباند و از آخرِ
+        // فهرستِ DOM به اول می‌رفت؛ آن‌جا یک جانشینِ همیشه‌حاضر (مثل
+        // `nav:more`، که در نوارِ پایین و آخرِ سند است) زودتر از لنگرِ دقیق
+        // برنده می‌شد.
+        //
+        // `grace`: تا این قدر فرصت فقط لنگرهای اصلی (`core` تایِ اول)
+        // پذیرفته می‌شوند تا چانکِ lazyِ صفحه برسد؛ بعد از آن جانشین‌ها هم
+        // آزادند تا هاله هرگز گم نشود.
+        const allowAll = !grace || (Date.now() - started) >= grace;
+        const upto = allowAll ? list.length : coreN;
+        for (let i = 0; i < upto; i += 1) {
+          let found = null;
+          try { found = document.querySelector(list[i]); } catch { found = null; }
+          if (found) {
+            const r = found.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) return resolve(found);
+          }
+        }
+        if (Date.now() - started > timeout) return resolve(null);
+        setTimeout(tick, 90);
+      };
+      tick();
+    });
+  }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -163,6 +194,25 @@ function clampBox(box, frame) {
 }
 
 const centerOf = (r) => (r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null);
+
+/** کادرِ تمرکز را به اندازه‌ای که «یک تکه» دیده شود کوچک می‌کند.
+ *
+ * لنگرِ بعضی بخش‌ها کلِ صفحه است (`wallet:top` روی `<section class="wide
+ * walletPage">`). هالهٔ هم‌اندازهٔ قاب یعنی سوراخ = کلِ قاب یعنی نه سایه
+ * می‌ماند و نه جا برای کارت. این‌جا فقط **بالای** تکه نگه داشته می‌شود —
+ * همان‌جا که عنوان و خلاصه است — تا هم هاله معنا بدهد و هم کارت جا داشته
+ * باشد. لنگرهای کوچک (دکمهٔ تب، کاشی) دست‌نخورده می‌مانند. */
+function limitFocus(r, frame) {
+  if (!r) return null;
+  const maxW = Math.max(FOCUS_MIN, frame.width * FOCUS_MAX_W);
+  const maxH = Math.max(FOCUS_MIN, frame.height * FOCUS_MAX_H);
+  return {
+    left: r.left,
+    top: r.top,
+    width: Math.max(FOCUS_MIN, Math.min(r.width, maxW)),
+    height: Math.max(FOCUS_MIN, Math.min(r.height, maxH)),
+  };
+}
 
 /** مرکزِ هدف، دوخته‌شده به قاب — دستِ انگشت هم بیرون نمی‌زند. */
 const HAND_HALF_X = 26;   // نصفِ عرضِ دست (۳۸px) + حاشیه
@@ -371,12 +421,31 @@ export default function Tour({ token, tab, goTab }) {
     if (run !== runRef.current) return;
 
     // ── ۳) هدف ───────────────────────────────────────────────────────
-    const anchors = (ui.anchors || []).map(a => `[data-tour="${a}"]`);
-    const el = await waitForAny(anchors);
+    const anchorIds = ui.anchors || [];
+    const anchors = anchorIds.map(a => `[data-tour="${a}"]`);
+    // لنگرهای «اصلی» = هرچه جانشینِ همیشه‌حاضرِ `nav:…` نیست. اول فقط این‌ها
+    // دیده می‌شوند (`CORE_GRACE`) تا چانکِ lazyِ صفحه برسد؛ بعد جانشین‌ها هم
+    // آزاد می‌شوند تا هاله هرگز گم نشود.
+    const coreCount = Math.max(1,
+      anchorIds.filter(a => !String(a).startsWith('nav:')).length);
+    const el = await waitForAny(anchors, MAX_WAIT, coreCount, CORE_GRACE);
     if (run !== runRef.current) return;
     elRef.current = el;
     if (el) {
-      try { el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' }); } catch { /* بی‌حرکت هم قبول */ }
+      // عنصرِ بلند (کلِ یک صفحه، مثلِ `walletPage`) را «وسط» نمی‌آوریم:
+      // آن‌وقت بالایش — که تنها چیزی است هاله نشان می‌دهد — بالای قاب
+      // می‌ماند و کارت روی هیچ می‌نشیند. بلندها به بالا چسبانده می‌شوند.
+      const tall = (() => {
+        try { return el.getBoundingClientRect().height > frameRef.current.height * 0.6; }
+        catch { return false; }
+      })();
+      try {
+        el.scrollIntoView({
+          block: tall ? 'start' : 'center',
+          inline: 'center',
+          behavior: 'smooth',
+        });
+      } catch { /* بی‌حرکت هم قبول */ }
       await sleep(420);
       if (run !== runRef.current) return;
     }
@@ -565,7 +634,10 @@ export default function Tour({ token, tab, goTab }) {
   // همهٔ اعدادِ پایین **نسبت به قاب** هستند (نه پنجره)؛ قاب همان ستونِ اپ
   // است که `readFrame` می‌دهد. این‌ها تنها جایی هستند که مختصات ساخته
   // می‌شود — بقیهٔ JSX فقط مصرف می‌کند.
-  const ringRect = stage === 'door' ? doorRect : rect;
+  // لنگر می‌تواند کلِ صفحه باشد (`wallet:top`، `invite:top`)؛ پیش از هر
+  // چیز به اندازهٔ «یک تکه» کوچک می‌شود تا سوراخ از قاب بزرگ‌تر نشود.
+  const rawRect = stage === 'door' ? doorRect : rect;
+  const ringRect = rawRect ? limitFocus(rawRect, frame) : null;
   // هاله = هدف + PAD، دوخته‌شده به قاب (لبهٔ بیرون‌زده کوچک می‌شود).
   const ringBox = ringRect
     ? clampBox({
@@ -660,7 +732,7 @@ export default function Tour({ token, tab, goTab }) {
         </div>
 
         {phase === 'offer' && (
-          <p className="tourHint">برای شروعِ پخشِ صدا یک‌بار بزن؛ بعدش خودش جلو می‌رود.</p>
+          <p className="tourHint">برای شنیدنِ صدا «پخش صدا» را بزن؛ بعدش خودش جلو می‌رود.</p>
         )}
         {phase === 'waiting' && (
           <p className="tourHint">مرورگر پخشِ خودکار را بست؛ یک‌بار روی «پخش صدا» بزن تا شروع شود.</p>
@@ -676,22 +748,25 @@ export default function Tour({ token, tab, goTab }) {
         )}
 
         <div className="tourActions">
-          {(phase === 'offer' || phase === 'waiting') ? (
-            <button type="button" className="tourPrimary" onClick={() => playCurrent(step)}>
-              {phase === 'offer' ? 'شروع آموزش' : 'پخش صدا'}
-            </button>
-          ) : (
-            <button type="button" className="tourPrimary" onClick={next}>
-              {idx + 1 >= total ? 'پایان' : 'بعدی'}
-            </button>
-          )}
+          {/* ── دکمهٔ اصلی همیشه «بعدی» است ──────────────────────────────
+              چرا (خواستهٔ مالک، ۵ مهر ۱۴۰۵): «تور آنلوردینگ دکمهٔ بعدی
+              نداشت.» پیش از این نقشِ این دکمه با فاز عوض می‌شد: در فازهای
+              `offer`/`waiting` می‌شد «شروع آموزش»/«پخش صدا» و **هیچ راهی
+              برای رفتن به بخشِ بعد نمانده بود** — اگر مرورگر پخشِ خودکار را
+              می‌بست یا فایلِ صدا نمی‌آمد، کاربر برای همیشه همان‌جا گیر
+              می‌کرد. حالا پیشروی همیشه در دست است و صدا ابزارِ جداگانهٔ
+              خودش را دارد. */}
+          <button type="button" className="tourPrimary" onClick={next}>
+            {idx + 1 >= total ? 'پایان' : 'بعدی'}
+          </button>
+          {/* صدا: پخش/دوباره — هیچ‌وقت نقشِ «بعدی» را نمی‌دزدد. */}
+          <button type="button" className="tourSecondary" onClick={() => playCurrent(step)}>
+            {phase === 'playing' || phase === 'error' ? 'پخش دوباره' : 'پخش صدا'}
+          </button>
           <button type="button" className="tourSecondary"
             onClick={() => { setMuted(m => !m); if (audioRef.current) audioRef.current.muted = !muted; }}>
             {muted ? 'صدا خاموش' : 'صدا روشن'}
           </button>
-          {(phase === 'playing' || phase === 'manual' || phase === 'error') && (
-            <button type="button" className="tourSecondary" onClick={replay}>پخش دوباره</button>
-          )}
         </div>
       </div>
 
