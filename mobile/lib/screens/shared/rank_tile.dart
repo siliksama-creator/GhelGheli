@@ -5,6 +5,56 @@ import '../../core/cosmetics.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/coin_chip.dart';
 
+String _prizePart(Map row) {
+  final kind = '${row['kind'] ?? ''}';
+  final label = '${row['label'] ?? ''}'.trim();
+  final value = row['value'];
+  final base = switch (kind) {
+    'cash' => '${faNum(value)} تومان',
+    'points' => '${faNum(value)} امتیاز',
+    'plus_days' => '${faNum(value)} روز قلقلی پلاس',
+    'card_box' => '${faNum(value)} صندوق کارت',
+    'shop_item' => label.isEmpty ? 'آیتم فروشگاه' : label,
+    _ => label,
+  };
+  if (base.isEmpty) return '';
+  if (label.isNotEmpty && kind != 'shop_item' && label != base) {
+    return '$base · $label';
+  }
+  return base;
+}
+
+String prizeChipText(Object? prize) {
+  if (prize is! List || prize.isEmpty) return '';
+  final parts = <String>[];
+  for (final item in prize) {
+    if (item is! Map) continue;
+    final line = _prizePart(Map<String, dynamic>.from(item));
+    if (line.isNotEmpty) parts.add(line);
+  }
+  return parts.join(' و ');
+}
+
+Widget? prizeCaption(Object? prize, {double fontSize = 11, TextAlign textAlign = TextAlign.start}) {
+  final text = prizeChipText(prize);
+  if (text.isEmpty) return null;
+  return Padding(
+    padding: const EdgeInsets.only(top: 2),
+    child: Text(
+      text,
+      textAlign: textAlign,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: const Color(0xFFFFD166),
+        fontSize: fontSize,
+        fontWeight: FontWeight.w800,
+        height: 1.35,
+      ),
+    ),
+  );
+}
+
 /// Dense leaderboard row for ranks beyond the podium.
 class RankTile extends StatelessWidget {
   final int rank;
@@ -63,8 +113,19 @@ class RankTile extends StatelessWidget {
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
                   ),
                 ),
-                // سکه معیارِ رتبه است، امتیاز تساوی‌شکن — پس سکه اول و
-                // پررنگ، امتیاز کنارش و کم‌رنگ‌تر.
+                if (prizeChipText(row['prize']).isNotEmpty)
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 6),
+                      child: Text(
+                        prizeChipText(row['prize']),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(color: Color(0xFFFFD166), fontSize: 11, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
                 CoinChip(value: row['coins'], size: 20),
                 Gaps.hXs,
                 Text(

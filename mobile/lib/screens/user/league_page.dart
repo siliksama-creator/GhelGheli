@@ -440,9 +440,9 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
                 ),
                 Gaps.vSm,
                 CoinGuide(economy: _economy),
-                if (_showPrizeSchedule(entries)) ...[
+                if (_prizeNote().isNotEmpty) ...[
                   Gaps.vSm,
-                  _PrizeSchedule(prizes: List<Map>.from(_data?['prizeList'] ?? const [])),
+                  _PrizeNote(note: _prizeNote()),
                 ],
                 // سکوی سه‌نفره فقط وقتی معنا دارد که سه نفر باشند. با یک یا
                 // دو نفر، Expanded کارت را تمامِ‌عرض می‌کند و چون محتوایش
@@ -453,7 +453,7 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
                   ...top.asMap().entries.map((e) {
                     final i = e.key;
                     final r = e.value;
-                    final rank = i + 1;
+                    final rank = _shownRank(r, i + 1);
                     final accent = rank == 1
                         ? const Color(0xFFFFD700)
                         : rank == 2
@@ -516,6 +516,19 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
                                     color: theme.colorScheme.onSurface),
                               ),
                             ),
+                            if (prizeChipText(r['prize']).isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  prizeChipText(r['prize']),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.end,
+                                  style: const TextStyle(color: Color(0xFFFFD166), fontSize: 12, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(width: 7),
                             CoinChip(value: r['coins'], size: 22),
                             const SizedBox(width: 7),
                             Text(
@@ -537,7 +550,7 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
                       final i = e.key;
                       final r = e.value;
                       final isFirst = i == 0;
-                      final rank = i + 1;
+                      final rank = _shownRank(r, i + 1);
                       return Expanded(
                         child: InkWell(
                           onTap: () => showPublicProfile(
@@ -618,6 +631,8 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
                                       fontSize: 12,
                                       color: theme.colorScheme.onSurface),
                                 ),
+                                if (prizeCaption(r['prize'], fontSize: 10.5, textAlign: TextAlign.center) != null)
+                                  prizeCaption(r['prize'], fontSize: 10.5, textAlign: TextAlign.center)!,
                                 const SizedBox(height: 4),
                                 Wrap(
                                   alignment: WrapAlignment.center,
@@ -689,6 +704,18 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
                             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
                           ),
                           const Spacer(),
+                          if (prizeChipText(myEntry?['prize']).isNotEmpty) ...[
+                            Flexible(
+                              child: Text(
+                                prizeChipText(myEntry?['prize']),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.end,
+                                style: const TextStyle(color: Color(0xFFFFD166), fontSize: 12, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                            const SizedBox(width: 7),
+                          ],
                           CoinChip(value: myCoins, size: 21),
                           const SizedBox(width: 7),
                           Text(
@@ -707,7 +734,7 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
                     padding: EdgeInsets.zero,
                     itemCount: rest.length,
                     itemBuilder: (context, i) => RankTile(
-                      rank: i + 4,
+                      rank: _shownRank(rest[i], i + 4),
                       row: rest[i],
                       onTap: () =>
                           showPublicProfile(context, widget.api, rest[i]['user_id']),
@@ -751,13 +778,46 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
     );
   }
 
-  bool _showPrizeSchedule(List<Map> entries) {
-    if (_data?['showPrizeList'] != true) return false;
-    final prizes = _data?['prizeList'];
-    if (prizes is! List || prizes.isEmpty) return false;
-    final mine = _data?['myEntry'];
-    if (mine is Map && _asInt(mine['coins']) > 0) return false;
-    return entries.every((e) => _asInt(e['coins']) <= 0);
+  String _prizeNote() {
+    if (_data?['showPrizeList'] != true) return '';
+    return '${_data?['prizeNote'] ?? ''}'.trim();
+  }
+}
+
+int _shownRank(Map row, int fallback) {
+  final n = _asInt(row['rank']);
+  return n > 0 ? n : fallback;
+}
+
+class _PrizeNote extends StatelessWidget {
+  const _PrizeNote({required this.note});
+  final String note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFD166).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'جوایز رتبه‌ها',
+            style: TextStyle(color: Color(0xFFFFD166), fontWeight: FontWeight.w900, fontSize: 14),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            note,
+            style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.7, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -765,71 +825,6 @@ int _asInt(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return int.tryParse('$value') ?? 0;
-}
-
-String _prizeLine(Map row) {
-  final kind = '${row['kind'] ?? ''}';
-  final label = '${row['label'] ?? ''}'.trim();
-  final value = row['value'];
-  final base = switch (kind) {
-    'cash' => '${faNum(value)} تومان',
-    'points' => '${faNum(value)} امتیاز',
-    'plus_days' => '${faNum(value)} روز قلقلی پلاس',
-    'card_box' => '${faNum(value)} صندوق کارت',
-    'shop_item' => label.isEmpty ? 'آیتم فروشگاه' : label,
-    _ => label.isEmpty ? 'جایزه' : label,
-  };
-  if (label.isNotEmpty && kind != 'shop_item' && label != base) {
-    return '$base · $label';
-  }
-  return base;
-}
-
-/// فهرست جوایز رتبه‌ها — آینهٔ `PrizeSchedule` در وب. فقط وقتی مدیر تیک زده
-/// و هنوز کسی سکه نبرده.
-class _PrizeSchedule extends StatelessWidget {
-  const _PrizeSchedule({required this.prizes});
-  final List<Map> prizes;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      title: 'جوایز رتبه‌ها',
-      subtitle: 'تا وقتی کسی در این لیگ سکه نبرده، جایزهٔ هر رتبه این است.',
-      child: Column(
-        children: [
-          for (var i = 0; i < prizes.length; i++)
-            Padding(
-              padding: EdgeInsets.only(bottom: i == prizes.length - 1 ? 0 : 4),
-              child: Row(
-                children: [
-                  Text(
-                    'رتبه ${faNum(prizes[i]['rank'])}',
-                    style: const TextStyle(
-                      color: Color(0xFFFFD166),
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _prizeLine(prizes[i]),
-                      textAlign: TextAlign.end,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 /// نمایش برندگان دورهٔ قبلی لیگ (تا پایان لیگ بعدی در این تب نمایش داده می‌شوند).

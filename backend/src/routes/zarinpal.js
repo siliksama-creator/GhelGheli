@@ -76,7 +76,7 @@ module.exports = function zarinpalRoutes({
         orderId: order.orderId,
       });
     } catch (e) {
-      await pool.query(`UPDATE payment_orders SET status='failed', updated_at=NOW(), gateway_payload=$2 WHERE id=$1`,
+      await pool.query(`UPDATE payment_orders SET status='failed', updated_at=NOW(), gateway_payload=$2::jsonb WHERE id=$1`,
         [order.orderId, JSON.stringify({ gateway: 'zarinpal', requestError: String(e.message) })]);
       return res.status(e.status || 402).json({ message: e.message || 'ساخت پرداخت ناموفق بود' });
     }
@@ -84,7 +84,7 @@ module.exports = function zarinpalRoutes({
     await pool.query(
       `UPDATE payment_orders
           SET purchase_token=$2,
-              gateway_payload=jsonb_build_object('authority', $3, 'amount_rial', $4, 'web_origin', $5)
+              gateway_payload=jsonb_build_object('authority', $3::text, 'amount_rial', $4::bigint, 'web_origin', $5::text)
         WHERE id=$1`,
       [order.orderId, started.authority, started.authority,
         zp.tomanToRial(order.amount), allowedOrigin(req)]
@@ -111,7 +111,7 @@ module.exports = function zarinpalRoutes({
 
     if (order.status === 'paid') return back('ok');           // کال‌بک تکراری
     if (status !== 'OK') {
-      await pool.query(`UPDATE payment_orders SET status='failed', updated_at=NOW(), gateway_payload=COALESCE(gateway_payload, '{}'::jsonb)||$2 WHERE id=$1`,
+      await pool.query(`UPDATE payment_orders SET status='failed', updated_at=NOW(), gateway_payload=COALESCE(gateway_payload, '{}'::jsonb)||$2::jsonb WHERE id=$1`,
         [order.id, JSON.stringify({ cancelStatus: status || 'NOK' })]);
       return back('cancel');
     }
@@ -119,7 +119,7 @@ module.exports = function zarinpalRoutes({
     const amountRial = Number(order.gateway_payload?.amount_rial || zp.tomanToRial(order.amount));
     const v = await zp.verifyPayment({ amountRial, authority });
     if (!v.ok) {
-      await pool.query(`UPDATE payment_orders SET status='failed', updated_at=NOW(), gateway_payload=COALESCE(gateway_payload, '{}'::jsonb)||$2 WHERE id=$1`,
+      await pool.query(`UPDATE payment_orders SET status='failed', updated_at=NOW(), gateway_payload=COALESCE(gateway_payload, '{}'::jsonb)||$2::jsonb WHERE id=$1`,
         [order.id, JSON.stringify({ verifyCode: v.code, verifyMessage: v.message })]);
       return back('failed');
     }
@@ -131,7 +131,7 @@ module.exports = function zarinpalRoutes({
       const claimed = await client.query(
         `UPDATE payment_orders
             SET status='paid', paid_at=NOW(), updated_at=NOW(),
-                gateway_payload=COALESCE(gateway_payload, '{}'::jsonb)||$2
+                gateway_payload=COALESCE(gateway_payload, '{}'::jsonb)||$2::jsonb
           WHERE id=$1 AND status='pending'
           RETURNING id`,
         [order.id, JSON.stringify({ refId: v.refId, verifyCode: v.code })]);
@@ -148,7 +148,7 @@ module.exports = function zarinpalRoutes({
       await client.query('ROLLBACK').catch(() => {});
       // تحویل نشد ولی پول تأیید شده: سفارش paid نمی‌ماند؛ پشتیبانی با
       // refId از gateway_payload پیگیری می‌کند.
-      await pool.query(`UPDATE payment_orders SET status='failed', updated_at=NOW(), gateway_payload=COALESCE(gateway_payload, '{}'::jsonb)||$2 WHERE id=$1 AND status='pending'`,
+      await pool.query(`UPDATE payment_orders SET status='failed', updated_at=NOW(), gateway_payload=COALESCE(gateway_payload, '{}'::jsonb)||$2::jsonb WHERE id=$1 AND status='pending'`,
         [order.id, JSON.stringify({ deliverError: String(e.message), refId: v.refId })]);
       return back('failed');
     } finally {

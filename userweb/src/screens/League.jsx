@@ -40,6 +40,44 @@ import CoinVault from '../components/CoinVault.jsx';
  * نمایش داده می‌شود. `PodiumRow` عمداً همان چیدمانِ ردیفِ «جایگاه شما»
  * را دارد تا همهٔ نفرات در یک سطح دیده شوند.
  */
+function shownRank(row, fallback) {
+  const n = Number(row?.rank);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+function prizeLine(row) {
+  const value = Number(row?.value || 0);
+  const label = String(row?.label || '').trim();
+  let base = '';
+  if (row?.kind === 'cash') base = `${fa(value)} تومان`;
+  else if (row?.kind === 'points') base = `${fa(value)} امتیاز`;
+  else if (row?.kind === 'plus_days') base = `${fa(value)} روز قلقلی پلاس`;
+  else if (row?.kind === 'card_box') base = `${fa(value)} صندوق کارت`;
+  else if (row?.kind === 'shop_item') base = label || 'آیتم فروشگاه';
+  else base = label || '';
+  if (!base) return '';
+  if (label && row?.kind !== 'shop_item' && label !== base) return `${base} · ${label}`;
+  return base;
+}
+
+function prizeChipText(prize) {
+  const list = Array.isArray(prize) ? prize : (prize ? [prize] : []);
+  return list.map(prizeLine).filter(Boolean).join(' و ');
+}
+
+function PrizeCaption({ prize, size = 11, align = 'start', inline = false }) {
+  const text = prizeChipText(prize);
+  if (!text) return null;
+  if (inline) {
+    return (
+      <span title={text} style={{ color:'#FFD166', fontWeight:800, fontSize:`${size}px`, lineHeight:1.3, maxWidth:'148px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flexShrink:1 }}>{text}</span>
+    );
+  }
+  return (
+    <div style={{ color:'#FFD166', fontWeight:800, fontSize:`${size}px`, lineHeight:1.4, marginTop:2, textAlign:align }}>{text}</div>
+  );
+}
+
 function PodiumRow({ rank, row, onTap }) {
   const accent = rank === 1 ? '#FFD700' : rank === 2 ? '#CBD5E1' : '#CD7F32';
   const badgeColor = rank === 1 ? '#241900' : rank === 2 ? '#1E293B' : '#FFF';
@@ -48,10 +86,11 @@ function PodiumRow({ rank, row, onTap }) {
       <span style={{ lineHeight:1, display:'flex', flexShrink:0, color: rank===1?'#FFD166':rank===2?'#CBD5E1':'#D08B5B' }}>
         <SvgIcon name={rank===1?'medal1':rank===2?'medal2':'medal3'} size={19} /></span>
       <span style={{ display:'inline-block', padding:'1px 7px', borderRadius:'99px', background:accent, color:badgeColor, fontSize:'10px', fontWeight:'900', flexShrink:0 }}>{fa(rank)}</span>
-      <span style={{ minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:'700', fontSize:'13px', color:'#FFF' }}>
+      <span style={{ minWidth:0, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:'700', fontSize:'13px', color:'#FFF' }}>
         <DisplayName name={row.nickname || 'کاربر'} cosmetics={row.cosmetics} level={row.level} />
       </span>
-      <span style={{ marginInlineStart:'auto', display:'flex', alignItems:'center', gap:'7px', flexShrink:0 }}>
+      <span style={{ marginInlineStart:'auto', display:'flex', alignItems:'center', gap:'7px', flexShrink:0, maxWidth:'58%' }}>
+        <PrizeCaption prize={row.prize} size={12} inline />
         <CoinChip value={row.coins} size={22} />
         <span style={{ fontSize:'12px', color:'rgba(255,255,255,0.6)', fontWeight:'700' }}>{fa(row.points)}</span>
       </span>
@@ -83,6 +122,7 @@ function PodiumCard({ rank, row, onTap }) {
         <CoinChip value={row.coins} size={isFirst ? 26 : 22} />
         <span style={{ fontSize:'11px', color:'rgba(255,255,255,0.6)' }}>{fa(row.points)}</span>
       </div>
+      <PrizeCaption prize={row.prize} size={10.5} align="center" />
     </div>
   );
 }
@@ -237,42 +277,14 @@ function LeagueTabs({ tab, setTab }) {
   );
 }
 
-function prizeLine(row) {
-  const value = Number(row?.value || 0);
-  const label = String(row?.label || '').trim();
-  let base = '';
-  if (row?.kind === 'cash') base = `${fa(value)} تومان`;
-  else if (row?.kind === 'points') base = `${fa(value)} امتیاز`;
-  else if (row?.kind === 'plus_days') base = `${fa(value)} روز قلقلی پلاس`;
-  else if (row?.kind === 'card_box') base = `${fa(value)} صندوق کارت`;
-  else if (row?.kind === 'shop_item') base = label || 'آیتم فروشگاه';
-  else base = label || 'جایزه';
-  if (label && row?.kind !== 'shop_item' && label !== base) return `${base} · ${label}`;
-  return base;
-}
-
-function nobodyHasCoins(d) {
-  const entries = d?.entries || [];
-  if (Number(d?.myEntry?.coins || 0) > 0) return false;
-  return entries.every((e) => Number(e?.coins || 0) <= 0);
-}
-
-/** فهرست جوایز رتبه‌ها — فقط وقتی مدیر تیک زده و هنوز کسی سکه نبرده. */
-function PrizeSchedule({ data }) {
-  const prizes = Array.isArray(data?.prizeList) ? data.prizeList : [];
-  if (data?.showPrizeList !== true || !prizes.length || !nobodyHasCoins(data)) return null;
+/** متنِ مدیر برای همین لیگ — نه فهرستِ خودکارِ مبلغ. */
+function PrizeNote({ data }) {
+  const note = String(data?.prizeNote || '').trim();
+  if (data?.showPrizeList !== true || !note) return null;
   return (
     <div style={{ margin: '0 0 12px', padding: '12px', borderRadius: '16px', background: 'rgba(255,209,102,0.08)', border: '1px solid rgba(255,209,102,0.35)' }}>
-      <b style={{ display: 'block', color: '#FFD166', fontSize: '14px', marginBottom: '4px' }}>جوایز رتبه‌ها</b>
-      <span style={{ display: 'block', color: 'rgba(255,255,255,0.62)', fontSize: '12px', lineHeight: 1.6, marginBottom: '8px' }}>
-        تا وقتی کسی در این لیگ سکه نبرده، جایزهٔ هر رتبه این است.
-      </span>
-      {prizes.map((p, i) => (
-        <div key={`${p.rank}-${p.kind}-${i}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '7px 10px', borderRadius: '11px', background: 'rgba(255,255,255,0.04)', marginBottom: '4px' }}>
-          <span style={{ color: '#FFD166', fontWeight: 900, fontSize: '13px', flexShrink: 0 }}>رتبه {fa(p.rank)}</span>
-          <span style={{ color: '#FFF', fontWeight: 800, fontSize: '13px', textAlign: 'left' }}>{prizeLine(p)}</span>
-        </div>
-      ))}
+      <b style={{ display: 'block', color: '#FFD166', fontSize: '14px', marginBottom: '6px' }}>جوایز رتبه‌ها</b>
+      <span style={{ display: 'block', color: '#FFF', fontSize: '13px', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{note}</span>
     </div>
   );
 }
@@ -451,7 +463,7 @@ export default function League({ token, openProfile }) {
 
             <CoinGuide open={guideOpen} onToggle={toggleGuide} economy={economy} />
 
-            <PrizeSchedule data={d} />
+            <PrizeNote data={d} />
 
             {/* سکوی سه‌نفره فقط وقتی معنا دارد که سه نفر باشند؛ زیرِ آن،
                 ردیفِ تک‌سطری تا همهٔ نفرات با «جایگاه شما» هم‌تراز بمانند. */}
@@ -459,13 +471,13 @@ export default function League({ token, openProfile }) {
               top.length < 3 ? (
                 <div style={{ marginBottom:'12px' }}>
                   {top.map((r,i) => (
-                    <PodiumRow key={r.user_id} rank={i+1} row={r} onTap={()=>openProfile && openProfile(r.user_id)} />
+                    <PodiumRow key={r.user_id} rank={shownRank(r, i+1)} row={r} onTap={()=>openProfile && openProfile(r.user_id)} />
                   ))}
                 </div>
               ) : (
                 <div style={{ display:'flex', gap:'6px', marginBottom:'12px', alignItems:'flex-end' }}>
                   {top.map((r,i) => (
-                    <PodiumCard key={r.user_id} rank={i+1} row={r} onTap={()=>openProfile && openProfile(r.user_id)} />
+                    <PodiumCard key={r.user_id} rank={shownRank(r, i+1)} row={r} onTap={()=>openProfile && openProfile(r.user_id)} />
                   ))}
                 </div>
               )
@@ -477,7 +489,8 @@ export default function League({ token, openProfile }) {
                 <span style={{ width:'28px', height:'28px', borderRadius:'50%', background:'rgba(56,189,248,0.15)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, color:'#38BDF8' }}><SvgIcon name="person" size={15} /></span>
                 <span style={{ color:'#94A3B8', fontSize:'12.5px', fontWeight:'700', flexShrink:0 }}>جایگاه شما</span>
                 <span style={{ color:'#FFF', fontWeight:'900', fontSize:'15px' }}>{fa(d.myEntry.rank)}</span>
-                <span style={{ marginInlineStart:'auto', display:'flex', alignItems:'center', gap:'7px' }}>
+                <span style={{ marginInlineStart:'auto', display:'flex', alignItems:'center', gap:'7px', minWidth:0 }}>
+                  <PrizeCaption prize={d.myEntry.prize} size={12} inline />
                   <CoinChip value={d.myEntry.coins} size={21} />
                   <span style={{ color:'#94A3B8', fontWeight:'700', fontSize:'12px' }}>{fa(d.myEntry.points)}</span>
                 </span>
@@ -488,10 +501,13 @@ export default function League({ token, openProfile }) {
               {rest.map((r, idx) => (
                 <div key={r.user_id} onClick={()=>openProfile && openProfile(r.user_id)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 12px', background:'rgba(255,255,255,0.03)', borderRadius:'11px', marginBottom:'4px', cursor:'pointer' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:'9px', minWidth:0 }}>
-                    <span style={{ fontWeight:'bold', width:'22px', textAlign:'center', color:'#94A3B8', fontSize:'13px', flexShrink:0 }}>{fa(idx+4)}</span>
-                    <DisplayName name={r.nickname || 'کاربر'} cosmetics={r.cosmetics} level={r.level} />
+                    <span style={{ fontWeight:'bold', width:'22px', textAlign:'center', color:'#94A3B8', fontSize:'13px', flexShrink:0 }}>{fa(shownRank(r, idx+4))}</span>
+                    <span style={{ minWidth:0, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      <DisplayName name={r.nickname || 'کاربر'} cosmetics={r.cosmetics} level={r.level} />
+                    </span>
                   </div>
-                  <span style={{ display:'flex', alignItems:'center', gap:'8px', flexShrink:0 }}>
+                  <span style={{ display:'flex', alignItems:'center', gap:'8px', flexShrink:0, maxWidth:'52%' }}>
+                    <PrizeCaption prize={r.prize} size={11} inline />
                     <CoinChip value={r.coins} size={20} />
                     <span style={{ fontWeight:'bold', color:'#38BDF8', fontSize:'12px' }}>{fa(r.points)}</span>
                   </span>

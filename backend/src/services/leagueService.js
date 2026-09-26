@@ -392,12 +392,13 @@ async function addLeaguePoints(client, userId, points) {
   }
 }
 /**
- * فهرستِ عمومیِ جوایز — فقط اگر مدیر هنگامِ ساختِ لیگ تیک زده باشد.
- * رتبه‌های خالی (نقدیِ صفر) حذف می‌شوند تا جدولِ پیش‌فرضِ ۱۰تاییِ خالی
- * به کاربر نشان داده نشود.
+ * ردیف‌های جایزهٔ همان لیگ — برای چسباندن روی رتبه، مستقل از تیکِ متن.
+ * تیک فقط متنِ توضیحی را نشان می‌دهد. جایزهٔ ثبت‌شده همیشه روی خودِ رتبه
+ * است، حتی اگر کاربر بیرون از فهرستِ دیده‌شده باشد.
+ * رتبه‌های خالی (نقدیِ صفر) حذف می‌شوند تا چیپِ بی‌معنا ساخته نشود.
  */
-async function publicPrizeList(season) {
-  if (!season || season.show_prize_list !== true) return [];
+async function seasonPrizeRows(season) {
+  if (!season) return [];
   const rows = [];
   for (const p of season.prize_table || []) {
     const amount = Number(p.amount || 0);
@@ -437,14 +438,39 @@ async function publicPrizeList(season) {
     .map(({ rank, kind, value, label }) => ({ rank, kind, value, label: label || null }));
 }
 
+function prizeForRank(prizeRows, rank) {
+  const n = Number(rank);
+  if (!Number.isInteger(n) || n <= 0) return null;
+  const found = prizeRows
+    .filter((row) => row.rank === n)
+    .map(({ kind, value, label }) => ({ kind, value, label: label || null }));
+  return found.length ? found : null;
+}
+
+function attachPrize(row, prizeRows) {
+  if (!row) return;
+  // رتبه از سرور است، نه شمارهٔ بصریِ i+1.
+  row.rank = Number(row.rank);
+  row.prize = prizeForRank(prizeRows, row.rank);
+}
+
+function publicPrizeNote(season) {
+  if (!season || season.show_prize_list !== true) return '';
+  return String(season.prize_note || '').split(String.fromCharCode(0)).join('').trim().slice(0, 1000);
+}
+
 function stripPrivatePrizeFields(season) {
-  if (season && Object.prototype.hasOwnProperty.call(season, 'perk_table')) {
+  if (!season) return;
+  if (Object.prototype.hasOwnProperty.call(season, 'perk_table')) {
     delete season.perk_table;
+  }
+  if (Object.prototype.hasOwnProperty.call(season, 'prize_note')) {
+    delete season.prize_note;
   }
 }
 
 async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
-  const seasonCols = 'id, title, league_type, month_year, starts_at, ends_at, status, prize_table, perk_table, show_prize_list, min_points_entry, plus_only';
+  const seasonCols = 'id, title, league_type, month_year, starts_at, ends_at, status, prize_table, perk_table, show_prize_list, prize_note, min_points_entry, plus_only';
   const { rows: activeSeasons } = await pool.query(
     `SELECT ${seasonCols} FROM league_seasons WHERE status='active' AND starts_at <= NOW() AND ends_at > NOW() ORDER BY starts_at ASC`
   );
@@ -527,7 +553,10 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
     }
   }
 
-  const prizeList = await publicPrizeList(season);
+  const prizeRows = await seasonPrizeRows(season);
+  for (const row of rows) attachPrize(row, prizeRows);
+  if (myEntry) attachPrize(myEntry, prizeRows);
+  const prizeNote = publicPrizeNote(season);
   stripPrivatePrizeFields(season);
   for (const s of activeSeasons) stripPrivatePrizeFields(s);
 
@@ -537,8 +566,10 @@ async function getLeaderboard(limit = 100, seasonId = null, userId = null) {
     entries: rows,
     previousWinners: prevWinners,
     myEntry,
-    prizeList,
+    // فهرستِ مبلغ عمداً خالی است تا کلاینتِ ۱.۱.۳۶ جعبهٔ جدا نشان ندهد.
+    prizeList: [],
     showPrizeList: season?.show_prize_list === true,
+    prizeNote,
   };
 }
 /**

@@ -72,10 +72,12 @@ ok(svc.includes("provider !== 'zarinpal' && !configured()"),
   'گذرگاه زرین‌پال از گیتِ بازار مستقل است');
 ok(svc.includes("provider === 'zarinpal' ? null : productForPrice"),
   'زرین‌پال به productId کافه‌بازار وابسته نیست و مبلغ آزاد دارد');
-ok(svc.includes("$6, $3, 'pending', 'shop_item'")
-  && svc.includes("$4, $3, 'pending', 'card_box'")
-  && svc.includes("$6, $3, 'pending', $4, $5"),
-  'ستون‌های provider/product_id در سه سازنده جابه‌جا نشده‌اند');
+ok(svc.includes("$6, $3::varchar, 'pending', 'shop_item'")
+  && svc.includes("$4, $3::varchar, 'pending', 'card_box'")
+  && svc.includes("$6, $3::varchar, 'pending', $4, $5"),
+  'ستون‌های provider/product_id در سه سازنده جابه‌جا نشده‌اند و null بی‌نوع نیست');
+ok(route.includes("jsonb_build_object('authority', $3::text, 'amount_rial', $4::bigint, 'web_origin', $5::text)"),
+  'jsonb_build_object پارامتر بی‌نوع ندارد');
 const shop = read('src/services/shopService.js');
 ok(shop.includes('async function deliverForOrder(') && shop.includes('deliverForOrder,'),
   'تحویلِ مشترک بین verify بازار و کال‌بک زرین‌پال');

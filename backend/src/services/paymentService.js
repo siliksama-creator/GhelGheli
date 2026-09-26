@@ -331,7 +331,7 @@ async function createShopOrder(userId, slug, { walletAmount = 0, provider = 'caf
     `INSERT INTO payment_orders
        (user_id, amount, provider, product_id, status,
         purchase_kind, shop_item_id, wallet_amount)
-     VALUES ($1, $2, $6, $3, 'pending', 'shop_item', $4, $5)
+     VALUES ($1, $2, $6, $3::varchar, 'pending', 'shop_item', $4, $5)
      RETURNING id, amount, created_at`,
     [userId, payable, productId, item.id, fromWallet, provider]);
 
@@ -378,7 +378,7 @@ async function createCardBoxOrder(userId, { provider = 'cafebazaar' } = {}) {
   const order = await pool.query(
     `INSERT INTO payment_orders
        (user_id, amount, provider, product_id, status, purchase_kind, wallet_amount)
-     VALUES ($1, $2, $4, $3, 'pending', 'card_box', 0)
+     VALUES ($1, $2, $4, $3::varchar, 'pending', 'card_box', 0)
      RETURNING id, amount, created_at`,
     [userId, price, productId, provider]);
 
@@ -410,7 +410,7 @@ async function createPlusOrder(userId, billingCycle, { provider = 'cafebazaar' }
     `INSERT INTO payment_orders
        (user_id, amount, provider, product_id, status,
         purchase_kind, plus_cycle)
-     VALUES ($1, $2, $6, $3, 'pending', $4, $5)
+     VALUES ($1, $2, $6, $3::varchar, 'pending', $4, $5)
      RETURNING id, amount, created_at`,
     [userId, plan.price, productId,
       cycle === 'annual' ? 'plus_annual' : 'plus_monthly', cycle, provider]);
