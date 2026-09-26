@@ -71,4 +71,5 @@ jobs:
           set -o pipefail
           cd /var/www/GhelGheli/userweb
           node tool/smoke.mjs https://user.ghelghelishop.com
-          node tool/cache-headers.mjs
+          node tool/cache-headers.mjs https://user.ghelghelishop.com
+          node tool/cache-headers.mjs https://admin.ghelghelishop.com

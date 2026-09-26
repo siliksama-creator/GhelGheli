@@ -8,6 +8,7 @@ import './theme.css';
 import './styles.css';
 
 import { createApi } from './lib/api.js';
+import { installChunkRecovery, isChunkLoadError, loadLazy, recoverFromChunkError } from './lib/chunkRecovery.js';
 import { installAdminErrorMonitor } from './lib/errorMonitor.js';
 import { canSeePage, isSuperAdmin } from './lib/roles.js';
 import { ToastProvider, useToast } from './lib/toast.jsx';
@@ -28,49 +29,57 @@ import { Dashboard } from './pages/dashboard.jsx';
 // رفت‌وبرگشتِ اضافه می‌ساخت.
 //
 // هیچ صفحه‌ای حذف نشده — فقط لحظهٔ دانلودش عوض شده.
-const PhotoCardsPage = lazy(() => import('./pages/photo-cards.jsx').then(m => ({ default: m.PhotoCardsPage })));
-const PointsPage = lazy(() => import('./pages/points.jsx').then(m => ({ default: m.PointsPage })));
-const LeaguePage = lazy(() => import('./pages/league.jsx').then(m => ({ default: m.LeaguePage })));
+// چانکِ گم‌شده بعد از دیپلوی نباید صفحه را روی «خطا خورد» قفل کند.
+installChunkRecovery();
+if (typeof navigator !== 'undefined' && navigator.serviceWorker && location.protocol === 'https:') {
+  navigator.serviceWorker.register('/chunk-recovery-sw.js', { updateViaCache: 'none' }).catch(() => {});
+}
+function lazyPage(importer) {
+  return lazy(() => loadLazy(importer));
+}
+const PhotoCardsPage = lazyPage(() => import('./pages/photo-cards.jsx').then(m => ({ default: m.PhotoCardsPage })));
+const PointsPage = lazyPage(() => import('./pages/points.jsx').then(m => ({ default: m.PointsPage })));
+const LeaguePage = lazyPage(() => import('./pages/league.jsx').then(m => ({ default: m.LeaguePage })));
 // «لیگ معرف‌ها» — آفرِ زمان‌دارِ بیشترین دعوت‌کننده. صفحهٔ مستقلی است چون
 // معیارش تعدادِ دعوت است، نه سکه؛ در گروهِ «ماموریت و درآمد» می‌آید کنارِ
 // «لیگ ماهانه» تا مدیر جای دیگری دنبالش نگردد.
-const InviteLeaguePage = lazy(() => import('./pages/invite-league.jsx').then(m => ({ default: m.InviteLeaguePage })));
-const WalletPage = lazy(() => import('./pages/wallet.jsx').then(m => ({ default: m.WalletPage })));
-const UsersPage = lazy(() => import('./pages/users.jsx').then(m => ({ default: m.UsersPage })));
-const ChatModerationPage = lazy(() => import('./pages/chat-moderation.jsx').then(m => ({ default: m.ChatModerationPage })));
-const SupportPage = lazy(() => import('./pages/support.jsx').then(m => ({ default: m.SupportPage })));
-const NotificationsPage = lazy(() => import('./pages/notifications.jsx').then(m => ({ default: m.NotificationsPage })));
-const GameRewardsPage = lazy(() => import('./pages/game-rewards.jsx').then(m => ({ default: m.GameRewardsPage })));
+const InviteLeaguePage = lazyPage(() => import('./pages/invite-league.jsx').then(m => ({ default: m.InviteLeaguePage })));
+const WalletPage = lazyPage(() => import('./pages/wallet.jsx').then(m => ({ default: m.WalletPage })));
+const UsersPage = lazyPage(() => import('./pages/users.jsx').then(m => ({ default: m.UsersPage })));
+const ChatModerationPage = lazyPage(() => import('./pages/chat-moderation.jsx').then(m => ({ default: m.ChatModerationPage })));
+const SupportPage = lazyPage(() => import('./pages/support.jsx').then(m => ({ default: m.SupportPage })));
+const NotificationsPage = lazyPage(() => import('./pages/notifications.jsx').then(m => ({ default: m.NotificationsPage })));
+const GameRewardsPage = lazyPage(() => import('./pages/game-rewards.jsx').then(m => ({ default: m.GameRewardsPage })));
 // ── «مود دوئل کارت» — کلیدِ دستیِ مودِ دومِ دوئل ────────────────────────
 // خواستهٔ مالک: «۲ تا مود ساخته شده؛ یکیش باید دستی از پنل فعال شه.»
 // پس صفحهٔ اختصاصی شد تا کلیدِ `duelMayhem` از فهرستِ خامِ عددها بیرون
 // بیاید و در NAV هم دیده شود.
-const DuelModesPage = lazy(() => import('./pages/duel-modes.jsx').then(m => ({ default: m.DuelModesPage })));
-const GameEconomyPage = lazy(() => import('./pages/game-economy.jsx').then(m => ({ default: m.GameEconomyPage })));
-const WheelPage = lazy(() => import('./pages/wheel.jsx').then(m => ({ default: m.WheelAdminPage })));
-const CardBoxPage = lazy(() => import('./pages/card-box.jsx').then(m => ({ default: m.CardBoxAdminPage })));
+const DuelModesPage = lazyPage(() => import('./pages/duel-modes.jsx').then(m => ({ default: m.DuelModesPage })));
+const GameEconomyPage = lazyPage(() => import('./pages/game-economy.jsx').then(m => ({ default: m.GameEconomyPage })));
+const WheelPage = lazyPage(() => import('./pages/wheel.jsx').then(m => ({ default: m.WheelAdminPage })));
+const CardBoxPage = lazyPage(() => import('./pages/card-box.jsx').then(m => ({ default: m.CardBoxAdminPage })));
 // «انتشار اپ» — آپلودِ نسخهٔ تازهٔ APK و ست‌کردنِ لینکِ به‌روزرسانی
 // (تصمیمِ مالک: بدونِ کافه‌بازار، فایل از خودِ سرور سرو شود).
-const AppReleasePage = lazy(() => import('./pages/app-release.jsx').then(m => ({ default: m.AppReleasePage })));
-const SettingsPage = lazy(() => import('./pages/settings.jsx').then(m => ({ default: m.SettingsPage })));
-const ZarinPalPage = lazy(() => import('./pages/zarinpal.jsx').then(m => ({ default: m.ZarinPalPage })));
-const LiveCopyPage = lazy(() => import('./pages/live-copy.jsx').then(m => ({ default: m.LiveCopyPage })));
-const AdminsPage = lazy(() => import('./pages/admins.jsx').then(m => ({ default: m.AdminsPage })));
-const MetricsPage = lazy(() => import('./pages/metrics.jsx').then(m => ({ default: m.MetricsPage })));
-const AnalyticsPage = lazy(() => import('./pages/analytics.jsx').then(m => ({ default: m.AnalyticsPage })));
+const AppReleasePage = lazyPage(() => import('./pages/app-release.jsx').then(m => ({ default: m.AppReleasePage })));
+const SettingsPage = lazyPage(() => import('./pages/settings.jsx').then(m => ({ default: m.SettingsPage })));
+const ZarinPalPage = lazyPage(() => import('./pages/zarinpal.jsx').then(m => ({ default: m.ZarinPalPage })));
+const LiveCopyPage = lazyPage(() => import('./pages/live-copy.jsx').then(m => ({ default: m.LiveCopyPage })));
+const AdminsPage = lazyPage(() => import('./pages/admins.jsx').then(m => ({ default: m.AdminsPage })));
+const MetricsPage = lazyPage(() => import('./pages/metrics.jsx').then(m => ({ default: m.MetricsPage })));
+const AnalyticsPage = lazyPage(() => import('./pages/analytics.jsx').then(m => ({ default: m.AnalyticsPage })));
 // ── صفحاتِ دورِ عملیات: فروشگاه، گذر نبرد، ماموریت، اهرم‌های موتور ──
-const ShopAdminPage = lazy(() => import('./pages/shop.jsx').then(m => ({ default: m.ShopAdminPage })));
-const BattlePassPage = lazy(() => import('./pages/battle-pass.jsx').then(m => ({ default: m.BattlePassPage })));
-const MissionsPage = lazy(() => import('./pages/missions.jsx').then(m => ({ default: m.MissionsPage })));
-const CustomMissionPage = lazy(() => import('./pages/custom-mission.jsx').then(m => ({ default: m.CustomMissionPage })));
+const ShopAdminPage = lazyPage(() => import('./pages/shop.jsx').then(m => ({ default: m.ShopAdminPage })));
+const BattlePassPage = lazyPage(() => import('./pages/battle-pass.jsx').then(m => ({ default: m.BattlePassPage })));
+const MissionsPage = lazyPage(() => import('./pages/missions.jsx').then(m => ({ default: m.MissionsPage })));
+const CustomMissionPage = lazyPage(() => import('./pages/custom-mission.jsx').then(m => ({ default: m.CustomMissionPage })));
 // سپرِ سرور (کلادفلر) — خواستهٔ مالک: آماده بماند، با تأیید روشن شود.
-const CloudflarePage = lazy(() => import('./pages/cloudflare.jsx').then(m => ({ default: m.CloudflarePage })));
+const CloudflarePage = lazyPage(() => import('./pages/cloudflare.jsx').then(m => ({ default: m.CloudflarePage })));
 // برنامه‌های پیشنهادی — خواستهٔ مالک (۲۶ شهریور): «در قسمت (بیشتر) وب و
 // اندروید، از پنل ادمین مدیریت بشه.»
-const RecommendedAppsPage = lazy(() => import('./pages/recommended-apps.jsx').then(m => ({ default: m.RecommendedAppsPage })));
+const RecommendedAppsPage = lazyPage(() => import('./pages/recommended-apps.jsx').then(m => ({ default: m.RecommendedAppsPage })));
 // شماره معکوسِ شروعِ لیگ — خواستهٔ مالک (۲۷ شهریور): «بازیِ آنلاین و ضربه‌زن
 // تا شروعِ لیگ بسته باشد، شمارش در سه صفحه دیده شود و متنش از پنل عوض شود.»
-const EnginePage = lazy(() => import('./pages/engine.jsx').then(m => ({ default: m.EnginePage })));
+const EnginePage = lazyPage(() => import('./pages/engine.jsx').then(m => ({ default: m.EnginePage })));
 
 // ── ErrorBoundary برای جلوگیری از صفحه سیاه ──────────────────────────────
 class AdminErrorBoundary extends Component {
@@ -79,16 +88,17 @@ class AdminErrorBoundary extends Component {
   componentDidCatch(error, info) {
     // لاگ به صندوق کرش (از قبل نصب شده) + کنسول
     try { console.error('[admin] ErrorBoundary:', error, info); } catch {}
+    // پیامِ واقعی «Failed to fetch dynamically imported module» است و
+    // کلمهٔ Chunk ندارد. یک رفرشِ cache-bust کافی است؛ دکمهٔ دستی force است.
+    if (isChunkLoadError(error)) recoverFromChunkError();
   }
   handleRetry = () => {
-    this.setState({ hasError: false, error: null });
-    // اگر خطای چانک بود، رفرش کامل لازم است
-    if (String(this.state.error?.message || '').includes('Chunk') || String(this.state.error?.message || '').includes('Loading')) {
-      window.location.reload();
-    } else {
-      // تلاش مجدد بدون رفرش (برای خطای رندر)
-      this.props.onReset?.();
+    if (isChunkLoadError(this.state.error)) {
+      recoverFromChunkError({ force: true });
+      return;
     }
+    this.setState({ hasError: false, error: null });
+    this.props.onReset?.();
   };
   render() {
     if (this.state.hasError) {
@@ -96,10 +106,10 @@ class AdminErrorBoundary extends Component {
         <div style={{ padding: '32px', textAlign: 'center', direction: 'rtl' }}>
           <div style={{ maxWidth: 480, margin: '40px auto', background: 'var(--surface, #0E1826)', border: '1px solid var(--border, rgba(255,255,255,0.1))', borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>خطا خورد</div>
-            <div style={{ fontSize: 14, opacity: 0.85, marginBottom: 16, lineHeight: 1.7 }}>دوباره تلاش کن و صفحه رو رفرش کن</div>
+            <div style={{ fontSize: 14, opacity: 0.85, marginBottom: 16, lineHeight: 1.7 }}>{isChunkLoadError(this.state.error) ? 'نسخهٔ ذخیره‌شدهٔ صفحه کهنه است. اگر خودش تازه نشد، این زبانه را ببند و دوباره باز کن.' : 'دوباره تلاش کن و صفحه رو رفرش کن'}</div>
             <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 16, direction: 'ltr', overflow: 'auto', maxHeight: 80 }}>{String(this.state.error?.message || '').slice(0, 300)}</div>
             <button onClick={this.handleRetry} style={{ background: 'var(--gg-emerald, #00D49A)', color: '#060D18', border: 'none', borderRadius: 999, padding: '10px 20px', fontWeight: 700, cursor: 'pointer' }}>تلاش دوباره</button>
-            <button onClick={() => window.location.reload()} style={{ marginRight: 8, background: 'transparent', color: 'var(--text, #EAF1FB)', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', cursor: 'pointer' }}>رفرش کامل</button>
+            <button onClick={() => recoverFromChunkError({ force: true })} style={{ marginRight: 8, background: 'transparent', color: 'var(--text, #EAF1FB)', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', cursor: 'pointer' }}>رفرش کامل</button>
           </div>
         </div>
       );

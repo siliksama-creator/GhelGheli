@@ -108,22 +108,30 @@ cd "$APP_DIR/admin"
 npm ci --no-audit --no-fund
 # VITE_APP_RELEASE مثل userweb: کرش‌ریپورت‌های پنل باید به SHAی ریلیز بچسبند تا با
 # سورس‌مپِ بایگانی‌شدهٔ همان ریلیز نگاشت شوند (قبلاً همیشه admin-web بود).
-VITE_APP_RELEASE="$NEW_SHA" npm run build
+# بیلد در dist-next است، نه روی distِ زنده: vite پیش‌فرض dist را خالی می‌کند و
+# همان لحظه هر تبِ باز «Failed to fetch dynamically imported module» می‌گیرد.
+rm -rf dist-next
+VITE_APP_RELEASE="$NEW_SHA" npx vite build --outDir dist-next --emptyOutDir
 
 log "Building user web app"
 cd "$APP_DIR/userweb"
 npm ci --no-audit --no-fund
-VITE_APP_RELEASE="$NEW_SHA" npm run build
+rm -rf dist-next
+node tool/jsx-react-import.mjs
+VITE_APP_RELEASE="$NEW_SHA" npx vite build --outDir dist-next --emptyOutDir
 
-log "Archiving hidden sourcemaps (private - never served)"
-# باندل‌ها hidden sourcemap دارند (.map بدون ارجاع در کد). آن‌ها را با شناسهٔ
-# ریلیز بایگانیِ خصوصی می‌کنیم و از dist پاک می‌کنیم تا nginx هرگز سرویشان
-# نکند؛ کرش‌ریپورت‌ها فیلد release دارند و با همین SHA نگاشت می‌شوند.
+log "Publishing web apps without dropping previous hashed assets"
+# باندل‌ها hidden sourcemap دارند (.map بدون ارجاع در کد). publish-spa-dist
+# آن‌ها را با شناسهٔ ریلیز بایگانیِ خصوصی می‌کند و هرگز سرو نمی‌کند. چانک‌های
+# ۳۰ روزِ اخیر می‌مانند تا تبِ بازِ وب، کرومِ اندروید و پنل بعد از دیپلوی نشکند.
 MAP_DIR="/root/ghelgheli-sourcemaps/$NEW_SHA"
 mkdir -p "$MAP_DIR/admin" "$MAP_DIR/userweb"
 chmod 700 /root/ghelgheli-sourcemaps "$MAP_DIR" "$MAP_DIR/admin" "$MAP_DIR/userweb"
 for _app in admin userweb; do
-  find "$APP_DIR/$_app/dist" -name '*.map' -exec mv {} "$MAP_DIR/$_app/" \; 
+  bash "$APP_DIR/scripts/publish-spa-dist.sh" \
+    "$APP_DIR/$_app/dist-next" \
+    "$APP_DIR/$_app/dist" \
+    "$MAP_DIR/$_app"
 done
 # نگه‌داشت: فقط ۱۰ ریلیزِ آخر (هر سری .map چند مگ است).
 ls -1t /root/ghelgheli-sourcemaps | tail -n +11 | while read -r _old; do rm -rf "/root/ghelgheli-sourcemaps/$_old"; done || true
@@ -332,8 +340,64 @@ find /etc/nginx/sites-enabled -maxdepth 1 -type f \
   \( -name '*.bak' -o -name '*.bak.*' -o -name '*.new' -o -name '*~' \) \
   -printf '  پاک شد (بکاپِ سرگردان): %p\n' -delete 2>/dev/null || true
 
+# ۴۰۴ِ /assets/ نباید immutable شود. فایلِ vhost روی سرور زندگی می‌کند
+# (در گیت نیست) پس همین‌جا وصله می‌شود، نه با بازنویسیٔ کلِ فایل.
+log "Stopping immutable cache on missing hashed assets"
+ASSET_BACKUPS=()
+if [ -d /etc/nginx/sites-enabled ]; then
+  mkdir -p /root/ghelgheli-backups/nginx
+  for f in /etc/nginx/sites-enabled/*; do
+    [ -f "$f" ] || continue
+    grep -q 'location ^~ /assets/' "$f" || continue
+    bk="/root/ghelgheli-backups/nginx/$(basename "$f").pre-asset-cache.$(date +%Y%m%d-%H%M%S)"
+    cp -a "$f" "$bk"
+    ASSET_BACKUPS+=("$f|$bk")
+    python3 "$APP_DIR/scripts/nginx-asset-cache.py" "$f"
+  done
+fi
+
 log "Reloading nginx"
 nginx -t && systemctl reload nginx
+
+# اگر وصله اعمال شده ولی ۴۰۴ هنوز کش‌شدنی است، کانفیگ برمی‌گردد تا مرورگرها
+# بیشتر مسموم نشوند. اگر پروب به سرور نرسد، هشدار می‌دهیم و دیپلوی را
+# به‌خاطرِ hairpin نمی‌خوابانیم — گامِ cache-headersِ ورک‌فلو همان را از بیرون می‌سنجد.
+asset_404_ok() {
+  local host="$1" headers code cc
+  headers="$(curl -sSI --max-time 15 --resolve "${host}:443:127.0.0.1" "https://${host}/assets/missing-chunk-cache-probe.js" || true)"
+  code="$(printf '%s\n' "$headers" | tr -d '\r' | awk 'toupper($1) ~ /^HTTP/ { c=$2 } END { print c }')"
+  if [ "$code" != "404" ]; then
+    headers="$(curl -sSI --max-time 15 "https://${host}/assets/missing-chunk-cache-probe.js" || true)"
+    code="$(printf '%s\n' "$headers" | tr -d '\r' | awk 'toupper($1) ~ /^HTTP/ { c=$2 } END { print c }')"
+  fi
+  if [ "$code" != "404" ]; then
+    printf '  warning: could not probe asset 404 on %s (HTTP %s)\n' "$host" "${code:-none}" >&2
+    return 0
+  fi
+  cc="$(printf '%s\n' "$headers" | tr -d '\r' | awk 'tolower($1)=="cache-control:" { print tolower($0) }' | tr '\n' ' ')"
+  case "$cc" in
+    *no-store*|*no-cache*|*max-age=0*)
+      printf '  asset 404 not cached: %s (%s)\n' "$host" "$cc"
+      return 0
+      ;;
+    *)
+      printf '  asset 404 still cacheable: %s (%s)\n' "$host" "${cc:-empty}" >&2
+      return 1
+      ;;
+  esac
+}
+if [ "${#ASSET_BACKUPS[@]}" -gt 0 ]; then
+  PROBE_FAIL=0
+  asset_404_ok admin.ghelghelishop.com || PROBE_FAIL=1
+  asset_404_ok user.ghelghelishop.com || PROBE_FAIL=1
+  if [ "$PROBE_FAIL" -ne 0 ]; then
+    for pair in "${ASSET_BACKUPS[@]}"; do
+      cp -a "${pair#*|}" "${pair%%|*}"
+    done
+    nginx -t && systemctl reload nginx || true
+    die "asset 404 is still cacheable — nginx asset-cache patch reverted"
+  fi
+fi
 
 # ── نگهبانِ سلامتِ سرور ────────────────────────────────────────────────────
 # monitor/health.sh هر ۳۰ ثانیه با systemd اجرا می‌شود و گره‌های API، دیسک و

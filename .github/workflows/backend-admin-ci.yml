@@ -74,6 +74,11 @@ jobs:
           bash scripts/test-ssh-watch.sh
           bash -n scripts/healthcheck.sh
           bash -n scripts/invoicle-limit.sh
+          bash -n scripts/deploy.sh
+          bash -n scripts/publish-spa-dist.sh
+          bash scripts/test-nginx-asset-cache.sh
+          bash scripts/test-publish-spa-dist.sh
+          node userweb/tool/chunk-recovery-guard.mjs
       # پردازشِ عکس: «قبل در برابر بعد» — بایت‌به‌بایت بودنِ فایلِ اصلی،
       # ابعادِ thumbnail‌ها، سرعت، و اینکه سقفِ هم‌زمانی رعایت می‌شود.
       - run: node scripts/test-image-pipeline.js
@@ -286,6 +291,7 @@ jobs:
       # معنی شود و بک‌اند باید در حالتِ سالم یک متنِ صریح برگرداند و هر دو گره
       # (game/http) را بخواند. این گارد آن قرارداد را بین بک‌اند و ادمین قفل می‌کند.
       - run: npm run test:admin-monitoring
+      - run: npm run test:chunk-recovery
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Serve the built app

@@ -10,12 +10,14 @@ mobile/linux/
 mobile/macos/
 mobile/windows/
 admin/dist/
+admin/dist-next/
 backend/uploads/
 apk/
 
 # Build output (built on the server / in CI, never committed — a tracked
 # dist/ makes `git pull` conflict on the VPS every deploy).
 userweb/dist/
+userweb/dist-next/
 
 # ── signing material — never commit ────────────────────────────────────────
 # The release keystore is the ONLY way to update an already-installed app.

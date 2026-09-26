@@ -30,9 +30,11 @@
 // هدرهای زندهٔ .com درست بودند (خروجیِ ممیزیِ ۸ مهر: html=no-cache،
 // assets=immutable). این ابزار در CI نیست و برای همین کسی ندید.
 const ORIGIN = process.argv[2] || 'https://user.ghelghelishop.com';
+const IS_ADMIN = /\/\/admin\./.test(ORIGIN);
 
 // نامِ ثابت ⇒ نباید کشِ ماندگار داشته باشد.
-const MUST_REVALIDATE = ['/', '/index.html', '/image-cache-sw.js'];
+// پنل سرویس‌ورکرِ تصویر ندارد؛ همان بررسی روی admin فقط ۴۰۴ِ بی‌ربط می‌ساخت.
+const MUST_REVALIDATE = ['/', '/index.html', ...(IS_ADMIN ? [] : ['/image-cache-sw.js'])];
 
 const fails = [];
 const pass = (m) => console.log('  ✅', m);
@@ -86,11 +88,29 @@ for (const a of [...new Set(assets)]) {
     : fail(`${a} → HTTP ${r.status} (index.html به فایلِ نبود اشاره می‌کند)`);
 }
 
+console.log('\n۴ب) ۴۰۴ِ دارایی نباید کش شود (وگرنه چانکِ گم‌شده یک سال می‌ماند):');
+{
+  const miss = await head('/assets/missing-chunk-cache-probe.js');
+  if (miss.status !== 404) {
+    fail(`/assets/missing-chunk-cache-probe.js باید ۴۰۴ باشد، شد ${miss.status} (SPA fallback؟)`);
+  } else if (miss.cc.includes('immutable') || /max-age=([1-9]\d*)/.test(miss.cc)) {
+    fail(`۴۰۴ کش می‌شود: ${miss.cc} — مرورگر «Failed to fetch dynamically imported module» را تکرار می‌کند`);
+  } else if (!(miss.cc.includes('no-store') || miss.cc.includes('no-cache') || /max-age=0(\D|$)/.test(miss.cc))) {
+    fail(`۴۰۴ هدرِ no-store ندارد (${miss.cc || 'خالی'})`);
+  } else {
+    pass(`۴۰۴ دارایی → ${miss.cc}`);
+  }
+}
+
 console.log('\n۴) SPA fallback نباید جای فایلِ واقعی را بگیرد:');
+if (IS_ADMIN) {
+  pass('پنل سرویس‌ورکرِ تصویر ندارد — این بررسی فقط برای وبِ کاربر است');
+} else {
 const sw = await head('/image-cache-sw.js');
 sw.type.includes('javascript')
   ? pass(`image-cache-sw.js → ${sw.type}`)
   : fail(`image-cache-sw.js نوعش ${sw.type} است ⇒ nginx به‌جایش index.html می‌دهد`);
+}
 
 console.log(fails.length ? `\n❌ ${fails.length} ایراد\n` : '\n✅ همهٔ هدرهای کش سالم‌اند\n');
 process.exit(fails.length ? 1 : 0);

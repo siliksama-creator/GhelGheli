@@ -32,6 +32,7 @@
     "test:style-backtick": "node tool/style-backtick.mjs",
     "test:audio-focus": "node tool/audio-focus.mjs",
     "test:cache-headers": "node tool/cache-headers.mjs",
+    "test:chunk-recovery": "node tool/chunk-recovery-guard.mjs",
     "test:admin-hint-parity": "node tool/admin-hint-parity.mjs",
     "test:admin-monitoring": "node tool/admin-monitoring.mjs"
   },

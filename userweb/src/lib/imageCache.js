@@ -162,5 +162,5 @@ export async function lookupCachedImage(url) {
 export function registerImageCacheWorker() {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
   if (typeof location === 'undefined' || location.protocol !== 'https:') return;
-  navigator.serviceWorker.register('/image-cache-sw.js').catch(() => {});
+  navigator.serviceWorker.register('/image-cache-sw.js', { updateViaCache: 'none' }).catch(() => {});
 }

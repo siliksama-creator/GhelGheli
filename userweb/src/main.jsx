@@ -23,6 +23,7 @@ import Tour from './tour/Tour.jsx';
 // برچسب درخواستِ دوم نمی‌زند.
 import { primeLiveConfig, text, liveConfigVersion } from './lib/liveConfig.js';
 import { primeImageCache, registerImageCacheWorker } from './lib/imageCache.js';
+import { installChunkRecovery, isChunkLoadError, loadLazy, recoverFromChunkError } from './lib/chunkRecovery.js';
 import Notifications from './components/Notifications.jsx';
 import Auth from './screens/Auth.jsx';
 import Home from './screens/Home.jsx';
@@ -47,33 +48,13 @@ import ScrollHint from './components/ScrollHint.jsx';
 // کاربرند و تا کلیک‌نشدن هیچ‌کس به آن‌ها نیاز ندارد.
 //
 // هیچ امکانی حذف نشده — فقط زمانِ رسیدنش عوض شده.
-// بعد از دیپلوی، مرورگر چانکِ هشِ قدیمی را از کش می‌خواهد و
-// «Failed to fetch dynamically imported module» می‌دهد. یک رفرش کافی است؛
-// بدون این، کاربر روی صفحهٔ سفید/خطا می‌ماند تا دستی رفرش کند.
+// بعد از دیپلوی، مرورگر چانکِ هشِ قدیمی را می‌خواهد و
+// «Failed to fetch dynamically imported module» می‌دهد. رفرش باید نشانیِ
+// سند را عوض کند؛ reload() ساده اگر index.html یا خودِ ۴۰۴ کش شده باشد
+// همان خطا را برمی‌گرداند. منطق در lib/chunkRecovery.js است و با پنل یکی است.
+installChunkRecovery();
 function lazyRetry(importer) {
-  return lazy(() => importer().catch((err) => {
-    const msg = String(err?.message || err || '');
-    if (/Failed to fetch dynamically imported module|Loading chunk|Importing a module script failed/i.test(msg)) {
-      try {
-        if (!sessionStorage.getItem('gg-chunk-reload')) {
-          sessionStorage.setItem('gg-chunk-reload', '1');
-          window.location.reload();
-          return new Promise(() => {});
-        }
-      } catch { /* private mode */ }
-    }
-    throw err;
-  }));
-}
-if (typeof window !== 'undefined') {
-  window.addEventListener('vite:preloadError', (event) => {
-    try { event.preventDefault(); } catch { /* ignore */ }
-    try {
-      if (sessionStorage.getItem('gg-chunk-reload')) return;
-      sessionStorage.setItem('gg-chunk-reload', '1');
-    } catch { return; }
-    window.location.reload();
-  });
+  return lazy(() => loadLazy(importer));
 }
 
 const Profile = lazyRetry(() => import('./screens/Profile.jsx'));
@@ -118,15 +99,15 @@ class UserErrorBoundary extends Component {
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   componentDidCatch(error, info) {
     try { console.error('[userweb] ErrorBoundary:', error, info); } catch {}
+    if (isChunkLoadError(error)) recoverFromChunkError();
   }
   handleRetry = () => {
-    this.setState({ hasError: false, error: null });
-    const m = String(this.state.error?.message || '');
-    if (/Chunk|Loading|dynamically imported module/i.test(m)) {
-      window.location.reload();
-    } else {
-      this.props.onReset?.();
+    if (isChunkLoadError(this.state.error)) {
+      recoverFromChunkError({ force: true });
+      return;
     }
+    this.setState({ hasError: false, error: null });
+    this.props.onReset?.();
   };
   render() {
     if (this.state.hasError) {
@@ -134,10 +115,10 @@ class UserErrorBoundary extends Component {
         <div style={{ padding: '32px', textAlign: 'center', direction: 'rtl' }}>
           <div style={{ maxWidth: 480, margin: '40px auto', background: 'var(--surface, #0E1826)', border: '1px solid var(--border, rgba(255,255,255,0.1))', borderRadius: 16, padding: 24 }}>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>خطا خورد</div>
-            <div style={{ fontSize: 14, opacity: 0.85, marginBottom: 16, lineHeight: 1.7 }}>دوباره تلاش کن و صفحه رو رفرش کن</div>
+            <div style={{ fontSize: 14, opacity: 0.85, marginBottom: 16, lineHeight: 1.7 }}>{isChunkLoadError(this.state.error) ? 'نسخهٔ ذخیره‌شدهٔ صفحه کهنه است. اگر خودش تازه نشد، این زبانه را ببند و دوباره باز کن.' : 'دوباره تلاش کن و صفحه رو رفرش کن'}</div>
             <div style={{ fontSize: 12, opacity: 0.6, marginBottom: 16, direction: 'ltr', overflow: 'auto', maxHeight: 80 }}>{String(this.state.error?.message || '').slice(0, 300)}</div>
             <button onClick={this.handleRetry} style={{ background: 'var(--gg-emerald, #00D49A)', color: '#060D18', border: 'none', borderRadius: 999, padding: '10px 20px', fontWeight: 700, cursor: 'pointer' }}>تلاش دوباره</button>
-            <button onClick={() => window.location.reload()} style={{ marginRight: 8, background: 'transparent', color: 'var(--text, #EAF1FB)', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', cursor: 'pointer' }}>رفرش کامل</button>
+            <button onClick={() => recoverFromChunkError({ force: true })} style={{ marginRight: 8, background: 'transparent', color: 'var(--text, #EAF1FB)', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', cursor: 'pointer' }}>رفرش کامل</button>
           </div>
         </div>
       );
