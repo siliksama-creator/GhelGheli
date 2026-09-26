@@ -16,10 +16,25 @@
      نیفتد (خواستهٔ مالک: «زمانِ توضیحِ قسمتی که مشخص شده رو نگیره»).
    ══════════════════════════════════════════════════════════════════════ */
 
-.tourRoot { position: fixed; inset: 0; z-index: 9500; }
+.tourRoot {
+  /* قابِ تور: `left/top/width/height` از خودِ JS می‌آید و برابرِ **ستونِ
+     اپ** است (نه کلِ پنجره) — روی دسکتاپ اپ یک ستونِ وسط‌چین است و تورِ
+     تمام‌عرض از قاب بیرون می‌زد. `overflow: hidden` آخرین تورِ ایمنی است:
+     اگر روزی چیزی از محاسبات بیرون زد، این‌جا بریده می‌شود، نه روی اپ. */
+  position: fixed;
+  z-index: 9500;
+  overflow: hidden;
+  /* اندازه‌ها هرگز نباید از قابِ درخواستی بزرگ‌تر شوند. */
+  box-sizing: border-box;
+}
+/* ⚠️ `box-sizing` را صریح برای همهٔ فرزندان هم می‌گذاریم. اپِ خودمان
+   `*{box-sizing:border-box}` دارد، ولی تور به `body` پورتال می‌شود و یک
+   روزی اگر آن قاعده عوض شود، کارت به‌اندازهٔ padding+border پهن‌تر می‌شد و
+   از قاب بیرون می‌زد — همان دسته باگی که یک بار دیدیم. */
+.tourRoot *, .tourRoot *::before, .tourRoot *::after { box-sizing: border-box; }
 
 .tourShade {
-  position: fixed;
+  position: absolute;
   background: rgba(2, 6, 23, 0.62);
   -webkit-backdrop-filter: blur(3.2px) saturate(0.75);
   backdrop-filter: blur(3.2px) saturate(0.75);
@@ -28,11 +43,11 @@
 .tourShadeFull { inset: 0; }
 
 /* مسدودکنندهٔ حفره: نامرئی، ولی کلیکِ کاربر روی هدف را می‌گیرد. */
-.tourBlock { position: fixed; background: transparent; }
+.tourBlock { position: absolute; background: transparent; }
 
 /* هالهٔ دورِ بخشِ جاری — نبضِ آرام تا چشم همان‌جا بماند. */
 .tourRing {
-  position: fixed;
+  position: absolute;
   border-radius: 18px;
   border: 2px solid rgba(255, 209, 102, 0.95);
   box-shadow: 0 0 0 4px rgba(255, 209, 102, 0.18), 0 10px 34px rgba(255, 209, 102, 0.22);
@@ -52,7 +67,7 @@
 
 /* ── انگشتِ خودکار ── */
 .tourFinger {
-  position: fixed;
+  position: absolute;
   transform: translate(-50%, -50%);
   pointer-events: none;
   animation: tourTapInPlace 2.4s cubic-bezier(.4, 0, .2, 1) infinite;
@@ -113,10 +128,10 @@
 /* ── کارتِ متن ── */
 /* جای کارت (`left/top/bottom/width/max-height`) را موتور می‌دهد. */
 .tourCard {
-  position: fixed;
+  position: absolute;
   display: flex;
   flex-direction: column;
-  max-width: calc(100% - 20px);
+  max-width: 100%;
   background: linear-gradient(160deg, rgba(15, 23, 42, 0.97), rgba(2, 6, 23, 0.97));
   border: 1px solid rgba(255, 209, 102, 0.32);
   border-radius: 20px;
@@ -146,9 +161,15 @@
 }
 .tourBar i { display: block; height: 100%; background: linear-gradient(90deg, #FFD166, #84CC16); transition: width .35s ease; }
 /* ناحیهٔ متن: تنها بخشِ اسکرول‌شونده — تا کارت روی هاله نیفتد. */
-.tourBody { overflow: auto; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; }
+.tourBody {
+  overflow: auto; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0;
+  overflow-x: hidden;            /* متنِ بلندِ لاتین کارت را پهن نکند */
+}
 .tourTitle { margin: 0 0 6px; font-size: 16px; font-weight: 900; color: #FFF; }
-.tourText { margin: 0; font-size: 13.5px; line-height: 1.95; color: #D7DEE8; }
+.tourText {
+  margin: 0; font-size: 13.5px; line-height: 1.95; color: #D7DEE8;
+  overflow-wrap: anywhere; word-break: break-word;
+}
 .tourHint { margin: 8px 0 0; font-size: 12px; color: #F59E0B; flex: 0 0 auto; }
 .tourActions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; flex: 0 0 auto; }
 .tourPrimary {

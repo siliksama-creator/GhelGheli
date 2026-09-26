@@ -112,6 +112,7 @@ check('پلِ زیرتبِ صندوقِ سکه هست',
 
 // ── ۶) تصمیمِ ایمنی: تور کلیک نمی‌کند ────────────────────────────────────
 const engine = read(path.join(WEB, 'tour', 'Tour.jsx'));
+const tourCss = read(path.join(WEB, 'tour', 'tour.css'));
 check('موتورِ تور روی هدف کلیک نمی‌کند (فقط نشان می‌دهد)',
   !/\.click\(\)/.test(engine));
 check('لایهٔ تار و هاله در موتور هست',
@@ -144,6 +145,25 @@ check('موتور مرحلهٔ «در→سفر→هدف» را اجرا می‌�
 // «کارت نباید روی بخشِ درحالِ‌توضیح بیفتد» → جای کارت باید حساب شود.
 check('کارتِ متن قرینهِ هدف می‌نشیند',
   engine.includes('roomBelow') && engine.includes('roomAbove') && engine.includes('maxHeight: pos.maxH'));
+
+// ── قابِ اپ (خواستهٔ مالک، ۵ مهر: «از سایز وب‌اپ و از کادر خارج می‌شه») ──
+// اپ روی دسکتاپ یک ستونِ وسط‌چین است؛ تورِ `inset:0` روی کلِ پنجره از قاب
+// بیرون می‌زد. حالا قاب از `main.tabPane` خوانده و با `visualViewport` بریده
+// می‌شود و هر کادر به آن **دوخته** می‌شود. این چهار بررسی همان قرارداد است.
+check('قابِ تور از ستونِ اپ خوانده می‌شود',
+  engine.includes('main.tabPane') && engine.includes('visualViewport')
+  && engine.includes('function readFrame'));
+check('هر کادر به قاب دوخته می‌شود',
+  engine.includes('function clampBox') && engine.includes('clampPoint')
+  && engine.includes('function rectInFrame'));
+check('تور به body پورتال می‌شود',
+  engine.includes("createPortal") && engine.includes('document.body'));
+check('لایه‌های تور داخلِ قاب‌اند (نه چسبیده به نما)',
+  !/position:\s*fixed[^}]*inset:\s*0/.test(tourCss)
+  && /\.tourRoot\s*\{[^}]*position:\s*fixed/.test(tourCss)
+  && /\.tourRoot\s*\{[^}]*overflow:\s*hidden/.test(tourCss)
+  && /\.tourCard\s*\{[^}]*position:\s*absolute/.test(tourCss)
+  && /\.tourShade\s*\{[^}]*position:\s*absolute/.test(tourCss));
 check('تورِ خودکار فقط از خانه شروع می‌شود',
   engine.includes("tabRef.current !== 'home'") && engine.includes('blockedRef')
   && engine.includes('bootKey'));

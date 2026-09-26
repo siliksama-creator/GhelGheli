@@ -42,9 +42,23 @@
 //
 // ۵. تورِ خودکار فقط از «خانه» شروع می‌شود؛ کسی که با لینکِ اتاقِ مشترک
 //    وارد شده وسطِ بازیِ زنده است و تور نباید او را به خانه بکشد.
+//
+// ۶. 🔴 تور **داخلِ قابِ خودِ اپ** می‌نشیند، نه روی کلِ پنجره.
+//    اپ روی دسکتاپ یک ستونِ وسط‌چین است (`main.tabPane` با
+//    `max-width:540px; margin-inline:auto` داخلِ `.portal`)، ولی نسخهٔ
+//    اولِ تور `inset:0` روی نما می‌نشست؛ نتیجه: هم لایهٔ تارِ تیره و هم
+//    کارتِ متن از دو طرفِ قاب بیرون می‌زدند. خودِ اپ این درس را یک بار
+//    برای لایهٔ «راهنمای اسکرول» نوشته بود («یک لایهٔ fixed داخلِ ستونِ
+//    اپ، نه چسبیده به نما»). این‌جا همان قاعده با `readFrame()` اجرا
+//    می‌شود: کادرِ ستونِ اپ خوانده و **قطع** می‌شود با ناحیهٔ دیده‌شدنیِ
+//    واقعی (`visualViewport` که نوارِ آدرسِ مرورگرِ موبایل را هم حساب
+//    می‌کند). همهٔ مختصاتِ داخلِ تور نسبت به همین قاب‌اند و در پایانِ کار
+//    هر لبه با `clampBox` به داخلِ قاب **دوخته** می‌شود: هاله حتی یک پیکسل
+//    هم بیرون نمی‌زند.
 // ══════════════════════════════════════════════════════════════════════
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { API, req } from '../lib/api.js';
 import { TOUR_UI } from './steps.js';
 import './tour.css';
@@ -83,23 +97,82 @@ function waitForAny(selectors, timeout = MAX_WAIT) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-/** کادرِ یک تیغه با محدودسازیِ داخلِ قاب — هاله هرگز بیرون نمی‌زند. */
-function rectOf(el) {
-  if (!el) return null;
+/**
+ * قابِ تور = ستونِ اپ، بریده‌شده با ناحیهٔ دیده‌شدنیِ واقعی.
+ *
+ * چرا `visualViewport` و نه `innerWidth/innerHeight`: روی موبایل، نوارِ
+ * آدرس/ابزارِ مرورگر بخشی از نما را می‌پوشاند و `innerHeight` آن را حساب
+ * نمی‌کند؛ نتیجه می‌شد کارتی که پایینش زیرِ نوارِ مرورگر می‌ماند. با
+ * `visualViewport` همان ناحیه‌ای خوانده می‌شود که کاربر واقعاً می‌بیند.
+ *
+ * چرا ستونِ اپ و نه کلِ پنجره: روی دسکتاپ اپ یک ستونِ وسط‌چین است؛ تورِ
+ * تمام‌عرض از قاب بیرون می‌زد (گزارشِ مالک: «از سایز وب‌اپ و از کادر خارج
+ * می‌شه»). اگر ستونِ اپ پیدا نشد (یا بی‌معنی باریک بود) به نما برمی‌گردیم —
+ * یعنی رفتارِ موبایل هرگز بدتر از قبل نمی‌شود.
+ */
+function readFrame() {
+  const vv = window.visualViewport;
+  const vw = Math.round(vv ? vv.width : document.documentElement.clientWidth);
+  const vh = Math.round(vv ? vv.height : document.documentElement.clientHeight);
+  const vTop = Math.round(vv ? vv.offsetTop : 0);
+  const vLeft = Math.round(vv ? vv.offsetLeft : 0);
+  const frame = { left: vLeft, top: vTop, width: vw, height: vh };
+  const col = document.querySelector('main.tabPane')
+    || document.querySelector('.page')
+    || document.querySelector('.portal');
+  if (!col) return frame;
+  const r = col.getBoundingClientRect();
+  const start = Math.max(vLeft, Math.round(r.left));
+  const end = Math.min(vLeft + vw, Math.round(r.right));
+  // کمتر از ۲۴۰ پیکسل یعنی عنصرِ اشتباهی پیدا شده؛ نما امن‌تر است.
+  if (end - start >= 240) {
+    frame.left = start;
+    frame.width = end - start;
+  }
+  return frame;
+}
+
+/** کادرِ عنصر در مختصاتِ **قاب** (نه پنجره). */
+function rectInFrame(el, frame) {
+  if (!el || !frame) return null;
   const r = el.getBoundingClientRect();
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const width = Math.min(Math.max(r.width, 44), vw - 12);
-  const height = Math.min(Math.max(r.height, 44), vh - 12);
+  if (r.width < 1 || r.height < 1) return null;
+  const width = Math.min(r.width, frame.width - 2 * EDGE);
+  const height = Math.min(Math.max(r.height, 40), frame.height - 2 * EDGE);
   return {
-    top: Math.min(Math.max(r.top, 6), vh - 40),
-    left: Math.min(Math.max(r.left, 6), Math.max(6, vw - 6 - width)),
+    left: Math.min(Math.max(r.left - frame.left, 0), Math.max(0, frame.width - width)),
+    top: Math.min(Math.max(r.top - frame.top, 0), Math.max(0, frame.height - height)),
     width,
     height,
   };
 }
 
+/**
+ * دوختنِ یک کادر به قاب: برای هاله که `PAD` پیکسل بزرگ‌تر از هدف است،
+ * لبهٔ بیرون‌زده با **کوچک‌کردن** کادر جبران می‌شود (نه جابه‌جا کردن).
+ * نتیجه: هاله هیچ‌وقت از قاب بیرون نمی‌زند، حتی روی تیغه‌ای که خودش تا لبهٔ
+ * ستون می‌رود.
+ */
+function clampBox(box, frame) {
+  let { left, top, width, height } = box;
+  if (left < 0) { width += left; left = 0; }
+  if (top < 0) { height += top; top = 0; }
+  if (left + width > frame.width) width = frame.width - left;
+  if (top + height > frame.height) height = frame.height - top;
+  return { left, top, width: Math.max(24, width), height: Math.max(24, height) };
+}
+
 const centerOf = (r) => (r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null);
+
+/** مرکزِ هدف، دوخته‌شده به قاب — دستِ انگشت هم بیرون نمی‌زند. */
+function clampPoint(p, frame) {
+  const MX = 22;  // نصفِ عرضِ دست (۳۸px) + حاشیه
+  const MY = 30;  // نصفِ ارتفاعِ دست (۵۳px) + حاشیه
+  return {
+    x: Math.min(Math.max(p.x, MX), Math.max(MX, frame.width - MX)),
+    y: Math.min(Math.max(p.y, MY), Math.max(MY, frame.height - MY)),
+  };
+}
 
 /** انگشتِ خودکار: از `from` به `to` می‌آید و آن‌جا تاچ می‌کند. */
 function Finger({ to, from, nonce }) {
@@ -128,6 +201,7 @@ export default function Tour({ token, tab, goTab }) {
   const [stage, setStage] = useState('target');  // door | target
   const [tick, setTick] = useState(0);          // برای اجرای دوبارهٔ انیمیشن‌ها
   const [cardH, setCardH] = useState(300);      // ارتفاعِ واقعیِ کارت
+  const [frame, setFrame] = useState(() => readFrame());
   // `entering` = وسطِ انیمیشنِ ورود (در → سفر → هدف). جدا از `waiting` است
   // چون آن یکی یعنی «مرورگر پخشِ خودکار را رد کرد» و کاربر باید یک بار
   // بزند؛ در `entering` دکمهٔ اصلی «بعدی» می‌ماند تا کاربر گیر نکند.
@@ -140,6 +214,8 @@ export default function Tour({ token, tab, goTab }) {
   const cardRef = useRef(null);
   const elRef = useRef(null);
   const dataRef = useRef(null);
+  const frameRef = useRef(frame);
+  frameRef.current = frame;
   const runRef = useRef(0);
   const openRef = useRef(false);
   const blockedRef = useRef(false);
@@ -148,10 +224,21 @@ export default function Tour({ token, tab, goTab }) {
   openRef.current = open;
   dataRef.current = data;
 
-  // ── اندازه‌گیریِ دوبارهٔ هدف (چیدمان/اسکرول/چرخش) ─────────────────────
+  // ── اندازه‌گیریِ دوبارهٔ هدف و قاب (چیدمان/اسکرول/چرخش/نوارِ مرورگر) ──
   const measure = useCallback(() => {
+    const f = readFrame();
     const el = elRef.current;
-    setRect(el ? rectOf(el) : null);
+    const r = rectInFrame(el, f);
+    // آستانهٔ ۰٫۵ پیکسل: بدونِ آن هر اندازه‌گیری یک state تازه می‌سازد و
+    // چرخهٔ رندر/اندازه‌گیری بی‌دلیل گرم می‌ماند.
+    setFrame(prev => (Math.abs(prev.left - f.left) > 0.5 || Math.abs(prev.top - f.top) > 0.5
+      || Math.abs(prev.width - f.width) > 0.5 || Math.abs(prev.height - f.height) > 0.5 ? f : prev));
+    setRect(prev => {
+      if (!r) return prev ? null : prev;
+      if (prev && Math.abs(prev.left - r.left) < 0.5 && Math.abs(prev.top - r.top) < 0.5
+        && Math.abs(prev.width - r.width) < 0.5 && Math.abs(prev.height - r.height) < 0.5) return prev;
+      return r;
+    });
   }, []);
 
   // ── ارتفاعِ کارت: با تغییرِ متن/دکمه‌ها عوض می‌شود ────────────────────
@@ -237,7 +324,7 @@ export default function Tour({ token, tab, goTab }) {
       }
       const doorEl = await waitForAny([`[data-tour="${doorAnchor}"]`], 2200);
       if (run !== runRef.current) return;
-      const dr = rectOf(doorEl);
+      const dr = rectInFrame(doorEl, frameRef.current);
       setDoorRect(dr);
       if (dr) {
         setStage('door');
@@ -270,7 +357,10 @@ export default function Tour({ token, tab, goTab }) {
       await sleep(420);
       if (run !== runRef.current) return;
     }
-    setRect(el ? rectOf(el) : null);
+    // بعد از سفر، اگر قاب عوض شده باشد (شیت بسته شد / نوارِ مرورگر جمع شد)
+    // دوباره از نو خوانده می‌شود؛ وگرنه هاله به مختصاتِ قدیمی می‌چسبد.
+    setFrame(readFrame());
+    setRect(rectInFrame(el, frameRef.current));
     setStage('target');
     // سفرِ انگشت از در به هدف: همین چند صد میلی‌ثانیه، «راهِ رسیدن» را
     // نشان می‌دهد و بعد صدا شروع می‌شود — پس کلِ روایت صرفِ همان بخشِ
@@ -367,6 +457,11 @@ export default function Tour({ token, tab, goTab }) {
     const id = setInterval(measure, 320);
     window.addEventListener('resize', measure);
     window.addEventListener('scroll', measure, true);
+    // نوارِ آدرسِ موبایل با اسکرول جمع/باز می‌شود و قابِ دیده‌شدنی عوض
+    // می‌شود؛ بدونِ این دو لیسنر، کارت زیرِ نوارِ مرورگر می‌ماند.
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', measure);
+    vv?.addEventListener('scroll', measure);
     const onKey = (e) => {
       if (e.key === 'Escape') finish(true);
       else if (e.key === 'ArrowLeft') next();
@@ -377,6 +472,8 @@ export default function Tour({ token, tab, goTab }) {
       clearInterval(id);
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
+      vv?.removeEventListener('resize', measure);
+      vv?.removeEventListener('scroll', measure);
       window.removeEventListener('keydown', onKey);
     };
   }, [open, measure, finish, next, replay]);
@@ -388,57 +485,86 @@ export default function Tour({ token, tab, goTab }) {
   if (!open || !step) return null;
   const total = data.steps.length || 0;
 
-  // ── جای کارت: قرینهِ هدف، تا روی بخشِ درحالِ‌توضیح نیفتد ──────────────
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const cardW = Math.min(520, vw - 20);
-  const focus = stage === 'door' ? (doorRect || rect) : rect;
-  let pos = { side: 'center', left: EDGE, width: cardW, maxH: CARD_MAX };
+  // ── هندسهٔ داخلِ قاب ────────────────────────────────────────────────
+  // همهٔ اعدادِ پایین **نسبت به قاب** هستند (نه پنجره)؛ قاب همان ستونِ اپ
+  // است که `readFrame` می‌دهد. این‌ها تنها جایی هستند که مختصات ساخته
+  // می‌شود — بقیهٔ JSX فقط مصرف می‌کند.
+  const ringRect = stage === 'door' ? doorRect : rect;
+  // هاله = هدف + PAD، دوخته‌شده به قاب (لبهٔ بیرون‌زده کوچک می‌شود).
+  const ringBox = ringRect
+    ? clampBox({
+      left: ringRect.left - PAD,
+      top: ringRect.top - PAD,
+      width: ringRect.width + PAD * 2,
+      height: ringRect.height + PAD * 2,
+    }, frame)
+    : null;
+  const holeBox = ringRect
+    ? clampBox({ left: ringRect.left, top: ringRect.top, width: ringRect.width, height: ringRect.height }, frame)
+    : null;
+
+  const to = ringBox ? centerOf(ringBox) : null;
+  const doorCenter = doorRect ? centerOf(doorRect) : null;
+  const from = stage === 'target' ? doorCenter : null;
+  const fingerTo = to ? clampPoint(to, frame) : null;
+  const fingerFrom = from && fingerTo ? clampPoint(from, frame) : null;
+
+  // ── جای کارت: قرینهِ هدف، داخلِ قاب ─────────────────────────────────
+  // «وقتی می‌زنیم بعدی باید جای اون متن عوض شه که زمانِ توضیحِ قسمتی که
+  //  مشخص شده رو نگیره.» + «از کادر خارج نشه.»
+  const cardW = Math.max(220, Math.min(520, frame.width - EDGE * 2));
+  const focus = holeBox;
+  let pos = { left: Math.round((frame.width - cardW) / 2), width: cardW, maxH: CARD_MAX };
   if (focus) {
-    const roomBelow = vh - (focus.top + focus.height + PAD + GAP) - EDGE;
-    const roomAbove = (focus.top - PAD - GAP) - EDGE;
+    const roomBelow = frame.height - (focus.top + focus.height + GAP) - EDGE;
+    const roomAbove = focus.top - GAP - EDGE;
     const side = roomBelow >= cardH + 8 ? 'bottom'
       : roomAbove >= cardH + 8 ? 'top'
         : (roomBelow >= roomAbove ? 'bottom' : 'top');
-    const room = Math.max(168, side === 'bottom' ? roomBelow : roomAbove);
-    const left = Math.min(Math.max(focus.left + focus.width / 2 - cardW / 2, EDGE),
-      Math.max(EDGE, vw - cardW - EDGE));
+    const room = Math.max(150, side === 'bottom' ? roomBelow : roomAbove);
+    // مرکزِ هدف، بعد دوختنِ همان مرکز به قاب — کارت هرگز از قاب بیرون نمی‌زند.
+    const centered = focus.left + focus.width / 2 - cardW / 2;
+    const left = Math.min(Math.max(centered, EDGE), Math.max(EDGE, frame.width - cardW - EDGE));
     pos = side === 'bottom'
-      ? { side, left, width: cardW, top: focus.top + focus.height + PAD + GAP, maxH: Math.min(CARD_MAX, room) }
-      : { side, left, width: cardW, bottom: Math.max(EDGE, vh - (focus.top - PAD - GAP)), maxH: Math.min(CARD_MAX, room) };
+      ? { left, width: cardW, top: Math.round(focus.top + focus.height + GAP), maxH: Math.min(CARD_MAX, room) }
+      : { left, width: cardW, bottom: Math.round(frame.height - (focus.top - GAP)), maxH: Math.min(CARD_MAX, room) };
   }
-  const ringRect = stage === 'door' ? doorRect : rect;
-  const to = centerOf(ringRect);
-  const from = centerOf(doorRect);
-  const travel = stage === 'target' && from && to ? from : null;
 
-  return (
-    <div className="tourRoot" role="dialog" aria-modal="true" aria-label="آموزش صوتی قلقلی">
-      {stage === 'target' && rect ? (
+  // ── پورتال به body ──────────────────────────────────────────────────
+  // چرا: اگر روزی یکی از والدهای اپ `transform/filter/overflow` بگیرد،
+  // `position: fixed` به همان والد می‌چسبد و تور جا به جا می‌شود. با
+  // پورتال، لایه همیشه نسبت به نماست و هیچ قابِ اپی آن را نمی‌بُرد.
+  return createPortal(
+    <div className="tourRoot"
+      style={{ left: frame.left, top: frame.top, width: frame.width, height: frame.height }}
+      role="dialog" aria-modal="true" aria-label="آموزش صوتی قلقلی">
+      {stage === 'target' && holeBox ? (
         <>
-          {/* چهار پنلِ تار: هرچه جز خودِ بخشِ جاری، مات و تار می‌شود. */}
-          <div className="tourShade" style={{ left: 0, right: 0, top: 0, height: Math.max(0, rect.top - PAD) }} />
-          <div className="tourShade" style={{ left: 0, right: 0, top: rect.top + rect.height + PAD, bottom: 0 }} />
-          <div className="tourShade" style={{ left: 0, top: Math.max(0, rect.top - PAD), width: Math.max(0, rect.left - PAD), height: rect.height + PAD * 2 }} />
-          <div className="tourShade" style={{ left: rect.left + rect.width + PAD, right: 0, top: Math.max(0, rect.top - PAD), height: rect.height + PAD * 2 }} />
+          {/* چهار پنلِ تار: هرچه جز خودِ بخشِ جاری، مات و تار می‌شود.
+              همه از «سوراخِ» دوخته‌شده حساب می‌شوند تا لبه‌شان قاب را
+              دقیقاً پر کند. */}
+          <div className="tourShade" style={{ left: 0, right: 0, top: 0, height: holeBox.top }} />
+          <div className="tourShade" style={{ left: 0, right: 0, top: holeBox.top + holeBox.height, bottom: 0 }} />
+          <div className="tourShade" style={{ left: 0, top: holeBox.top, width: holeBox.left, height: holeBox.height }} />
+          <div className="tourShade" style={{ left: holeBox.left + holeBox.width, right: 0, top: holeBox.top, height: holeBox.height }} />
           {/* مسدودکنندهٔ حفره: تور خودش کلیک نمی‌کند و نمی‌گذارد کاربر هم
               وسطِ آموزش روی هدف بزند و از صحنه بیرون بیفتد. «رد کردن» و
               «بعدی» تنها راهِ تعامل‌اند — تا تور هرگز نصفه رها نشود. */}
-          <div className="tourBlock" style={{ left: rect.left - PAD, top: rect.top - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 }} />
+          <div className="tourBlock" style={{ left: holeBox.left, top: holeBox.top, width: holeBox.width, height: holeBox.height }} />
         </>
       ) : (
         <div className="tourShade tourShadeFull" />
       )}
 
-      {ringRect && (
+      {ringBox && (
         <div className={`tourRing${stage === 'door' ? ' tourRing--door' : ''}`}
-          style={{ left: ringRect.left - PAD, top: ringRect.top - PAD, width: ringRect.width + PAD * 2, height: ringRect.height + PAD * 2 }}
+          style={{ left: ringBox.left, top: ringBox.top, width: ringBox.width, height: ringBox.height }}
           aria-hidden="true" />
       )}
-      {to && <Finger to={to} from={travel} nonce={`${stage}-${idx}-${tick}`} />}
+      {fingerTo && <Finger to={fingerTo} from={fingerFrom} nonce={`${stage}-${idx}-${tick}`} />}
 
       <div className="tourCard" ref={cardRef}
-        style={{ left: pos.left, width: pos.width, maxHeight: pos.maxH, top: pos.top, bottom: pos.bottom }}>
+        style={{ left: pos.left, width: pos.width, maxWidth: frame.width - EDGE * 2, maxHeight: pos.maxH, top: pos.top, bottom: pos.bottom }}>
         <div className="tourCardTop">
           <span className="tourBadge">آموزش صوتی قلقلی</span>
           <span className="tourCount">{idx + 1} از {total}</span>
@@ -503,6 +629,7 @@ export default function Tour({ token, tab, goTab }) {
           if (phase !== 'offer') setPhase('error');
         }}
       />
-    </div>
+    </div>,
+    document.body,
   );
 }
