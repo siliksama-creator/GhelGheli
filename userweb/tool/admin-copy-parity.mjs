@@ -56,7 +56,7 @@ ok('پنل وب: GROUP_LABEL خوانده شد', Object.keys(webGroups).length >
 
 ok('پنل وب: صفحه در NAV ثبت است', /'live-copy',\s*'متن‌های زنده'/.test(webMain));
 ok('پنل وب: صفحه تنبل بارگذاری می‌شود (مثل بقیهٔ صفحات)',
-  /LiveCopyPage = lazy\(\(\) => import\('\.\/pages\/live-copy\.jsx'\)/.test(webMain));
+  /LiveCopyPage = lazy(?:Page)?\(\(\) => import\('\.\/pages\/live-copy\.jsx'\)/.test(webMain));
 
 // ── ۲) پوششِ کاملِ گروه‌ها نسبت به سرور ───────────────────────────────────
 const svcSrc = read('backend/src/services/liveContent.js');

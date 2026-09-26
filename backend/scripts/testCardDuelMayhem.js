@@ -235,7 +235,8 @@ async function main() {
   // ۸٫۱ ردیفِ NAV در گروهِ «بازی‌ها» — جایی که مدیر دنبال بازی می‌گردد.
   const navRow = /\['duel-modes',\s*'مود دوئل کارت'[\s\S]{0,220}?'games'\],/.test(adminMain);
   ok(navRow, 'ردیفِ NAV «مود دوئل کارت» در گروهِ «بازی‌ها» هست (تو‌چشمِ منو)');
-  ok(/lazy\(\(\) => import\('\.\/pages\/duel-modes\.jsx'\)/.test(adminMain),
+  // lazyPage همان lazy است، با بازیابیِ چانکِ گم‌شده بعد از دیپلوی.
+  ok(/lazy(?:Page)?\(\(\) => import\('\.\/pages\/duel-modes\.jsx'\)/.test(adminMain),
     'صفحهٔ اختصاصیِ کلید در پنل ثبت (lazy) شده است');
 
   // ۸٫۲ صفحه و کارتِ مشترک: پلکانِ چهارپله‌ای و وضعیتِ خوانا.

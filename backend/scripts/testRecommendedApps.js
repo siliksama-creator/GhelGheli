@@ -190,7 +190,7 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
     // است (همان‌طور که صفحهٔ «سپرِ سرور» نوشته شده). پس `.then(...)` اختیاری
     // است — چیزی که مهم است تنبل‌بودن و نامِ فایل است، نه شکلِ صادرکردن.
     ok('پنل به منو وصل شده و تنبل بارگذاری می‌شود',
-      /lazy\(\(\) => import\('\.\/pages\/recommended-apps\.jsx'\)[\s\S]{0,120}?\)/.test(read('admin/src/main.jsx')));
+      /lazy(?:Page)?\(\(\) => import\('\.\/pages\/recommended-apps\.jsx'\)[\s\S]{0,120}?\)/.test(read('admin/src/main.jsx')));
     ok('صفحهٔ پنل فقط برای ادمین/مدیرکل دیده می‌شود',
       /recommended-apps/.test(read('admin/src/lib/roles.js')));
     ok('مسیرِ پنل در وب کاربر، در شیتِ «بیشتر» است',
