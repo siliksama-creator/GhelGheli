@@ -183,7 +183,19 @@ class TourOverlayState extends State<TourOverlay> {
   }
 
   void _onBus() {
-    if (_data == null) return;
+    // اگر خواندنِ اولیهٔ وضعیت موفق نشده باشد (اینترنتِ لحظهٔ ورود)،
+    // دکمهٔ «دوباره ببین» نباید بی‌اثر باشد: یک بار دیگر می‌خوانیم.
+    if (_data == null) {
+      unawaited(_bootForced());
+      return;
+    }
+    unawaited(start(fromStep: 0));
+  }
+
+  Future<void> _bootForced() async {
+    final d = await fetchTour(widget.api);
+    if (!mounted || d == null) return;
+    setState(() => _data = d);
     unawaited(start(fromStep: 0));
   }
 
@@ -351,9 +363,12 @@ class TourOverlayState extends State<TourOverlay> {
       debugPrint('[tour] آماده‌سازیِ صدا ناموفق: $e');
     }
     try {
+      final base = widget.api.baseUrl.isNotEmpty
+          ? widget.api.baseUrl
+          : ApiClient.defaultBaseUrl;
       final url = step.audioUrl.startsWith('http')
           ? step.audioUrl
-          : '${ApiClient.defaultBaseUrl}${step.audioUrl}';
+          : '$base${step.audioUrl}';
       await player.stop();
       await player.play(UrlSource(url));
       if (!mounted) return;
@@ -623,7 +638,7 @@ class TourOverlayState extends State<TourOverlay> {
             children: <Widget>[
               _badge(),
               const Spacer(),
-              Text('${_index + 1} از $total',
+              Text('${faNum(_index + 1)} از ${faNum(total)}',
                   style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5)),
               const SizedBox(width: 8),
               _skip(),

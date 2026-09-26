@@ -97,12 +97,15 @@ class TourBus extends ChangeNotifier {
   int _replayTick = 0;
   int get replayTick => _replayTick;
 
-  /// زیرتبِ جاریِ «چت و بازی» — تور باید بتواند ماموریت/گذر نبرد را نشان
-  /// دهد و آن صفحه به state خودش دسترسی از بیرون نمی‌دهد.
+  /// پلِ زیرتبِ «چت و بازی» — خودِ صفحهٔ اجتماعی این‌جا ثبت می‌کند.
   ///
-  /// چرا `ValueNotifier` جدا و نه `notifyListeners` سراسری: `requestReplay`
-  /// نباید هر بار زیرتبِ کاربر را هم عوض کند؛ دو موضوعِ متفاوت‌اند.
-  final ValueNotifier<int?> socialTab = ValueNotifier<int?>(null);
+  /// چرا **callback** و نه `ValueNotifier`: نوتیفایرِ مقداری وقتی مقدار
+  /// عوض نشود خبر نمی‌دهد. بارِ اول تور «بازی‌ها» را انتخاب می‌کند (مقدار
+  /// ۱ می‌شود)؛ اگر کاربر بعداً دستی به «چت» برگردد، مقدارِ نوتیفایر همچنان
+  /// ۱ است — پس دفعهٔ دوم هیچ خبری نمی‌رسد، زیرتب جابه‌جا نمی‌شود، لنگرِ
+  /// شبکهٔ بازی‌ها پیدا نمی‌شود و تور به جانشینِ کم‌دقت می‌افتد. این باگِ
+  /// «بارِ دوم کار نمی‌کند» را همین‌جا بستیم.
+  void Function(int index)? socialTabHandler;
 
   /// نامِ زیرتب (همان idهای وب) → شمارهٔ زیرتبِ صفحهٔ اجتماعی.
   static const Map<String, int> _socialIndex = <String, int>{
@@ -114,7 +117,7 @@ class TourBus extends ChangeNotifier {
 
   void setSocialTab(String name) {
     final i = _socialIndex[name];
-    if (i != null) socialTab.value = i;
+    if (i != null) socialTabHandler?.call(i);
   }
 
   /// «دوباره ببین» — لایهٔ تور به این گوش می‌دهد و از بخشِ اول شروع می‌کند.

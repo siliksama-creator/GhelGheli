@@ -227,8 +227,11 @@ check('همهٔ مقصدهای تور در پوسته تب دارند', missingN
 check('لایهٔ تور در پوسته سوار شده و به نگاشت وصل است',
   SHELL.includes('TourOverlay(') && SHELL.includes('indexFor: _tourIndexFor')
   && SHELL.includes('onSubTab: TourBus.instance.setSocialTab'));
-check('زیرتب‌ها از بیرون قابلِ عوض‌کردن‌اند (پلِ ماموریت/گذر نبرد)',
-  SOC.includes('socialTab.addListener') && SOC.includes('tour_service.dart'));
+// پلِ زیرتب باید **callback** باشد نه `ValueNotifier`: نوتیفایرِ مقداری بارِ
+// دوم خبر نمی‌دهد (مقدار عوض نشده) و تور به جانشینِ کم‌دقت می‌افتد.
+check('زیرتب‌ها از بیرون قابلِ عوض‌کردن‌اند (پلِ callback، نه نوتیفایرِ مقداری)',
+  SOC.includes('socialTabHandler = _goTo') && SOC.includes('tour_service.dart')
+  && !SOC.includes('socialTab.addListener'));
 check('«دوباره ببین» در پروفایل هست', PROF.includes('requestReplay')
   && PROF.includes("id: 'profile:top'"));
 check('شیتِ «بیشتر» لنگرِ ردیف دارد (انگشت روی همان ردیف می‌نشیند)',

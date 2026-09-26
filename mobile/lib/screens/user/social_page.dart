@@ -72,16 +72,6 @@ class _SocialPageState extends State<SocialPage> {
   /// کاربر را از دست نمی‌دهد) — همان دلیلی که از اول `IndexedStack` بود.
   final Set<int> _visited = <int>{0};
 
-  /// ── پلِ زیرتب برای تورِ آموزشِ صوتی ──────────────────────────────
-  /// تور در شلِ خانه است و به State این صفحه دسترسی ندارد؛ برای «ماموریت» و
-  /// «گذر نبرد» باید خودِ این صفحه زیرتب را عوض کند — آینهٔ رویدادِ
-  /// `gg:tour-sub` وب.
-  void _onTourSub() {
-    final want = TourBus.instance.socialTab.value;
-    if (want == null || !mounted) return;
-    _goTo(want);
-  }
-
   /// رفتن به یک زیرتب + ثبتِ بازدیدش (تنها راهِ عوض‌کردنِ `_tab`).
   void _goTo(int index) {
     setState(() {
@@ -99,12 +89,18 @@ class _SocialPageState extends State<SocialPage> {
       _tab = 1;
       _visited.add(1);
     }
-    TourBus.instance.socialTab.addListener(_onTourSub);
+    // پلِ زیرتب: خودِ این صفحه ثبت می‌شود تا تور بتواند «بازی‌ها»،
+    // «ماموریت» و «گذر نبرد» را نشان دهد (آینهٔ رویدادِ `gg:tour-sub` وب).
+    TourBus.instance.socialTabHandler = _goTo;
   }
 
   @override
   void dispose() {
-    TourBus.instance.socialTab.removeListener(_onTourSub);
+    // فقط اگر پل هنوز همین صفحه است پاک می‌شود؛ وگرنه نسخهٔ تازهٔ صفحه
+    // (بعد از بازسازی) را از پل جدا می‌کردیم.
+    if (identical(TourBus.instance.socialTabHandler, _goTo)) {
+      TourBus.instance.socialTabHandler = null;
+    }
     super.dispose();
   }
 
