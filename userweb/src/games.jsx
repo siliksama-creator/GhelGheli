@@ -761,6 +761,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
   const {
     phase, g, error, secondsLeft, move, leave, playBot, joinOnline, rematch,
     stillSearching, connectionNotice, rematchWaiting,
+    resultDeferred, revealResult,
   } = useGameSession(
     api, token, gameId, stake, vsBot, roomCode, externalSocket, initialStart);
   // قفلِ شماره معکوس داخلِ صحنهٔ بازی: دکمهٔ «پیدا کردن حریف آنلاین» غیرفعال
@@ -771,6 +772,16 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
   const pX = g.players?.X || { nickname: 'کاربر ۱' };
   const pO = g.players?.O || (g.vsBot ? { nickname: 'هوش مصنوعی (ربات)', isBot: true } : { nickname: 'کاربر ۲' });
   const isOnlineMatch = activeStake === 100 || activeStake === 1000;
+  // ── پنالتی: تخته باید زنده بماند تا توپِ آخر کامل شود ────────────────────
+  //
+  // خواستهٔ مالک (۵ مهر ۱۴۰۵): «برای راند آخر که نتیجه کل رو هم اعلام میکنه
+  // همینطور.» سرور `game:over` را در همان تیکِ آخرین ضربه می‌فرستد، پس اگر
+  // همان لحظه تخته را با صحنهٔ نتیجه عوض کنیم، انیمیشنِ ضربهٔ آخر اصلاً پخش
+  // نمی‌شود و جشن روی توپی می‌نشیند که هنوز در هواست. session نتیجه را به
+  // تعویق می‌اندازد و تخته با `revealResult()` پایانِ انیمیشن را خبر می‌دهد.
+  const waitingForBoard = Boolean(resultDeferred) && activeGameId === 'penalty';
+  const boardPhase = phase === 'playing' || waitingForBoard;
+  const overPhase = phase === 'over' && !waitingForBoard;
   const resultColors = ['#071522', '#38BDF8'];
   const gameTitle = activeGameId === 'penalty' ? 'ضربات پنالتی' : activeGameId === 'memory' ? 'جفت‌یاب' : 'دوئل کارت‌ها';
 
@@ -883,7 +894,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
        چیدمان دو‌ستونه سوییچ کند — کاری که با استایلِ inline ممکن نبود.
        `isPlaying` فقط وقتی روشن است که تخته واقعاً رندر می‌شود؛ صفحه‌های
        idle/waiting/over تک‌ستونهٔ وسط‌چین می‌مانند. */
-    <div className={`card wide gameShell gameShell-${activeGameId}${phase === 'playing' ? ' isPlaying' : ''}`}
+    <div className={`card wide gameShell gameShell-${activeGameId}${boardPhase ? ' isPlaying' : ''}`}
       style={{ padding: '20px', textAlign: 'center', position:'relative', overflow:'hidden' }}>
       <div className="gameShellHead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', position:'relative', zIndex:5 }}>
         <button type="button" onClick={() => { leave(); onBack(); }} style={{ background: 'rgba(255,255,255,0.1)', color: '#FFF', border: 'none', padding: '6px 14px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
@@ -900,7 +911,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
       {error && <div className="err" style={{ marginBottom: '12px', background:'#EF444422', border:'1px solid #EF4444', color:'#FCA5A5', padding:'8px', borderRadius:'8px' }}>{error}</div>}
       {connectionNotice && <div className="gameReconnectBanner">{connectionNotice}</div>}
 
-      {phase === 'playing' && (
+      {boardPhase && (
         <div className="gameShellScore" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.35)', padding: '10px 16px', borderRadius: '16px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ display:'flex', flex:'1 1 0', minWidth:0, alignItems:'center', gap:'8px', borderBottom:g.turn==='X'?'2px solid #38BDF8':'none', paddingBottom:'4px' }}>
             <GamePlayerIdentity player={pX} fallback="کاربر ۱" />
@@ -914,7 +925,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
         </div>
       )}
 
-      {activeStake>0 && !g.vsBot && phase==='playing' && (
+      {activeStake>0 && !g.vsBot && boardPhase && (
         <div className="gameShellPot" style={{ margin:'0 auto 10px', display:'inline-flex', alignItems:'center', gap:'6px', background:'linear-gradient(90deg, #FFD70022, #FF9F4322)', border:'1px solid #FFD166', color:'#FFD166', padding:'4px 12px', borderRadius:'99px', fontSize:'11px', fontWeight:'900' }}>
           <span style={{ display:'inline-flex', verticalAlign:'-3px', color:'#FFD166' }}><SvgIcon name="trophy" size={16} /></span> جایزهٔ برنده: {fa(g.netPot || netPotFor(activeStake))} امتیاز
         </div>
@@ -971,10 +982,11 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
         )
       )}
 
-      {phase === 'playing' && (
+      {boardPhase && (
         <div className="gameShellBoard">
           {activeGameId === 'penalty' && (
-            <PenaltyGame state={g.state} mySymbol={g.me} turn={g.turn} onMove={move} />
+            <PenaltyGame state={g.state} mySymbol={g.me} turn={g.turn} onMove={move}
+              onSettled={revealResult} />
           )}
           {activeGameId === 'memory' && (
             <MemoryGrid cards={g.state?.cards || []} playable={g.state?.playable || []} onMove={move} />
@@ -982,7 +994,7 @@ function GameScaffold({ api, token, gameId, stake, vsBot, roomCode, externalSock
         </div>
       )}
 
-      {phase === 'over' && (activeGameId === 'memory' ? (
+      {overPhase && (activeGameId === 'memory' ? (
         /* ── جفت‌یاب: نتیجهٔ «خشک» + لحظهٔ جایزه ──
            خواستهٔ مالک: تیترِ «تو برنده شدی»/«حریف برنده شد» در جفت‌یاب
            دیگر نباشد؛ جشن مالِ «لحظهٔ جایزه» است. ولی خودِ نتیجه (امتیازِ

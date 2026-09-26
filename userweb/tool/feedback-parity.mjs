@@ -84,6 +84,34 @@ ok('وب هم خودِ شوت را با صدای tap و lightImpact اعلام �
 ok('پنالتی وب دیگر بی‌صدا نیست (gameAudio را import کرده)',
   /import\s*\{[^}]*\bplay\b[^}]*\}\s*from\s*'\.\/gameAudio\.js'/.test(web.penalty));
 
+// ── نتیجه «بعد از» گل، نه هم‌زمان با رسیدنِ توپ (۵ مهر ۱۴۰۵) ───────────────
+//
+// خواستهٔ مالک: «ببین توپ کامل گل بشه بعد نتیجه هر راند اعلام بشه… برای راند
+// آخر که نتیجه کل رو هم اعلام میکنه همینطور.» تا پیش از این، هر دو کلاینت
+// نتیجه را در ۶۰–۶۲٪ انیمیشن اعلام می‌کردند؛ یعنی درست در لحظه‌ای که توپ به
+// دهانهٔ دروازه می‌رسید، هنوز در هوا بود و تور موج برنداشته بود. اعلام باید
+// بعد از **پایانِ** انیمیشن باشد. این ادعاها فقط جفت‌بودن را قفل می‌کنند
+// (هر دو کلاینت یک قانون دارند)، نه عددِ میلی‌ثانیه را.
+ok('اندروید نتیجهٔ راند را بعد از کامل شدنِ انیمیشن اعلام می‌کند',
+  /AnimationStatus\.completed/.test(android.penalty)
+  && /_deliverVerdict\(\)/.test(android.penalty));
+ok('وب هم نتیجهٔ راند را بعد از کامل شدنِ انیمیشن اعلام می‌کند',
+  /value >= 1 && !outcomeCued\.current/.test(web.penalty));
+ok('هیچ‌کدام نتیجه را در ۶۲٪ پرواز اعلام نمی‌کنند (توپ هنوز در هواست)',
+  !/value >= \.62 && !outcomeCued/.test(web.penalty)
+  && !/_kick\.value >= _flightEndsAt[\s\S]{0,200}Sfx\./.test(android.penalty));
+// راندِ آخر: `game:over` در همان تیکِ ضربهٔ آخر می‌رسد، پس نتیجهٔ کلِ مسابقه
+// هم باید منتظرِ توپ بماند — وگرنه تخته حذف می‌شود و انیمیشن اصلاً پخش
+// نمی‌شود (وب) یا جشن روی توپِ در حالِ پرواز می‌نشیند (اندروید).
+ok('اندروید نتیجهٔ کل را تا پایانِ انیمیشنِ ضربهٔ آخر نگه می‌دارد',
+  android.session.includes('deferResult(')
+  && android.session.includes('void revealResult()')
+  && android.scaffold.includes('session.resultDeferred'));
+ok('وب هم نتیجهٔ کل را نگه می‌دارد و تخته زنده می‌ماند',
+  web.session.includes('deferResult(')
+  && web.session.includes('revealResult')
+  && read('userweb/src/games.jsx').includes('waitingForBoard'));
+
 // ── tap: four engine events + the throttled per-tap buzz ───────────────────
 console.log('\n== ضربه‌زن: چهار رویداد و لرزشِ هر ضربه ==');
 ok('اندروید برای هر ضربه selectionClick دارد',
@@ -143,7 +171,11 @@ ok('وب همان ریتم چهارضربه‌ای را دارد',
   (web.haptics.match(/45, 105/g) || []).length >= 1
   && web.session.includes('victoryFanfare()'));
 ok('وب فقط برای برنده جشن می‌گیرد، نه بازنده',
-  /if \(winner === prev\.me\) victoryFanfare\(\)/.test(web.session));
+  // مسابقهٔ معمولی: همان لحظهٔ `game:over`، و فقط اگر برنده خودِ کاربر باشد.
+  /if \(!waitForBoard && winner === prev\.me\) victoryFanfare\(\)/.test(web.session)
+  // پنالتی: جشن به تعویق می‌افتد تا توپِ آخر کامل شود، و همان‌جا هم شرطِ
+  // «برنده خودِ کاربر است» سرِ جایش مانده.
+  && /winner === meRef\.current\) \{ play\('win'\); victoryFanfare\(\)/.test(web.session));
 ok('اندروید بردِ گردونه را heavyImpact می‌دهد',
   android.wheel.includes('HapticFeedback.heavyImpact'));
 ok('وب هم بردِ گردونه را heavyImpact می‌دهد',

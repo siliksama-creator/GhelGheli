@@ -118,6 +118,53 @@ class GameSession extends ChangeNotifier {
   bool resultHolding = false;
   int _introHoldMs = 0;
   int _resultHoldMs = 0;
+
+  /// ── نتیجه‌ای که منتظرِ تمام شدنِ صحنهٔ تخته است ──
+  ///
+  /// خواستهٔ مالک (۵ مهر ۱۴۰۵): «ببین توپ کامل گل بشه بعد نتیجه هر راند
+  /// اعلام بشه» — و راندِ آخر، نتیجهٔ کلِ بازی را هم اعلام می‌کند.
+  ///
+  /// سرور برای پنالتی `game:over` را در همان تیک اعلام می‌کند (این بازی
+  /// `resultHoldMs` ندارد، چون مکثِ راند مالِ دوئلِ کارت است). پس جشنِ
+  /// برد/باخت روی توپی می‌نشست که هنوز در هوا بود. حالا تخته با
+  /// [deferResult] مهلت می‌گیرد و با [revealResult] خبر می‌دهد که توپ نشست.
+  ///
+  /// ⚠️ تایمرِ ایمنی اجباری است: اگر تخته هرگز گزارش ندهد (کاربر وسطِ پرواز
+  ///    صفحه را ببندد، یا باگی در تخته باشد)، نتیجه بعد از ۴ ثانیه به‌هرحال
+  ///    می‌آید. گم شدنِ نتیجهٔ یک مسابقهٔ شرطی خیلی بدتر از یک جشنِ کمی دیر
+  ///    است.
+  bool resultDeferred = false;
+  Timer? _resultDeferTimer;
+
+  /// اختصاصاً برای [GamePhase.over]: نمایش و صدای نتیجهٔ نهایی عقب بیفتد.
+  void deferResult() {
+    resultDeferred = true;
+    _resultDeferTimer?.cancel();
+    _resultDeferTimer = Timer(const Duration(milliseconds: 4000), revealResult);
+  }
+
+  /// صحنهٔ تخته تمام شد؛ نتیجهٔ نهایی را آزاد کن.
+  ///
+  /// اگر چیزی به تعویق نیفتاده باشد بی‌اثر است — یعنی تخته می‌تواند بعد از
+  /// هر ضربه بی‌قید صدایش بزند.
+  void revealResult() {
+    _resultDeferTimer?.cancel();
+    if (!resultDeferred) return;
+    resultDeferred = false;
+    // صدای پایان همراهِ خودِ جشن می‌آید، نه روی توپی که هنوز در پرواز است.
+    if (phase == GamePhase.over && winner != null) {
+      GameAudio.instance.play(
+        winner == 'DRAW' ? Sfx.draw : (iWon ? Sfx.win : Sfx.lose),
+      );
+    }
+    if (!_disposed) notifyListeners();
+  }
+
+  void _clearResultDefer() {
+    _resultDeferTimer?.cancel();
+    _resultDeferTimer = null;
+    resultDeferred = false;
+  }
   int turnSeconds = 15;
 
   /// ═════════════════════════════════════════════════════════════════════
@@ -424,6 +471,18 @@ class GameSession extends ChangeNotifier {
       connectionNotice = null;
       phase = GamePhase.over;
       _stopClock();
+      // ── پنالتی: اول توپِ آخر کامل شود، بعد نتیجه ──
+      //
+      // بقیهٔ بازی‌ها یا مکثِ راندِ خودشان را دارند (دوئلِ کارت) یا صحنهٔ
+      // ویژه‌ای ندارند، ولی پنالتی یک انیمیشنِ ۱٫۹ ثانیه‌ای دارد که سرور
+      // از آن خبر ندارد. تا وقتی تخته نگفته توپ نشسته، اسکافولد صحنهٔ
+      // نتیجه را نشان نمی‌دهد و صدای پایان هم عقب می‌افتد.
+      //
+      // ⚠️ شرطِ «آخرین ضربه وجود دارد» الزامی است: اگر مسابقه با قطعِ ارتباط
+      //    یا اتمامِ زمان بسته شود، تخته انیمیشنی پخش نمی‌کند که منتظرش
+      //    بمانیم و تعویق فقط صفحه را بی‌دلیل یخ می‌زد.
+      final waitForBoard = gameId == 'penalty' && state['lastKick'] is Map;
+      if (waitForBoard) deferResult();
       if (gameId == 'card_duel') {
         unawaited(GameAudio.instance.stopDuelMusic());
         GameAudio.instance.play(
@@ -431,7 +490,8 @@ class GameSession extends ChangeNotifier {
               ? Sfx.duelFinalDraw
               : (iWon ? Sfx.duelVictory : Sfx.duelDefeat),
         );
-      } else {
+      } else if (!waitForBoard) {
+        // پنالتی صدایش را در `revealResult` می‌گیرد.
         GameAudio.instance.play(
           winner == 'DRAW' ? Sfx.draw : (iWon ? Sfx.win : Sfx.lose),
         );
@@ -714,6 +774,7 @@ class GameSession extends ChangeNotifier {
     lastMove = null;
     timedOutSymbol = null;
     stillSearching = false;
+    _clearResultDefer();
     _socket
         ?.emit('game:join', {'gameId': gameId, 'vsBot': vsBot, 'stake': stake});
     phase = GamePhase.waiting;
@@ -727,6 +788,7 @@ class GameSession extends ChangeNotifier {
     lastMove = null;
     timedOutSymbol = null;
     stillSearching = false;
+    _clearResultDefer();
     _socket?.emit('game:join_room', {'roomCode': roomCode});
     phase = GamePhase.waiting;
     notifyListeners();
@@ -739,6 +801,7 @@ class GameSession extends ChangeNotifier {
     lastMove = null;
     timedOutSymbol = null;
     stillSearching = false;
+    _clearResultDefer();
     _socket?.emit('game:play_bot', {'gameId': gameId});
     phase = GamePhase.waiting;
     notifyListeners();
@@ -930,6 +993,8 @@ class GameSession extends ChangeNotifier {
     _ticker?.cancel();
     _searchTicker?.cancel();
     _payoutTimer?.cancel();
+    _resultDeferTimer?.cancel();
+    _resultDeferTimer = null;
     if (gameId == 'card_duel') unawaited(GameAudio.instance.stopDuelMusic());
     clock.dispose();
     _socket?.dispose();

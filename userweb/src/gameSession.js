@@ -62,6 +62,58 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
   const payoutTimerRef = useRef(null);
   const announcedPayoutRef = useRef('');
 
+  // ── انتشارِ نتیجهٔ نهاییِ پنالتی (۵ مهر ۱۴۰۵) ───────────────────────────
+  //
+  // خواستهٔ مالک: «ببین توپ کامل گل بشه بعد نتیجه هر راند اعلام بشه… برای
+  // راند آخر که نتیجه کل رو هم اعلام میکنه همینطور.»
+  //
+  // سرور `game:over` را در همان تیک می‌فرستد که ضربهٔ آخر زده می‌شود (پنالتی
+  // تنها بازی‌ای است که نتیجه با آخرین ورودی قطعی می‌شود)، پس اگر `phase`
+  // همان لحظه `over` شود، تخته از درخت حذف می‌شود و توپ اصلاً به تور
+  // نمی‌رسد — و جشنِ برد/باخت روی توپی می‌نشیند که هنوز در هواست.
+  // فقط کلاینت می‌داند انیمیشنِ ضربه چند میلی‌ثانیه است، پس تعویق اینجا
+  // انجام می‌شود، نه در سرور. تخته پایانِ انیمیشن را با `revealResult()`
+  // اعلام می‌کند.
+  const [resultDeferred, setResultDeferred] = useState(false);
+  const resultDeferredRef = useRef(false);
+  const deferTimerRef = useRef(0);
+  const pendingWinnerRef = useRef(null);
+  const meRef = useRef(initialStart?.yourSymbol || null);
+  // تخته ممکن است اصلاً صدا نزند (تب بسته شود، انیمیشن رها شود)؛ این تایمرِ
+  // اطمینان جلوی «صفحه‌ای که دیگر تمام نمی‌شود» را می‌گیرد.
+  const RESULT_DEFER_MS = 4000;
+
+  const revealResult = () => {
+    if (!resultDeferredRef.current) return;
+    window.clearTimeout(deferTimerRef.current);
+    resultDeferredRef.current = false;
+    setResultDeferred(false);
+    const winner = pendingWinnerRef.current; pendingWinnerRef.current = null;
+    if (!winner) return;
+    // صدای پایان همان‌جایی پخش می‌شود که نتیجه واقعاً دیده می‌شود.
+    if (winner === 'DRAW') play('draw');
+    // نمادِ خودمان معلوم نیست (مسابقه از یک چالش وارد شده و `game:start`
+    // نرسیده)؛ سکوت بهتر از پخشِ صدایِ باخت برای یک برد است.
+    else if (!meRef.current) return;
+    else if (winner === meRef.current) { play('win'); victoryFanfare(); }
+    else play('lose');
+  };
+
+  const deferResult = winner => {
+    pendingWinnerRef.current = winner || null;
+    resultDeferredRef.current = true;
+    setResultDeferred(true);
+    window.clearTimeout(deferTimerRef.current);
+    deferTimerRef.current = window.setTimeout(revealResult, RESULT_DEFER_MS);
+  };
+
+  const clearResultDefer = () => {
+    window.clearTimeout(deferTimerRef.current);
+    resultDeferredRef.current = false;
+    pendingWinnerRef.current = null;
+    setResultDeferred(false);
+  };
+
   useEffect(() => {
     if (!enabled && !initialStart) {
       setPhase('idle');
@@ -113,6 +165,8 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         startDuelMusic();
         play('duel_intro', 0.82);
       } else play('match_found');
+      meRef.current = d.yourSymbol || null;
+      clearResultDefer();
       setG({
         state: d.state || {}, players: d.players || null,
         me: d.yourSymbol || null, turn: d.turn || null, winner: null,
@@ -171,19 +225,27 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
       if (disposed) return;
       deadlineRef.current = null; setSecondsLeft(0);
       activeRoomRef.current = null;
+      const rawWinner = d?.winner || null;
+      const winner = d?.resolvedWinner || rawWinner;
+      const finishReason = rawWinner === 'DISCONNECT' ? 'disconnect' : null;
+      // پنالتی: نتیجه (صدا، جشن و خودِ صحنهٔ پایان) را همان لحظه اعلام
+      // نمی‌کنیم؛ تخته باید زنده بماند تا توپِ آخر کامل به مقصد برسد و بعد
+      // `revealResult()` صدا زده شود.
+      // ⚠️ شرطِ «آخرین ضربه وجود دارد» الزامی است: اگر مسابقه با قطعِ ارتباط
+      //    یا اتمامِ زمان بسته شود، تخته انیمیشنی پخش نمی‌کند که منتظرش
+      //    بمانیم و تعویق فقط صفحه را بی‌دلیل یخ می‌زد.
+      const waitForBoard = gameId === 'penalty' && Boolean(d?.state?.lastKick);
       setG(prev => {
-        const rawWinner = d?.winner || null;
-        const winner = d?.resolvedWinner || rawWinner;
-        const finishReason = rawWinner === 'DISCONNECT' ? 'disconnect' : null;
         if (gameId === 'card_duel') {
           stopDuelMusic();
           play(winner === 'DRAW' ? 'duel_final_draw'
             : winner === prev.me ? 'duel_victory' : 'duel_defeat');
-        } else play(winner === 'DRAW' ? 'draw' : (winner === prev.me ? 'win' : 'lose'));
+        } else if (!waitForBoard) play(winner === 'DRAW' ? 'draw' : (winner === prev.me ? 'win' : 'lose'));
         // The four-pulse celebration Android fires from the confetti overlay
         // (`game_scaffold.dart`), here for every game and not just the duel.
         // Losing gets nothing on purpose: Android is silent there too.
-        if (winner === prev.me) victoryFanfare();
+        // پنالتی هر دو را به `revealResult()` می‌سپارد تا با توپ هم‌زمان شود.
+        if (!waitForBoard && winner === prev.me) victoryFanfare();
         return {
           ...prev, state: d?.state ?? prev.state, winner, finishReason,
           matchId: d?.matchId || prev.roomId,
@@ -192,6 +254,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
         };
       });
       setPhase('over'); setConnectionNotice('');
+      if (waitForBoard) deferResult(winner);
     };
     const onSettlement = d => {
       setG(prev => {
@@ -363,6 +426,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     return () => {
       disposed = true; window.clearInterval(timer);
       window.clearTimeout(payoutTimerRef.current);
+      window.clearTimeout(deferTimerRef.current);
       for (const [event, handler] of [
         ['connect', requestStart], ['disconnect', onDisconnect], ['connect_error', onConnectError],
         ['game:waiting', onWaiting], ['game:still-waiting', onStillWaiting],
@@ -392,6 +456,7 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
     socket.emit('game:leave', { roomId: activeRoomRef.current || undefined });
     window.clearTimeout(payoutTimerRef.current);
     if ((g.gameId || gameId) === 'card_duel') stopDuelMusic();
+    clearResultDefer();
     requestedRef.current = true; activeRoomRef.current = null;
     setError(''); setStillSearching(false); setPhase('waiting'); setRematchWaiting(false);
     socket.emit(event, payload);
@@ -427,5 +492,6 @@ export function useGameSession(api, token, gameId, stake = 0, vsBot = false, roo
   return {
     phase, g, error, secondsLeft, holding, resultHolding, move, leave, playBot, joinOnline, rematch,
     createChallenge, stillSearching, connected, connectionNotice, rematchWaiting,
+    resultDeferred, revealResult,
   };
 }

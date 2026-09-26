@@ -116,7 +116,7 @@ class GameScaffold extends StatelessWidget {
             );
           },
         ),
-        if (session.phase == GamePhase.over && session.iWon)
+        if (_showResult && session.iWon)
           const Positioned.fill(
             child: IgnorePointer(
               child: _ConfettiOverlay(),
@@ -125,6 +125,15 @@ class GameScaffold extends StatelessWidget {
       ],
     );
   }
+
+  /// آیا حالا وقتِ نشان دادنِ نتیجهٔ نهایی است؟
+  ///
+  /// پنالتی تا وقتی توپِ آخر کامل نشود «تمام‌شده» نشان داده نمی‌شود
+  /// (`session.resultDeferred`): سرور `game:over` را در همان تیک می‌فرستد،
+  /// پس بدون این گارد جشنِ برد/باخت روی توپی می‌نشیند که هنوز در هواست —
+  /// و در وب، کلِ زمین یک لحظه‌ای حذف می‌شد و انیمیشن اصلاً پخش نمی‌شد.
+  bool get _showResult =>
+      session.phase == GamePhase.over && !session.resultDeferred;
 
   Widget _body(BuildContext context, ThemeData theme) {
     if (session.error != null) {
@@ -347,7 +356,7 @@ class GameScaffold extends StatelessWidget {
             ],
             Gaps.vXxs,
             if (scoreboard != null) ...[scoreboard!, Gaps.vXxs],
-            if (session.phase == GamePhase.over) ...[
+            if (_showResult) ...[
               // ── جشنِ پایانِ بازی ──
               //
               // خواستهٔ مالک (دورِ ۳۳): «در بازی پنالتی چه با ربات و چه با
@@ -419,7 +428,7 @@ class GameScaffold extends StatelessWidget {
             Gaps.vXxs,
             SizedBox(
               height: 40,
-              child: session.phase == GamePhase.over
+              child: _showResult
                   ? _ResultActions(session: session, accent: accent, api: api, gameTitle: title)
                   : OutlinedButton.icon(
                       onPressed: session.leave,

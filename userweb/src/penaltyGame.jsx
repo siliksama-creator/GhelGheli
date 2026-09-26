@@ -14,6 +14,10 @@ const GOAL = '#84CC16';
 const SAVE = '#38BDF8';
 const MISS = '#EF4444';
 const GOLD = '#FFD36B';
+// مدتِ ماندنِ پرچمِ نتیجه روی صفحه، بعد از اینکه انیمیشنِ ضربه **کامل** شد
+// (همتای `_verdictHoldMs` در `penalty_board.dart`). پرچم که بسته شود، تخته
+// با `onSettled()` به session می‌گوید مسابقه را تمام کند.
+const VERDICT_HOLD_MS = 900;
 const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeOutQuad = t => 1 - (1 - t) * (1 - t);
@@ -462,8 +466,11 @@ function Scoreboard({ view }) {
   );
 }
 
-function Outcome({ lastKick, me, kick }) {
-  if (!lastKick || kick <= .60) return null;
+function Outcome({ lastKick, me, show }) {
+  // ⚠️ پرچم فقط وقتی ظاهر می‌شود که تخته بگوید (`show`)، یعنی بعد از اینکه
+  //    توپ کامل به مقصد رسید — دیگر با `kick` (درصدِ انیمیشن) تصمیم
+  //    نمی‌گیریم، چون در ۶۰٪ هنوز توپ در هواست.
+  if (!lastKick || !show) return null;
   const mine = lastKick.shooter === me;
   const text = lastKick.outcome === 'goal'
     ? (mine ? 'گل زدی!' : 'گل خوردی')
@@ -479,23 +486,29 @@ function Outcome({ lastKick, me, kick }) {
   );
 }
 
-export default function PenaltyGame({ state, mySymbol, onMove }) {
+export default function PenaltyGame({ state, mySymbol, onMove, onSettled }) {
   const view = penaltyView(state, mySymbol);
   const [selected, setSelected] = useState(null);
   const [charging, setCharging] = useState(false);
   const [power, setPower] = useState(.7);
   const [kick, setKick] = useState(0);
   const [animating, setAnimating] = useState(false);
+  // آیا پرچمِ نتیجهٔ این راند هم‌اکنون روی صفحه است؟ (همتای
+  // `_verdictVisible` در `penalty_board.dart`)
+  const [verdict, setVerdict] = useState(false);
   const [, setFrame] = useState(0);
   const powerRef = useRef(.7);
   const chargeStart = useRef(0);
   const kickStart = useRef(0);
   const played = useRef(0);
   const netHit = useRef(false);
-  // The outcome cue fires once per kick, at the same 62% of the timeline
-  // Android uses. `netHit` cannot double as the latch because it only ever
-  // trips on a goal, leaving saves and misses silent.
+  // The outcome cue fires once per kick. `netHit` cannot double as the latch
+  // because it only ever trips on a goal, leaving saves and misses silent.
+  // ⚠️ این نشانگر **بعد از کامل شدنِ انیمیشن** می‌افتد، نه در ۶۲٪ مسیر:
+  //    خواستهٔ مالک (۵ مهر ۱۴۰۵) این است که اول توپ کامل گل شود (تور موج
+  //    بخورد و آرام شود)، بعد نتیجهٔ راند اعلام شود.
   const outcomeCued = useRef(false);
+  const verdictTimer = useRef(0);
   const net = useRef(new PenaltyNet());
 
   useEffect(() => {
@@ -505,6 +518,7 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
       kickStart.current = performance.now();
       netHit.current = false;
       outcomeCued.current = false;
+      window.clearTimeout(verdictTimer.current); setVerdict(false);
       // The strike itself, as the ball leaves the boot — `penalty_board.dart`
       // plays Sfx.tap at 0.9 with a light impact at exactly this point.
       play('tap', .9);
@@ -512,8 +526,13 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
     } else if (view.history.length === 0 && played.current !== 0) {
       played.current = 0; net.current.reset(); setKick(0); setAnimating(false);
       outcomeCued.current = false;
+      window.clearTimeout(verdictTimer.current); setVerdict(false);
     }
   }, [view.history.length, view.lastKick]);
+
+  // تخته ممکن است در میانهٔ مکثِ نتیجه حذف شود (مثلاً کاربر برگردد)؛ تایمرِ
+  // نگه‌داشت نباید بعد از رفتنِ کامپوننت صدا بزند.
+  useEffect(() => () => window.clearTimeout(verdictTimer.current), []);
 
   useEffect(() => {
     let raf = 0;
@@ -540,15 +559,23 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
             Number(view.lastKick.power || .7));
           netHit.current = true;
         }
-        // The verdict lands with the ball, not when the socket message
-        // arrived — the same 62% mark the goal-net impact uses, so sound,
-        // haptic and the on-screen `Outcome` label all agree.
-        if (value >= .62 && !outcomeCued.current && view.lastKick) {
+        // ⚠️ اعلامِ نتیجه در ۱۰۰٪ انیمیشن است، نه ۶۲٪: در ۶۲٪ توپ تازه به
+        //    دهانهٔ دروازه می‌رسد. خواستهٔ مالک (۵ مهر ۱۴۰۵): «ببین توپ کامل
+        //    گل بشه بعد نتیجه هر راند اعلام بشه». پس ترتیب این است: موجِ تور
+        //    در ۶۲٪ → توپ می‌نشیند و تور آرام می‌شود → بعد صدا، لرزش و
+        //    پرچمِ روی صفحه → مکثِ کوتاه → `onSettled()`.
+        if (value >= 1 && !outcomeCued.current && view.lastKick) {
           outcomeCued.current = true;
           const outcome = view.lastKick.outcome;
           if (outcome === 'goal') { play('win', 1); heavyImpact(); }
           else if (outcome === 'save') { play('drop', .9); mediumImpact(); }
           else { play('timeout', .8); selectionClick(); }
+          setVerdict(true);
+          window.clearTimeout(verdictTimer.current);
+          verdictTimer.current = window.setTimeout(() => {
+            setVerdict(false);
+            onSettled?.();
+          }, VERDICT_HOLD_MS);
         }
         if (value >= 1) setAnimating(false);
       }
@@ -559,7 +586,9 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
     return () => cancelAnimationFrame(raf);
   }, [charging, animating, view.lastKick]);
 
-  const enabled = !view.alreadyChose && !animating;
+  // در مکثِ نتیجه هم ناحیه‌ها قفل‌اند (همتای `enabled: !_verdictVisible`
+  // در اندروید): نباید بتوان وسطِ اعلام، ضربهٔ بعدی را فرستاد.
+  const enabled = !view.alreadyChose && !animating && !verdict;
   const startShot = (zone, event) => {
     if (!enabled || !view.amShooter) return;
     event.preventDefault();
@@ -607,7 +636,7 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
             </button>
           ))}
         </div>
-        <Outcome lastKick={view.lastKick} me={view.me} kick={kick} />
+        <Outcome lastKick={view.lastKick} me={view.me} show={verdict} />
       </div>
       <div className={`penPrompt${view.amShooter ? ' shooter' : ' keeper'}`}>
         {prompt}

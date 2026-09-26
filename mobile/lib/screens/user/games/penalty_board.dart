@@ -97,6 +97,29 @@ const _saveBlue = Color(0xFF38BDF8);
 const _missRed = Color(0xFFEF4444);
 const _gold = Color(0xFFFFD36B);
 
+// ── زمان‌بندیِ یک ضربه: اول توپ، بعد اعلام ─────────────────────────────────
+//
+// خواستهٔ مالک (۵ مهر ۱۴۰۵): «ببین توپ کامل گل بشه بعد نتیجه هر راند اعلام
+// بشه» — و برای راندِ آخر، نتیجهٔ کلِ بازی هم همین‌طور.
+//
+// پیش از این صدا و پرچمِ نتیجه در ۶۰ تا ۶۲ درصدِ انیمیشن می‌آمدند؛ یعنی
+// درست همان لحظه‌ای که توپ تازه به دهانهٔ دروازه می‌رسید و هنوز در تور
+// ننشسته بود، کنفتی هنوز پخش نشده بود و موجِ تور تازه شروع شده بود. نتیجه
+// پیش از دیده‌شدنِ خودِ گل لو می‌رفت — و در راندِ آخر، جشنِ «بردی/باختی»
+// روی همان توپِ در حالِ پرواز می‌نشست.
+//
+// حالا ترتیب این است:
+//   ۰ … ۶۲٪       پروازِ توپ تا دهانهٔ دروازه
+//   ۶۲ … ۱۰۰٪     نشستنِ توپ در تور + موجِ تور + کنفتی   ← «گل کامل شد»
+//   بعد از ۱۰۰٪   اعلام: صدا، لرزش، پرچمِ نتیجه
+//   + _verdictHoldMs  پرچم می‌ماند و بعد محو می‌شود
+
+/// جایی که توپ به دهانهٔ دروازه می‌رسد (نقاش با همین عدد مسیر را می‌بندد).
+const double _flightEndsAt = 0.62;
+
+/// مدتِ نمایشِ پرچمِ نتیجه، بعد از اتمامِ کاملِ انیمیشنِ ضربه.
+const int _verdictHoldMs = 900;
+
 class PenaltyScreen extends StatefulWidget {
   const PenaltyScreen({
     super.key,
@@ -211,6 +234,18 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
   /// آخرین ضربه‌ای که انیمیشنش پخش شد — تا یک ضربه دوبار پخش نشود.
   int _playedKicks = -1;
 
+  /// آیا نتیجهٔ این ضربه اعلام شده (تا یک ضربه دو بار اعلام نشود).
+  bool _verdictDone = false;
+
+  /// پرچمِ نتیجه روی صفحه است؟ از پایانِ انیمیشن تا پایانِ مهلتِ نمایش.
+  bool _verdictVisible = false;
+
+  /// ورود/خروجِ پرچمِ نتیجه — مستقل از انیمیشنِ توپ، چون پرچم از جایی شروع
+  /// می‌شود که توپ تمام شده.
+  late final AnimationController _verdict;
+
+  Timer? _verdictTimer;
+
   @override
   void initState() {
     super.initState();
@@ -225,6 +260,10 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
     _power = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
+    );
+    _verdict = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _verdictHoldMs),
     );
     _netTicker = createTicker(_onNetTick);
     _kick.addListener(_onKickFrame);
@@ -247,10 +286,12 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
   void dispose() {
     widget.session.removeListener(_onState);
     _idleTimer?.cancel();
+    _verdictTimer?.cancel();
     _kick.removeListener(_onKickFrame);
     _netTicker.dispose();
     _kick.dispose();
     _power.dispose();
+    _verdict.dispose();
     super.dispose();
   }
 
@@ -278,31 +319,52 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
   /// تور باید دقیقاً همان فریمی موج بردارد که توپ به آن می‌رسد، وگرنه
   /// چشم ناهماهنگی را می‌گیرد و کل جلوه فرو می‌ریزد.
   void _onKickFrame() {
-    if (_netHit || !_kick.isAnimating) return;
+    // ── ۱) برخورد: فقط فیزیک، بدون هیچ اعلامی ──
+    //
     // ۰.۶۲ = لحظه‌ای که توپ به دهانهٔ دروازه می‌رسد (همان عددی که نقاش
-    // برای پایانِ مسیرِ پرتابه استفاده می‌کند).
-    if (_kick.value < 0.62) return;
+    // برای پایانِ مسیرِ پرتابه استفاده می‌کند). اینجا فقط تور تکان می‌خورد؛
+    // نتیجه را اعلام نمی‌کنیم چون توپ هنوز ننشسته است.
+    if (!_netHit && _kick.isAnimating && _kick.value >= _flightEndsAt) {
+      final hit = widget.session.state['lastKick'];
+      if (hit is Map) {
+        // فقط گل به تور می‌خورد. مهار یعنی توپ در دستکش مانده، و بیرون یعنی
+        // اصلاً وارد چارچوب نشده.
+        _netHit = true;
+        if ('${hit['outcome']}' == 'goal') {
+          final z = NumberParser.toInt(hit['shotZone']);
+          final power = (hit['power'] as num?)?.toDouble() ?? 0.7;
+          // ⚠️ سطر بر `kZoneRows` تقسیم می‌شود نه `kZoneCols`: با ۲ ردیف،
+          //    تقسیمِ قدیمی بر ۳ موج را به نیمهٔ بالاییِ تور می‌چسباند.
+          final u = ((z % kZoneCols) + 0.5) / kZoneCols;
+          final v = ((z ~/ kZoneCols) + 0.5) / kZoneRows;
+          _net.hit(u, v, power);
+          if (!_netTicker.isActive) {
+            _lastTick = Duration.zero;
+            _netTicker.start();
+          }
+        }
+      }
+    }
+
+    // ── ۲) اعلام: فقط بعد از اینکه توپ **کامل** به مقصد رسید ──
+    if (!_verdictDone && _kick.status == AnimationStatus.completed) {
+      _deliverVerdict();
+    }
+  }
+
+  /// اعلامِ نتیجهٔ ضربه — صدا، لرزش و پرچم.
+  ///
+  /// ⚠️ فقط وقتی صدا زده می‌شود که انیمیشنِ ضربه **کامل** تمام شده باشد
+  ///    (توپ در تور نشسته، موج برگشته، کنفتی پخش شده). خواستهٔ مالک:
+  ///    «ببین توپ کامل گل بشه بعد نتیجه هر راند اعلام بشه».
+  void _deliverVerdict() {
     final last = widget.session.state['lastKick'];
     if (last is! Map) return;
+    _verdictDone = true;
     final outcome = '${last['outcome']}';
-    // فقط گل به تور می‌خورد. مهار یعنی توپ در دستکش مانده، و بیرون یعنی
-    // اصلاً وارد چارچوب نشده.
-    _netHit = true;
     if (outcome == 'goal') {
-      // Goal impact at 62% of animation timeline
       GameAudio.instance.play(Sfx.win, volume: 1.0);
       HapticFeedback.heavyImpact();
-      final z = NumberParser.toInt(last['shotZone']);
-      final power = (last['power'] as num?)?.toDouble() ?? 0.7;
-      // ⚠️ سطر بر `kZoneRows` تقسیم می‌شود نه `kZoneCols`: با ۲ ردیف،
-      //    تقسیمِ قدیمی بر ۳ موج را به نیمهٔ بالاییِ تور می‌چسباند.
-      final u = ((z % kZoneCols) + 0.5) / kZoneCols;
-      final v = ((z ~/ kZoneCols) + 0.5) / kZoneRows;
-      _net.hit(u, v, power);
-      if (!_netTicker.isActive) {
-        _lastTick = Duration.zero;
-        _netTicker.start();
-      }
     } else if (outcome == 'save') {
       GameAudio.instance.play(Sfx.drop, volume: 0.9);
       HapticFeedback.mediumImpact();
@@ -310,6 +372,18 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
       GameAudio.instance.play(Sfx.timeout, volume: 0.8);
       HapticFeedback.selectionClick();
     }
+    _verdictVisible = true;
+    _verdict.forward(from: 0);
+    _verdictTimer?.cancel();
+    _verdictTimer = Timer(const Duration(milliseconds: _verdictHoldMs), () {
+      if (!mounted) return;
+      // تابلو/شبکه با `AnimatedBuilder` از `_verdict` هم خبر دارند، پس
+      // همین یک `setState` برای جمع کردنِ پرچم کافی است.
+      setState(() => _verdictVisible = false);
+      // نتیجهٔ کلِ بازی هم همین‌جا آزاد می‌شود: توپِ آخر کامل شده و وقتِ
+      // جشن است. اگر این ضربه آخرین نبود، `revealResult` بی‌اثر است.
+      widget.session.revealResult();
+    });
   }
 
   /// وقتی سرور نتیجهٔ ضربه را فرستاد، انیمیشن را اجرا کن.
@@ -320,6 +394,13 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
       _pickedZone = null;
       _charging = false;
       _netHit = false;
+      // ضربهٔ تازه یعنی نتیجهٔ قبلی باید جمع شود و اعلامِ تازه از نو
+      // شروع شود — وگرنه پرچمِ ضربهٔ قبل روی پروازِ بعدی می‌ماند.
+      _verdictTimer?.cancel();
+      _verdictDone = false;
+      _verdictVisible = false;
+      _verdict.stop();
+      _verdict.reset();
       _power.stop();
       _kick.forward(from: 0);
       // Play kick strike sound at start of animation
@@ -381,10 +462,11 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
     final me = widget.session.mySymbol ?? 'X';
     final foe = me == 'X' ? 'O' : 'X';
 
-    // پرچمِ نتیجه از ۵۵٪ انیمیشن (کمی پیش از رسیدنِ توپ) تا آخر می‌ماند.
-    // شروعِ زودتر باعث می‌شد نتیجه پیش از دیدنِ برخورد لو برود.
-    final showOutcome =
-        lastKick is Map && _kick.isAnimating && _kick.value > 0.60;
+    // پرچمِ نتیجه فقط **بعد از** اتمامِ کاملِ انیمیشن می‌آید و تا پایانِ
+    // مهلتِ نمایش می‌ماند. خواستهٔ مالک: «ببین توپ کامل گل بشه بعد نتیجه
+    // هر راند اعلام بشه». پیش از این از ۶۰٪ می‌آمد؛ یعنی نتیجه پیش از
+    // دیده‌شدنِ خودِ گل لو می‌رفت.
+    final showOutcome = lastKick is Map && _verdictVisible;
 
     return Column(
       children: [
@@ -430,7 +512,7 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
                   width: pitchH * 1.30,
                   height: pitchH,
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_kick, _power]),
+                    animation: Listenable.merge([_kick, _power, _verdict]),
                     builder: (context, _) => Stack(
                       children: [
                         Positioned.fill(
@@ -455,7 +537,13 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
                                 
                               ),
                               child: _ZoneGrid(
-                                enabled: widget.session.phase == GamePhase.playing && !_alreadyChose && !_kick.isAnimating,
+                                enabled: widget.session.phase == GamePhase.playing &&
+                                    !_alreadyChose &&
+                                    !_kick.isAnimating &&
+                                    // تا پرچمِ نتیجه روی دروازه است شبکه
+                                    // قفل می‌ماند: پرچم وسطِ دروازه است و
+                                    // اگر هدف‌گیری باز شود روی آن می‌نشیند.
+                                    !_verdictVisible,
                                 amShooter: _amShooter,
                                 picked: _pickedZone,
                                 
@@ -476,8 +564,10 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
                               child: _OutcomeFlag(
                                 outcome: '${lastKick['outcome']}',
                                 mine: lastKick['shooter'] == me,
-                                t: ((_kick.value - 0.60) / 0.40)
-                                    .clamp(0.0, 1.0),
+                                // طولِ عمرِ پرچم دیگر از انیمیشنِ توپ
+                                // نمی‌آید (آن تمام شده)؛ کنترلرِ خودش
+                                // آن را از صفر تا محو شدن می‌برد.
+                                t: _verdict.value.clamp(0.0, 1.0),
                               ),
                             ),
                           ),
