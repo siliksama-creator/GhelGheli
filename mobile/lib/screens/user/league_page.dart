@@ -164,9 +164,9 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, 0),
-            child: SegmentedButton<int>TourAnchor(
+            child: TourAnchor(
               id: 'league:tabs',
-              child: (
+              child: SegmentedButton<int>(
               segments: [
                 const ButtonSegment(value: 0, label: Text('جدول لیگ')),
                 const ButtonSegment(value: 1, label: Text('باشگاه‌ها')),

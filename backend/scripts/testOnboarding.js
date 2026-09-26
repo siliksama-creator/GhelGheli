@@ -331,7 +331,9 @@ check('هر `nav:…` نقشه در ترتیبِ نوار پایین هست', mi
 // یا متنِ کامنت، گرفتار نمی‌شود چون کامنت‌ها پیش از آزمون پاک می‌شوند.
 const badWrap = dartFiles.flatMap((f) => read(f).split('\n')
   .map((l, i) => ({ f, l, i }))
-  .filter(({ l }) => /[A-Za-z0-9_]TourAnchor\(/.test(strip(l))));
+  // `>` هم جزوِ نشانه است: `SegmentedButton<int>TourAnchor(` هم همین
+  // کلاسِ خرابی بود (آرگومانِ جنریک، سرِ درج را جابه‌جا می‌کرد).
+  .filter(({ l }) => /[A-Za-z0-9_>]TourAnchor\(/.test(strip(l))));
 check('پیچشِ لنگر سالم است (سرِ نامِ ویجت، نه سرِ پرانتز)', badWrap.length === 0,
   badWrap.map(({ f, i }) => `${path.basename(f)}:${i + 1}`).join(', '));
 
