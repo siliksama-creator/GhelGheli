@@ -169,7 +169,7 @@ class TourOverlayState extends State<TourOverlay> {
 
   void _onBus() {
     if (_data == null) return;
-    start(fromStep: 0);
+    unawaited(start(fromStep: 0));
   }
 
   /// راه‌اندازی: وضعیت را از سرور می‌خواند و در صورت لزوم شروع می‌کند.
@@ -184,15 +184,15 @@ class TourOverlayState extends State<TourOverlay> {
       _pendingAuto = true;
       return;
     }
-    start(fromStep: 0);
+    unawaited(start(fromStep: 0));
   }
 
   @override
-  void didUpdateWidget(covariant TourOverlay old) {
-    super.didUpdateWidget(old);
+  void didUpdateWidget(covariant TourOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
     if (_pendingAuto && widget.currentIndex == 0) {
       _pendingAuto = false;
-      if (!_open) start(fromStep: 0);
+      if (!_open) unawaited(start(fromStep: 0));
     }
   }
 
@@ -268,8 +268,8 @@ class TourOverlayState extends State<TourOverlay> {
     }
 
     // ── ۲) همان مسیری که کاربر می‌رفت ───────────────────────────────
-    if (needTab && destIndex != null) {
-      widget.goIndex(destIndex);
+    if (needTab) {
+      widget.goIndex(destIndex!);
       await Future<void>.delayed(_settleMs);
       if (!mounted || run != _run) return;
     }
@@ -410,7 +410,7 @@ class TourOverlayState extends State<TourOverlay> {
     final frame = Rect.fromLTWH(0, mq.padding.top, mq.size.width,
         mq.size.height - mq.padding.top - mq.padding.bottom);
     final hole = _stage == 'door' ? _doorRect : _targetRect;
-    final ring = _clampTo(frame, hole);
+    final Rect? ring = _clampTo(frame, hole);
 
     return Positioned.fill(
       child: Directionality(
@@ -519,7 +519,7 @@ class TourOverlayState extends State<TourOverlay> {
   Widget _card(TourStep step, Rect frame, Rect? ring, int total) {
     final width = (frame.width - 20).clamp(200.0, 520.0).toDouble();
     const cardMaxH = 320.0;
-    final heightGuess = 230.0;
+    const heightGuess = 230.0;
     double? top;
     if (ring != null) {
       final below = frame.bottom - ring.bottom - 12;
@@ -716,8 +716,12 @@ class TourOverlayState extends State<TourOverlay> {
       );
 
   /// دوختنِ کادر به قاب (با حاشیهٔ ۸ پیکسلی برای هاله).
-  Rect _clampTo(Rect frame, Rect? r) {
-    if (r == null) return Rect.zero;
+  ///
+  /// `null` برمی‌گرداند اگر لنگر روی صفحه نباشد — نه یک مستطیلِ صفر. با
+  /// `Rect.zero` هالهٔ صفرسایز در گوشهٔ قاب کشیده می‌شد و پنل‌های پرده
+  /// حولِ همان نقطه چیده می‌شدند.
+  Rect? _clampTo(Rect frame, Rect? r) {
+    if (r == null) return null;
     const pad = 8.0;
     var left = r.left - pad;
     var top = r.top - pad;

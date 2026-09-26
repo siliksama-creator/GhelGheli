@@ -140,7 +140,6 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
 
-  @override
   /// کارتِ «آموزش را دوباره ببین».
   ///
   /// چرا در پروفایل: همان‌جایی که کاربر دنبالِ تنظیماتِ حسابش می‌گردد — و
@@ -178,6 +177,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  @override
   Widget build(BuildContext context) {
     if (!_loaded) return const LoadingView();
     final theme = Theme.of(context);
