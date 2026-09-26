@@ -710,14 +710,31 @@ class TourOverlayState extends State<TourOverlay> {
                 style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12)),
           ],
           const SizedBox(height: 11),
+          // ── ⚠️ دکمهٔ اصلی یک ردیفِ خودش ────────────────────────────────
+          //
+          // نسخهٔ اول هر سه دکمه را در یک `Row` می‌گذاشت: «بعدی» با
+          // `Expanded` (عرضِ محدود) و دو دکمهٔ دیگر بی‌`Expanded`. `Row`
+          // به فرزندِ غیرِ‌فِلکس **عرضِ بی‌نهایت** می‌دهد (تا اندازهٔ
+          // ذاتی‌اش را بسنجد) و دکمهٔ متریال با آن می‌ترکد:
+          //
+          //     BoxConstraints forces an infinite width
+          //
+          // این خطا در اولین اجرای واقعیِ تور (تستِ ویجت، ۵ مهر) بیرون زد؛
+          // یعنی کارتِ تور روی گوشی هم خراب می‌شد. حالا دکمهٔ اصلی تمام‌عرض
+          // است و دو دکمهٔ کمکی کنارِ هم با `Expanded` (عرضِ محدود) —
+          // روی موبایل هم خوانا‌تر است.
+          SizedBox(width: double.infinity, height: 44, child: _primary()),
+          const SizedBox(height: 8),
           Row(
             children: <Widget>[
-              Expanded(flex: 3, child: _primary()),
-              const SizedBox(width: 8),
-              _secondary(_muted ? 'صدا خاموش' : 'صدا روشن', _toggleMute),
+              Expanded(
+                child: _secondary(_muted ? 'صدا خاموش' : 'صدا روشن', _toggleMute),
+              ),
               if (_phase == 'playing' || _phase == 'manual' || _phase == 'error') ...<Widget>[
                 const SizedBox(width: 8),
-                _secondary('پخش دوباره', () => unawaited(_replay())),
+                Expanded(
+                  child: _secondary('پخش دوباره', () => unawaited(_replay())),
+                ),
               ],
             ],
           ),
