@@ -170,6 +170,16 @@ check('لایه‌های تور داخلِ قاب‌اند (نه چسبیده ب
   && /\.tourRoot\s*\{[^}]*overflow:\s*hidden/.test(tourCss)
   && /\.tourCard\s*\{[^}]*position:\s*absolute/.test(tourCss)
   && /\.tourShade\s*\{[^}]*position:\s*absolute/.test(tourCss));
+// «دوباره ببین» و راه‌اندازی نباید به دادهٔ ناکشیده گره بخورند: کاربری که
+// سرِ ورود اینترنتش لنگ زده، هر بار دکمه را می‌زند و هیچ اتفاقی نمی‌افتد
+// (همین باگ یک بار در اندروید رفع شد و در وب هم وجود داشت).
+check('وب: «دوباره ببین» اگر داده نبود خودش می‌کشد',
+  engine.includes('const load = useCallback(async (forced)')
+  && engine.includes('await load(true)'));
+check('وب: خواندنِ ناموفقِ وضعیت یک بار دوباره تلاش می‌شود',
+  engine.includes('BOOT_RETRY_MS') && engine.includes("state === 'error'")
+  && engine.includes('clearTimeout(retry)'));
+
 check('تورِ خودکار فقط از خانه شروع می‌شود',
   engine.includes("tabRef.current !== 'home'") && engine.includes('blockedRef')
   && engine.includes('bootKey'));

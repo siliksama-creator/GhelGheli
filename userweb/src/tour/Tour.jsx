@@ -235,6 +235,10 @@ export default function Tour({ token, tab, goTab }) {
   const dataRef = useRef(null);
   const frameRef = useRef(frame);
   frameRef.current = frame;
+  /// فاصلهٔ تلاشِ دوباره وقتی خواندنِ وضعیت شکست خورده باشد.
+  /// کوتاه نگه داشته شده: کاربر همین حالا وارد اپ شده و منتظر است.
+  const BOOT_RETRY_MS = 6000;
+
   const runRef = useRef(0);
   const openRef = useRef(false);
   const blockedRef = useRef(false);
@@ -415,6 +419,34 @@ export default function Tour({ token, tab, goTab }) {
   // «پخش دوباره» = بازپخشِ همین بخش از اول، با همان انیمیشنِ ورود.
   const replay = useCallback(() => present(idx), [idx, present]);
 
+  // ── کشیدنِ وضعیت از سرور و (در صورت لزوم) شروعِ تور ─────────────────
+  //
+  // چرا یک تابعِ مشترک: راه‌اندازی، تلاشِ دوباره و «دوباره ببین» هر سه
+  // همین کار را می‌کنند. سه نسخهٔ جدا یعنی سه جای باگِ جدا — و همان باگ
+  // یکی بار رخ داد: «دوباره ببین» سرِ خودش چک می‌کرد و اگر داده تهی بود
+  // بی‌صدا برمی‌گشت.
+  //
+  // برمی‌گرداند: 'started' | 'seen' | 'blocked' | 'off' | 'error' — تا
+  // تنها جایی که ارزشِ تلاشِ دوباره دارد (`error`) از بقیه جدا باشد.
+  const load = useCallback(async (forced) => {
+    if (!token) return 'error';
+    const d = await req('/api/onboarding', 'GET', null, token).catch(() => null);
+    if (!d?.steps?.length) return 'error';
+    setData(d);
+    if (!d.enabled) return 'off';
+    const q = new URLSearchParams(window.location.search).get('tour') === '1';
+    const hard = forced === true || q;
+    if (d.seen && !hard) return 'seen';
+    // تورِ خودکار فقط وقتی تب «خانه» است شروع می‌شود. اگر کاربر با لینکِ
+    // اتاقِ مشترک وارد شده باشد تبش club است؛ تور روی بازیِ در جریان
+    // نمی‌پرد و به‌محضِ برگشتن به خانه خودش می‌آید.
+    if (!hard && tabRef.current !== 'home') { blockedRef.current = true; return 'blocked'; }
+    setOpen(true);
+    setIdx(0);
+    await present(0, d.steps);
+    return 'started';
+  }, [token, present]);
+
   // ── راه‌اندازی: کشیدنِ وضعیت از سرور ────────────────────────────────
   // `bootKey` فقط وقتی بالا می‌رود که تورِ خودکار به‌خاطرِ «کاربر وسطِ اتاقِ
   // مشترک است» عقب افتاده باشد؛ آن‌وقت با برگشتن به خانه از اول تلاش می‌کند.
@@ -423,24 +455,30 @@ export default function Tour({ token, tab, goTab }) {
     // تغییرِ تب در میانهٔ تور، ناوبریِ خودِ تور است؛ بازخوانی و ری‌استارت نه.
     if (openRef.current) return undefined;
     let alive = true;
+    let retry = 0;
     (async () => {
-      const d = await req('/api/onboarding', 'GET', null, token).catch(() => null);
-      if (!alive || !d?.steps?.length) return;
-      setData(d);
-      if (!d.enabled) return;
-      const forced = new URLSearchParams(window.location.search).get('tour') === '1';
-      if (d.seen && !forced) return;
-      // تورِ خودکار فقط وقتی تب «خانه» است شروع می‌شود. اگر کاربر با لینکِ
-      // اتاقِ مشترک وارد شده باشد تبش club است؛ تور روی بازیِ در جریان
-      // نمی‌پرد و به‌محضِ برگشتن به خانه خودش می‌آید.
-      if (!forced && tabRef.current !== 'home') { blockedRef.current = true; return; }
-      setOpen(true);
-      setIdx(0);
-      await present(0, d.steps);
+      const state = await load(false);
+      if (!alive) return;
+      // خواندنِ ناموفق (اینترنتِ لنگِ لحظهٔ ورود) یک بار بی‌سروصدا دوباره
+      // تلاش می‌شود؛ وگرنه کاربر آموزش را هرگز نمی‌بیند. برای `seen` یا
+      // `blocked` هیچ تلاشی لازم نیست.
+      if (state === 'error') {
+        retry = window.setTimeout(() => { if (alive) load(false); }, BOOT_RETRY_MS);
+      }
     })();
-    return () => { alive = false; };
+    return () => { alive = false; if (retry) window.clearTimeout(retry); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, bootKey]);
+  }, [token, bootKey, load]);
+
+  // ── اگر داده نداشتیم و کاربر به خانه برگشت، یک تلاشِ محدودِ دیگر ────
+  // (بدونِ این، کسی که روی خانه است و یک بار خطا خورده تا رفرشِ صفحه
+  //  چیزی نمی‌بیند.) سقفِ دو تلاش گذاشته شده تا حلقه نشود.
+  useEffect(() => {
+    if (tab !== 'home' || openRef.current || bootKey > 1) return;
+    if (dataRef.current?.steps?.length) return;
+    setBootKey(k => k + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   // ── پیش‌بارگذاریِ بخشِ بعد ─────────────────────────────────────────
   useEffect(() => {
@@ -461,14 +499,20 @@ export default function Tour({ token, tab, goTab }) {
 
   // ── «دوباره ببین» از پروفایل ────────────────────────────────────────
   useEffect(() => {
-    const onReplay = () => {
-      if (!dataRef.current?.steps?.length) return;
-      setOpen(true);
-      present(0);
+    const onReplay = async () => {
+      // داده که هست → همان لحظه شروع. اگر خواندنِ اولیه شکست خورده بود،
+      // دکمه **نباید** بی‌صدا بی‌اثر بماند: یک بار دیگر می‌کشیم و بعد
+      // شروع می‌کنیم (آینهٔ `_bootForced` در اندروید).
+      if (dataRef.current?.steps?.length) {
+        setOpen(true);
+        present(0);
+        return;
+      }
+      await load(true);
     };
     window.addEventListener('gg:tour-replay', onReplay);
     return () => window.removeEventListener('gg:tour-replay', onReplay);
-  }, [present]);
+  }, [present, load]);
 
   // ── هم‌گام‌سازیِ هاله با چیدمان + کلیدهای میان‌بر ────────────────────
   useEffect(() => {
