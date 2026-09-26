@@ -542,7 +542,9 @@ class _ResultStrip extends StatelessWidget {
     String? deltaText;
     if (showDelta) {
       if (draw) {
-        // تساویِ پنالتی: کمسیون کسر می‌شود، پس «ورودی کامل» دروغ بود.
+        // تساوی (دوئلِ کارت): کمسیون کسر می‌شود، پس «ورودی کامل» دروغ بود.
+        // پنالتی دیگر به این شاخه نمی‌رسد — آن بازی تساوی ندارد و با
+        // راندهای اضافه تا رسیدن به برنده ادامه پیدا می‌کند.
         deltaText = session.drawRefund > 0
             ? '${faNum(session.drawRefund)} امتیاز برگشت '
                 '(کمسیون ${faNum(session.drawFee)})'

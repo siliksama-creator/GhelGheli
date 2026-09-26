@@ -51,13 +51,15 @@ function ok(cond, msg) {
 
   console.log('\n== ۳. تست منطق فیزیک و مهار دقیق بازی پنالتی ۲۰۲۸ ==');
   try {
-    for (let z = 0; z < 9; z++) {
+    // دروازه ۶ ناحیه دارد (۳ ستون × ۲ ردیف) — خواستهٔ مالک، مهر ۱۴۰۵.
+    ok(penalty.ZONES === 6, 'پنالتی: دروازه ۶ ناحیه دارد');
+    for (let z = 0; z < penalty.ZONES; z++) {
       const saveRes = penalty.resolveKick(z, 0.6, z, () => 0.999);
       ok(saveRes.outcome === 'save', `شیرجه به ناحیه ${z} -> مهار قطعی دروازه‌بان`);
     }
-    const goalRes = penalty.resolveKick(0, 0.6, 8, () => 0.999);
+    const goalRes = penalty.resolveKick(0, 0.6, 5, () => 0.999);
     ok(goalRes.outcome === 'goal', 'شوت در چارچوب و شیرجه به ناحیه دیگر -> گل قطعی');
-    const goalRes2 = penalty.resolveKick(0, 0.95, 8, () => 0.01);
+    const goalRes2 = penalty.resolveKick(0, 0.95, 5, () => 0.01);
     ok(goalRes2.outcome === 'goal', 'شوت بدون مهار دروازه‌بان -> گل قطعی');
   } catch (e) {
     fail++;

@@ -7,7 +7,7 @@ import { fa } from './lib/api.js';
 import PenaltyNet from './penaltyNet.js';
 import { play } from './gameAudio.js';
 import { heavyImpact, lightImpact, mediumImpact, selectionClick } from './haptics.js';
-import { penaltyPowerAt, penaltyView, zoneCenter } from './penaltyModel.js';
+import { penaltyPowerAt, penaltyView, zoneCenter, ZONES, ZONE_COLS, ZONE_ROWS } from './penaltyModel.js';
 import { SvgIcon } from './components/IconAsset.jsx';
 
 const GOAL = '#84CC16';
@@ -421,8 +421,9 @@ function PenaltyCanvas({ kick, animating, lastKick, selected, power, charging,
         const back = clamp((kick - .62) / .38);
         ball = { x: lerp(ball.x, spot.x, back), y: lerp(ball.y, spot.y - h * .10, back) };
       } else if (outcome === 'miss') {
-        const side = shot % 3 === 0 ? -1 : shot % 3 === 2 ? 1 : 0;
-        const up = Math.floor(shot / 3) === 0 ? -1 : 0;
+        const col = shot % ZONE_COLS, row = Math.floor(shot / ZONE_COLS);
+        const side = col === 0 ? -1 : col === ZONE_COLS - 1 ? 1 : 0;
+        const up = row === 0 ? -1 : 0;
         const over = Math.max(0, (kick - .62) / .38);
         ball.x += side * goalW * (.16 * e + .55 * over);
         ball.y += up * goalH * (.28 * e + .9 * over);
@@ -448,6 +449,9 @@ function Scoreboard({ view }) {
       <div className={view.myScore > view.foeScore ? 'leading' : ''}>تو</div>
       <strong>{fa(view.myScore)} - {fa(view.foeScore)}</strong>
       <div className={view.foeScore > view.myScore ? 'leading' : ''}>حریف</div>
+      {view.extraRound && (
+        <b>راندِ اضافه — تا رسیدن به برنده</b>
+      )}
       <div className="penMarkers mine">
         {view.history.filter(h => h.shooter === view.me).map(marker)}
       </div>
@@ -527,8 +531,13 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
         setKick(value); active = value < 1;
         if (view.lastKick?.outcome === 'goal' && value >= .62 && !netHit.current) {
           const z = Number(view.lastKick.shotZone || 0);
-          net.current.hit(((z % 3) + .5) / 3,
-            (Math.floor(z / 3) + .5) / 3, Number(view.lastKick.power || .7));
+          // ⚠️ هندسه از `penaltyModel` می‌آید، نه عددِ ثابت: با ۳ ستون × ۲
+          //    ردیف، تقسیمِ سطر بر ۳ (نسخهٔ ۹ ناحیه‌ای) موج را به نیمهٔ
+          //    بالاییِ تور می‌چسباند و برخوردِ پایینِ دروازه را کج نشان
+          //    می‌داد.
+          net.current.hit(((z % ZONE_COLS) + .5) / ZONE_COLS,
+            (Math.floor(z / ZONE_COLS) + .5) / ZONE_ROWS,
+            Number(view.lastKick.power || .7));
           netHit.current = true;
         }
         // The verdict lands with the ball, not when the socket message
@@ -585,7 +594,7 @@ export default function PenaltyGame({ state, mySymbol, onMove }) {
           selected={selected} power={power} charging={charging}
           net={net.current} />
         <div className="penZones" dir="ltr">
-          {Array.from({ length: 9 }, (_, zone) => (
+          {Array.from({ length: ZONES }, (_, zone) => (
             <button key={zone} type="button"
               className={selected === zone ? (view.amShooter ? 'aim' : 'dive') : ''}
               disabled={!enabled}

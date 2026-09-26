@@ -5,12 +5,26 @@
 // `sweet` (the golden window) was removed: the server never let shot power
 // affect the outcome, so surfacing it here made the UI promise a skill that
 // did not exist. The only rule is shot zone == dive zone -> save, else goal.
+
+// ── هندسهٔ دروازه: ۳ ستون × ۲ ردیف = ۶ ناحیه ──
+//
+//     ۰  ۱  ۲      بالا
+//     ۳  ۴  ۵      پایین
+//
+// ⚠️ باید با `backend/src/games/rules/penalty.js` و
+//    `mobile/lib/screens/user/games/penalty_board.dart` یکی بماند.
+//    گاردِ `game-parity` و تست‌های پنالتی روی همین اعداد قفل‌اند.
+export const ZONE_COLS = 3;
+export const ZONE_ROWS = 2;
+export const ZONES = ZONE_COLS * ZONE_ROWS;
+
 export function penaltyView(state = {}, mySymbol = 'X') {
   const me = mySymbol || 'X';
   const foe = me === 'X' ? 'O' : 'X';
   const role = state.role || (state.shooter === me ? 'shooter' : 'keeper');
   const score = state.score || {};
   const taken = state.taken || {};
+  const suddenDeath = state.suddenDeath === true;
   return {
     me,
     foe,
@@ -23,7 +37,11 @@ export function penaltyView(state = {}, mySymbol = 'X') {
     foeTaken: Number(taken[foe] || 0),
     history: Array.isArray(state.history) ? state.history : [],
     lastKick: state.lastKick || null,
-    suddenDeath: state.suddenDeath === true,
+    suddenDeath,
+    // وقتِ اضافه یعنی بازی از ۵ ضربه گذشته و دارد راندبه‌راند ادامه پیدا
+    // می‌کند تا یکی برتر شود؛ رابط باید این را نشان دهد وگرنه کاربر
+    // فکر می‌کند بازی تمام شده و دوباره دارد شروع می‌شود.
+    extraRound: suddenDeath,
   };
 }
 
@@ -36,13 +54,13 @@ export function penaltyPowerAt(elapsedMs) {
 }
 
 export function zoneCenter(zone, width, height) {
-  const z = Math.max(0, Math.min(8, Number(zone) || 0));
+  const z = Math.max(0, Math.min(ZONES - 1, Number(zone) || 0));
   const goalW = width * 0.78;
   const goalH = height * 0.46;
   const left = (width - goalW) / 2;
   const top = height * 0.06;
   return {
-    x: left + goalW * ((z % 3) + 0.5) / 3,
-    y: top + goalH * (Math.floor(z / 3) + 0.5) / 3,
+    x: left + goalW * ((z % ZONE_COLS) + 0.5) / ZONE_COLS,
+    y: top + goalH * (Math.floor(z / ZONE_COLS) + 0.5) / ZONE_ROWS,
   };
 }

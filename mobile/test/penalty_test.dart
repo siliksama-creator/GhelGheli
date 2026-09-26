@@ -14,40 +14,85 @@
 // سرور یکی بمانند. اگر این دو از هم جدا بیفتند، کاربر انیمیشنی می‌بیند
 // که با نتیجهٔ واقعی نمی‌خواند — بدترین نوع باگ چون شبیه تقلب به‌نظر
 // می‌رسد.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ دروازه ۶ ناحیه‌ای است، نه ۹
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// مالک: «دیگه نباید به ۹ جهت شوت زد و فقط به ۶ جهت میشه شوت زد». پس هندسه
+// از ۳×۳ به **۳ ستون × ۲ ردیف** رفت:
+//
+//     ۰  ۱  ۲      بالا
+//     ۳  ۴  ۵      پایین
+//
+// سرور ناحیهٔ ۶ به بالا را رد می‌کند، پس اگر کلاینت ۹ خانه بسازد، سه خانه
+// برای همیشه لمس‌ناپذیر می‌مانند. این تست هندسه را با خودِ سرور یکی نگه
+// می‌دارد.
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 
 /// همان نگاشتی که سرور و نقاش صفحه استفاده می‌کنند.
-int zoneCol(int z) => z % 3;
-int zoneRow(int z) => z ~/ 3;
+const int kZoneCols = 3;
+const int kZoneRows = 2;
+const int kZoneCount = kZoneCols * kZoneRows;
+
+int zoneCol(int z) => z % kZoneCols;
+int zoneRow(int z) => z ~/ kZoneCols;
 
 /// درون‌یابی خطی — همان که _PitchPainter برای مسیر توپ به کار می‌برد.
 double lerp(double a, double b, double t) => a + (b - a) * t;
 
 void main() {
   group('نگاشت نواحی دروازه', () {
-    test('۹ ناحیه، بدون هم‌پوشانی', () {
+    test('۶ ناحیه، بدون هم‌پوشانی', () {
       final seen = <String>{};
-      for (var z = 0; z < 9; z++) {
+      for (var z = 0; z < kZoneCount; z++) {
         seen.add('${zoneRow(z)},${zoneCol(z)}');
       }
-      expect(seen.length, 9);
+      expect(seen.length, kZoneCount);
     });
 
     test('گوشه‌ها درست نگاشت می‌شوند', () {
       expect([zoneRow(0), zoneCol(0)], [0, 0], reason: 'بالا-چپ');
       expect([zoneRow(2), zoneCol(2)], [0, 2], reason: 'بالا-راست');
-      expect([zoneRow(6), zoneCol(6)], [2, 0], reason: 'پایین-چپ');
-      expect([zoneRow(8), zoneCol(8)], [2, 2], reason: 'پایین-راست');
-      expect([zoneRow(4), zoneCol(4)], [1, 1], reason: 'مرکز');
+      expect([zoneRow(3), zoneCol(3)], [1, 0], reason: 'پایین-چپ');
+      expect([zoneRow(5), zoneCol(5)], [1, 2], reason: 'پایین-راست');
+      expect([zoneRow(1), zoneCol(1)], [0, 1], reason: 'بالا-وسط');
+      expect([zoneRow(4), zoneCol(4)], [1, 1], reason: 'پایین-وسط');
     });
 
     test('هر ناحیه در محدودهٔ معتبر است', () {
-      for (var z = 0; z < 9; z++) {
-        expect(zoneRow(z), inInclusiveRange(0, 2));
-        expect(zoneCol(z), inInclusiveRange(0, 2));
+      for (var z = 0; z < kZoneCount; z++) {
+        expect(zoneRow(z), inInclusiveRange(0, kZoneRows - 1));
+        expect(zoneCol(z), inInclusiveRange(0, kZoneCols - 1));
       }
+    });
+
+    test('هندسه با سرور و وب یکی است', () {
+      // سرور مرجعِ حقیقت است: کلیدِ خارج از این محدوده را رد می‌کند.
+      final server =
+          File('../backend/src/games/rules/penalty.js').readAsStringSync();
+      expect(server.contains('const ZONE_COLS = $kZoneCols;'), isTrue,
+          reason: 'ستون‌های سرور باید با کلاینت یکی باشد');
+      expect(server.contains('const ZONE_ROWS = $kZoneRows;'), isTrue,
+          reason: 'ردیف‌های سرور باید با کلاینت یکی باشد');
+
+      final web = File('../userweb/src/penaltyModel.js').readAsStringSync();
+      expect(web.contains('export const ZONE_COLS = $kZoneCols;'), isTrue,
+          reason: 'ستون‌های وب باید با اندروید یکی باشد');
+      expect(web.contains('export const ZONE_ROWS = $kZoneRows;'), isTrue,
+          reason: 'ردیف‌های وب باید با اندروید یکی باشد');
+
+      final board =
+          File('lib/screens/user/games/penalty_board.dart').readAsStringSync();
+      expect(board.contains('const int kZoneCols = $kZoneCols;'), isTrue);
+      expect(board.contains('const int kZoneRows = $kZoneRows;'), isTrue);
+      // `kZoneCount` عبارت است نه عددِ لیتِرال — عمداً، تا با عوض شدنِ
+      // ستون/ردیف خودش درست شود و دو منبعِ حقیقت نسازیم.
+      expect(board.contains('const int kZoneCount = kZoneCols * kZoneRows;'),
+          isTrue);
+      expect(kZoneCols * kZoneRows, kZoneCount);
     });
   });
 
@@ -108,12 +153,20 @@ void main() {
 
   group('قرارداد با سرور', () {
     test('شیء حرکت شکل درستی دارد', () {
-      // سرور {zone:int 0..8, power:double 0..1} می‌خواهد.
-      final shot = {'zone': 7, 'power': 0.82};
+      // سرور {zone:int 0..5, power:double 0..1} می‌خواهد.
+      final shot = {'zone': 5, 'power': 0.82};
       expect(shot['zone'], isA<int>());
       expect(shot['power'], isA<double>());
-      expect(shot['zone'] as int, inInclusiveRange(0, 8));
+      expect(shot['zone'] as int, inInclusiveRange(0, kZoneCount - 1));
       expect(shot['power'] as double, inInclusiveRange(0.0, 1.0));
+    });
+
+    test('ناحیهٔ ۶ دیگر معتبر نیست', () {
+      // نگهبانِ برگشت: اگر کسی هندسه را دوباره به ۳×۳ برگرداند، این قرمز
+      // می‌شود — نه با ابهام، که با عدد.
+      expect(kZoneCount, 6);
+      expect(6, isNot(inInclusiveRange(0, kZoneCount - 1)),
+          reason: 'سرور ناحیهٔ ۶ را رد می‌کند؛ کلاینت هم نباید آن را بسازد');
     });
 
     test('دروازه‌بان فقط ناحیه می‌فرستد', () {
@@ -165,6 +218,17 @@ void main() {
       // با فاصلهٔ آزاد سنجیده می‌شود.
       expect(RegExp(r'_ResultStrip\(\s*session: session\b').hasMatch(scaffold), isTrue,
           reason: 'نتیجه باید بالای زمین و همیشه در دید باشد');
+    });
+
+    test('وقتی اضافه نشان داده می‌شود — بازی تساوی ندارد', () {
+      // قاعدهٔ تازه: بعد از ۵ ضربهٔ هر طرف، اگر مساوی بود راندهای اضافه
+      // ادامه پیدا می‌کنند تا برنده پیدا شود. پس رابط باید وضعیت را show
+      // کند، وگرنه کاربر فکر می‌کند بازی تمام شده و دارد دوباره شروع می‌شود.
+      final src = File('lib/screens/user/games/penalty_board.dart').readAsStringSync();
+      expect(src.contains("st['suddenDeath'] == true"), isTrue,
+          reason: 'تابلوی امتیاز باید پرچمِ وقتِ اضافه را از سرور بخواند');
+      expect(src.contains('راندِ اضافه'), isTrue,
+          reason: 'در وقتِ اضافه باید برچسبی دیداری باشد');
     });
   });
 

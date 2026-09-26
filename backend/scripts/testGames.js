@@ -210,10 +210,13 @@ console.log('\n== penalty ==');
   ok(s.taken.X === 1 && s.history.length === 1, 'kick is recorded once');
   ok(s.shooter === 'O', 'roles swap after the kick');
 
-  const goal = r.resolveKick(0, 0.6, 8, () => 0.99, s.sweet);
+  // دروازه ۶ ناحیه دارد (۳ ستون × ۲ ردیف): ناحیهٔ ۵ آخرینِ آن‌هاست.
+  const goal = r.resolveKick(0, 0.6, 5, () => 0.99, s.sweet);
   ok(goal.outcome === 'goal', 'different-zone dive is a goal');
   const save = r.resolveKick(4, 0.6, 4, () => 0.99, s.sweet);
   ok(save.outcome === 'save', 'matching dive is a save');
+  ok(!r.isValidMove(s, { zone: 6, power: 0.6 }, 'X'),
+    'zone 6 is out of range now that the goal has six zones');
 
   // Full deterministic self-play: X always scores, O is always saved.
   let crashed = 0, finished = 0;

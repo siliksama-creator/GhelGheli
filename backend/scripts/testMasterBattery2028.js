@@ -27,11 +27,13 @@ const ok = (condition, message) => {
   const mem = memory.create();
   ok(mem.size === 16 && memory.FACES.length === 8,
     'جفت‌یاب ۱۶ کارت و ۸ جفت دارد');
-  for (let z = 0; z < 9; z++) {
+  // دروازه ۶ ناحیه دارد (۳ ستون × ۲ ردیف) — خواستهٔ مالک، مهر ۱۴۰۵.
+  ok(penalty.ZONES === 6, 'پنالتی: دروازه ۶ ناحیه دارد');
+  for (let z = 0; z < penalty.ZONES; z++) {
     ok(penalty.resolveKick(z, 0.6, z).outcome === 'save',
       `پنالتی ناحیه ${z}: شیرجه هم‌جهت مهار است`);
   }
-  ok(penalty.resolveKick(0, 0.6, 8).outcome === 'goal',
+  ok(penalty.resolveKick(0, 0.6, 5).outcome === 'goal',
     'پنالتی: جهت مخالف گل است');
 
   console.log('\n[2] قواعد stake');

@@ -78,6 +78,20 @@ import 'game_session.dart';
 import 'penalty_net.dart';
 
 const _accent = Color(0xFF38BDF8);
+
+// ── هندسهٔ دروازه: ۳ ستون × ۲ ردیف = ۶ ناحیه ──
+//
+//     ۰  ۱  ۲      بالا
+//     ۳  ۴  ۵      پایین
+//
+// ⚠️ باید با `backend/src/games/rules/penalty.js` و
+//    `userweb/src/penaltyModel.js` یکی بماند. سرور ناحیهٔ خارج از ۰..۵ را
+//    رد می‌کند، پس اگر اینجا ۹ تا بسازیم سه ناحیه برای همیشه لمس‌ناپذیر
+//    می‌مانند و کاربر فکر می‌کند بازی قفل کرده.
+const int kZoneCols = 3;
+const int kZoneRows = 2;
+const int kZoneCount = kZoneCols * kZoneRows;
+
 const _goalGreen = Color(0xFF84CC16);
 const _saveBlue = Color(0xFF38BDF8);
 const _missRed = Color(0xFFEF4444);
@@ -280,8 +294,10 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
       HapticFeedback.heavyImpact();
       final z = NumberParser.toInt(last['shotZone']);
       final power = (last['power'] as num?)?.toDouble() ?? 0.7;
-      final u = ((z % 3) + 0.5) / 3;
-      final v = ((z ~/ 3) + 0.5) / 3;
+      // ⚠️ سطر بر `kZoneRows` تقسیم می‌شود نه `kZoneCols`: با ۲ ردیف،
+      //    تقسیمِ قدیمی بر ۳ موج را به نیمهٔ بالاییِ تور می‌چسباند.
+      final u = ((z % kZoneCols) + 0.5) / kZoneCols;
+      final v = ((z ~/ kZoneCols) + 0.5) / kZoneRows;
       _net.hit(u, v, power);
       if (!_netTicker.isActive) {
         _lastTick = Duration.zero;
@@ -379,6 +395,7 @@ class _PenaltyBoardState extends State<_PenaltyBoard>
           foeTaken: NumberParser.toInt(taken[foe]),
           history: history,
           me: me,
+          suddenDeath: st['suddenDeath'] == true,
         ),
         Gaps.vSm,
         Center(
@@ -498,11 +515,13 @@ class _Scoreboard extends StatelessWidget {
     required this.foeTaken,
     required this.history,
     required this.me,
+    required this.suddenDeath,
   });
 
   final int myScore, foeScore, myTaken, foeTaken;
   final List history;
   final String me;
+  final bool suddenDeath;
 
   @override
   Widget build(BuildContext context) {
@@ -558,12 +577,42 @@ class _Scoreboard extends StatelessWidget {
           Gaps.vXs,
           // ردیف توپ‌ها: گل سبز، مهار/بیرون خاکستری. یک نگاه کافی است.
           //
-          // ⚠️ با ۱۰ ضربه برای هر بازیکن (۳ مهر ۱۴۰۵) این ردیف دو برابر
-          //    شد. اندازه‌های قبلی (۱۴px + ۴px فاصله ⇒ ۱۸۰px برای هر سمت)
-          //    روی گوشیِ باریک سرریز می‌کرد و نوارِ زرد-مشکی می‌داد. حالا
-          //    هر سمت داخل `Flexible` + `FittedBox` است: روی گوشیِ پهن
-          //    همان اندازهٔ قبل، روی گوشیِ باریک خودش را کوچک می‌کند —
-          //    بدونِ بُرش و بدونِ سرریز.
+          // ── برچسبِ وقتِ اضافه ──
+          //
+          // همتایِ `<b>` در `penaltyGame.jsx`. بدونِ آن، بعد از ضربهٔ
+          // پنجمِ هر دو بازی بی‌هیچ توضیحی ادامه پیدا می‌کند و کاربر
+          // فکر می‌کند باگ است یا بازی دارد دوباره شروع می‌شود.
+          if (suddenDeath)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(999),
+                  color: const Color(0xFFFFD36B).withValues(alpha: 0.22),
+                  border: Border.all(color: const Color(0xFFFFD36B)),
+                ),
+                child: const Text(
+                  'راندِ اضافه — تا رسیدن به برنده',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFFFFD36B),
+                  ),
+                ),
+              ),
+            ),
+          // ⚠️ این ردیف باید **بی‌انتها** باشد، نه به تعدادِ ضربه‌ها.
+          //    وقتِ قانونی ۵ ضربه است، ولی اگر ۵-۵ مساوی شود بازی راندبه‌راند
+          //    ادامه پیدا می‌کند تا برنده پیدا شود (تساوی حذف شده)؛ پس تعداد
+          //    مهره‌ها از پیش معلوم نیست.
+          //
+          //    اندازه‌های قبلی (۱۴px + ۴px فاصله ⇒ ۱۸۰px برای هر سمت) روی
+          //    گوشیِ باریک سرریز می‌کرد و نوارِ زرد-مشکی می‌داد. حالا هر
+          //    سمت داخل `Flexible` + `FittedBox` است: روی گوشیِ پهن همان
+          //    اندازهٔ قبل، روی گوشیِ باریک خودش را کوچک می‌کند — بدونِ
+          //    بُرش و بدونِ سرریز.
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -763,16 +812,16 @@ class _ZoneGrid extends StatelessWidget {
               height: gh,
               child: Column(
                 children: [
-                  for (var r = 0; r < 3; r++)
+                  for (var r = 0; r < kZoneRows; r++)
                     Expanded(
                       child: Row(
                         children: [
-                          for (var col = 0; col < 3; col++)
+                          for (var col = 0; col < kZoneCols; col++)
                             Expanded(
                               child: _ZoneCell(
-                                zone: r * 3 + col,
+                                zone: r * kZoneCols + col,
                                 enabled: enabled,
-                                selected: picked == r * 3 + col,
+                                selected: picked == r * kZoneCols + col,
                                 amShooter: amShooter,
                                 
                                 onDown: onDown,
@@ -972,8 +1021,9 @@ class _PitchPainter extends CustomPainter {
 
     /// مرکز یک ناحیه روی دهانهٔ دروازه.
     Offset zoneCenter(int z) {
-      final c = z % 3, r = z ~/ 3;
-      return Offset(gl + gw * (c + 0.5) / 3, gt + gh * (r + 0.5) / 3);
+      final c = z % kZoneCols, r = z ~/ kZoneCols;
+      return Offset(gl + gw * (c + 0.5) / kZoneCols,
+          gt + gh * (r + 0.5) / kZoneRows);
     }
 
 
@@ -1054,8 +1104,10 @@ class _PitchPainter extends CustomPainter {
       }
       // بیرون: از کنار تیرک رد می‌شود و از قاب خارج می‌شود.
       if (outcome == 'miss') {
-        final off = (shotZone % 3 == 0) ? -1.0 : (shotZone % 3 == 2 ? 1.0 : 0.0);
-        final up = shotZone ~/ 3 == 0 ? -1.0 : 0.0;
+        final col = shotZone % kZoneCols, row = shotZone ~/ kZoneCols;
+        final off =
+            (col == 0) ? -1.0 : (col == kZoneCols - 1 ? 1.0 : 0.0);
+        final up = row == 0 ? -1.0 : 0.0;
         final over = math.max(0.0, (kick - 0.62) / 0.38);
         ball = Offset(ball.dx + off * gw * (0.16 * e + 0.55 * over),
             ball.dy + up * gh * (0.28 * e + 0.9 * over));

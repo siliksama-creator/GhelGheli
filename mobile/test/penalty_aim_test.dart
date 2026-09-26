@@ -13,9 +13,20 @@
 //
 // این تست ریاضیِ نقاش را مستقل بازتولید می‌کند و ثابت می‌کند:
 //   • ناحیهٔ انتخابی → مختصات یکتا و درست
-//   • هر ۹ ناحیه به ۹ نقطهٔ متمایز نگاشت می‌شوند
+//   • هر ۶ ناحیه به ۶ نقطهٔ متمایز نگاشت می‌شوند
 //   • انیمیشن در t=1 دقیقاً روی همان نقطه می‌ایستد
 //   • دروازه‌بان به سمتِ ناحیهٔ خودش شیرجه می‌رود، نه ناحیهٔ شوت
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ هندسه: ۳ ستون × ۲ ردیف
+// ═══════════════════════════════════════════════════════════════════════════
+//
+//     ۰  ۱  ۲      بالا
+//     ۳  ۴  ۵      پایین
+//
+// تقسیمِ **سطر** بر تعدادِ ردیف‌ها (۲) انجام می‌شود نه بر تعدادِ ستون‌ها؛
+// همان اشتباهی که وقتی هندسه از ۳×۳ به ۳×۲ آمد، موجِ تور را به نیمهٔ
+// بالایی می‌چسباند.
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -28,16 +39,26 @@ const double gh = h * 0.46;
 const double gl = (w - gw) / 2;
 const double gt = h * 0.06;
 
+const int kZoneCols = 3;
+const int kZoneRows = 2;
+const int kZoneCount = kZoneCols * kZoneRows;
+
 /// کپیِ دقیق `_PitchPainter.zoneCenter`.
 Offset zoneCenter(int z) {
-  final c = z % 3, r = z ~/ 3;
-  return Offset(gl + gw * (c + 0.5) / 3, gt + gh * (r + 0.5) / 3);
+  final c = z % kZoneCols, r = z ~/ kZoneCols;
+  return Offset(gl + gw * (c + 0.5) / kZoneCols, gt + gh * (r + 0.5) / kZoneRows);
 }
 
 /// مرکز افقیِ خانهٔ لمسی، با فرض شبکهٔ **LTR** (رفع باگ آینه).
 double touchX(int z) {
-  final c = z % 3;
-  return gl + gw * (c + 0.5) / 3;
+  final c = z % kZoneCols;
+  return gl + gw * (c + 0.5) / kZoneCols;
+}
+
+/// مرکز عمودیِ خانهٔ لمسی — باید با ردیفِ نقاش یکی باشد.
+double touchY(int z) {
+  final r = z ~/ kZoneCols;
+  return gt + gh * (r + 0.5) / kZoneRows;
 }
 
 /// موقعیت توپ در لحظهٔ t از انیمیشن (کپیِ منطق نقاش، بدون قوس).
@@ -61,17 +82,17 @@ Offset keeperAt(int diveZone, double t) {
 
 void main() {
   group('نگاشت ناحیه به مختصات', () {
-    test('هر ۹ ناحیه نقطهٔ یکتا دارند', () {
+    test('هر ۶ ناحیه نقطهٔ یکتا دارند', () {
       final pts = <String>{};
-      for (var z = 0; z < 9; z++) {
+      for (var z = 0; z < kZoneCount; z++) {
         final p = zoneCenter(z);
         pts.add('${p.dx.toStringAsFixed(2)},${p.dy.toStringAsFixed(2)}');
       }
-      expect(pts.length, 9, reason: 'هیچ دو ناحیه‌ای هم‌مکان نیستند');
+      expect(pts.length, kZoneCount, reason: 'هیچ دو ناحیه‌ای هم‌مکان نیستند');
     });
 
     test('همهٔ نقاط داخل دهانهٔ دروازه‌اند', () {
-      for (var z = 0; z < 9; z++) {
+      for (var z = 0; z < kZoneCount; z++) {
         final p = zoneCenter(z);
         expect(p.dx, greaterThan(gl));
         expect(p.dx, lessThan(gl + gw));
@@ -81,40 +102,48 @@ void main() {
     });
 
     test('ستون چپ/وسط/راست به ترتیب درست‌اند', () {
-      for (final row in [0, 1, 2]) {
-        final l = zoneCenter(row * 3).dx;
-        final c = zoneCenter(row * 3 + 1).dx;
-        final r = zoneCenter(row * 3 + 2).dx;
+      for (final row in [0, 1]) {
+        final l = zoneCenter(row * kZoneCols).dx;
+        final c = zoneCenter(row * kZoneCols + 1).dx;
+        final r = zoneCenter(row * kZoneCols + 2).dx;
         expect(l, lessThan(c), reason: 'ردیف $row: چپ باید کمتر از وسط باشد');
         expect(c, lessThan(r), reason: 'ردیف $row: وسط باید کمتر از راست باشد');
       }
     });
 
-    test('ردیف بالا/وسط/پایین به ترتیب درست‌اند', () {
+    test('ردیف بالا/پایین به ترتیب درست‌اند', () {
       for (final col in [0, 1, 2]) {
         final top = zoneCenter(col).dy;
-        final mid = zoneCenter(col + 3).dy;
-        final bot = zoneCenter(col + 6).dy;
-        expect(top, lessThan(mid));
-        expect(mid, lessThan(bot));
+        final bot = zoneCenter(col + kZoneCols).dy;
+        expect(top, lessThan(bot), reason: 'ستون $col: بالا باید از پایین بالاتر باشد');
       }
+    });
+
+    test('دو ردیف داخلِ ارتفاعِ دروازه پخش شده‌اند، نه روی هم', () {
+      // قدیم: `(r + 0.5) / 3` با دو ردیف ⇒ ۰.۱۶۷ و ۰.۵؛ یعنی هر دو نقطه
+      // در نیمهٔ بالایی می‌ماندند و ردیفِ پایین عملاً لمس‌ناپذیر می‌شد.
+      final top = zoneCenter(0).dy, bottom = zoneCenter(3).dy;
+      expect(top, lessThan(gt + gh / 2));
+      expect(bottom, greaterThan(gt + gh / 2));
     });
   });
 
   group('🎯 لمس و نقاشی هم‌جهت‌اند — رفع باگ آینه', () {
     test('مختصات لمس با مختصات نقاش دقیقاً یکی است', () {
-      for (var z = 0; z < 9; z++) {
+      for (var z = 0; z < kZoneCount; z++) {
         expect(touchX(z), closeTo(zoneCenter(z).dx, 0.001),
             reason: 'ناحیهٔ $z: جایی که لمس می‌شود باید همان‌جایی باشد که '
                 'توپ می‌رود');
+        expect(touchY(z), closeTo(zoneCenter(z).dy, 0.001),
+            reason: 'ناحیهٔ $z: ارتفاعِ لمس و نقاش باید یکی باشد');
       }
     });
 
     test('اگر شبکه RTL بود، آینه می‌شد — بازتولید باگ', () {
       // در RTL ستون ۰ سمت راست می‌افتد.
       double mirroredX(int z) {
-        final c = z % 3;
-        return gl + gw * ((2 - c) + 0.5) / 3;
+        final c = z % kZoneCols;
+        return gl + gw * ((2 - c) + 0.5) / kZoneCols;
       }
 
       expect(mirroredX(0), isNot(closeTo(zoneCenter(0).dx, 0.001)),
@@ -127,7 +156,7 @@ void main() {
 
   group('⚽ توپ دقیقاً روی ناحیهٔ انتخابی می‌ایستد', () {
     test('در پایان انیمیشن، توپ روی مرکز ناحیه است', () {
-      for (var z = 0; z < 9; z++) {
+      for (var z = 0; z < kZoneCount; z++) {
         final end = ballAt(z, 1.0);
         final target = zoneCenter(z);
         expect(end.dx, closeTo(target.dx, 0.01),
@@ -138,28 +167,33 @@ void main() {
     });
 
     test('توپ از نقطهٔ پنالتی شروع می‌کند', () {
-      final start = ballAt(4, 0);
+      final start = ballAt(1, 0);
       expect(start.dx, closeTo(w / 2, 0.01));
       expect(start.dy, closeTo(h * 0.88, 0.01));
     });
 
     test('شوت به راست واقعاً به راست می‌رود', () {
-      // ناحیهٔ ۸ = پایین-راست
-      final end = ballAt(8, 1.0);
+      // ناحیهٔ ۵ = پایین-راست
+      final end = ballAt(5, 1.0);
       expect(end.dx, greaterThan(w / 2),
           reason: 'شوت به گوشهٔ راست باید سمت راستِ نقطهٔ پنالتی بنشیند');
     });
 
     test('شوت به چپ واقعاً به چپ می‌رود', () {
-      final end = ballAt(6, 1.0);
+      final end = ballAt(3, 1.0);
       expect(end.dx, lessThan(w / 2));
+    });
+
+    test('شوت به پایین واقعاً پایین می‌نشیند', () {
+      // با دو ردیف، پایین-وسط (۴) باید از بالا-وسط (۱) پایین‌تر باشد.
+      expect(ballAt(4, 1.0).dy, greaterThan(ballAt(1, 1.0).dy));
     });
 
     test('حرکت یکنواخت و رو به جلوست', () {
       // برای ناحیهٔ راست، x باید در طول انیمیشن فقط زیاد شود.
-      var prev = ballAt(8, 0).dx;
+      var prev = ballAt(5, 0).dx;
       for (var i = 1; i <= 20; i++) {
-        final x = ballAt(8, i / 20 * 0.62).dx;
+        final x = ballAt(5, i / 20 * 0.62).dx;
         expect(x, greaterThanOrEqualTo(prev - 0.001),
             reason: 'توپ نباید به عقب بپرد');
         prev = x;
@@ -169,7 +203,7 @@ void main() {
 
   group('🧤 دروازه‌بان به سمت ناحیهٔ خودش می‌پرد', () {
     test('در پایان شیرجه، روی مرکز ناحیهٔ انتخابی است', () {
-      for (var z = 0; z < 9; z++) {
+      for (var z = 0; z < kZoneCount; z++) {
         final end = keeperAt(z, 1.0);
         final target = zoneCenter(z);
         expect(end.dx, closeTo(target.dx, 0.01),
@@ -181,13 +215,15 @@ void main() {
     test('شیرجه به راست واقعاً به راست است', () {
       expect(keeperAt(2, 1.0).dx, greaterThan(w / 2));
       expect(keeperAt(5, 1.0).dx, greaterThan(w / 2));
-      expect(keeperAt(8, 1.0).dx, greaterThan(w / 2));
     });
 
     test('شیرجه به چپ واقعاً به چپ است', () {
       expect(keeperAt(0, 1.0).dx, lessThan(w / 2));
       expect(keeperAt(3, 1.0).dx, lessThan(w / 2));
-      expect(keeperAt(6, 1.0).dx, lessThan(w / 2));
+    });
+
+    test('شیرجه به پایین واقعاً پایین می‌ماند', () {
+      expect(keeperAt(4, 1.0).dy, greaterThan(keeperAt(1, 1.0).dy));
     });
 
     test('ناحیهٔ وسط یعنی نماندن سر جا نیست — عمودی حرکت می‌کند', () {
@@ -198,9 +234,9 @@ void main() {
     });
 
     test('دروازه‌بان مستقل از ناحیهٔ شوت حرکت می‌کند', () {
-      // شوت به ۸ ولی شیرجه به ۰ → دروازه‌بان باید سمت چپ برود
+      // شوت به ۵ ولی شیرجه به ۰ → دروازه‌بان باید سمت چپ برود
       final keeper = keeperAt(0, 1.0);
-      final ball = ballAt(8, 1.0);
+      final ball = ballAt(5, 1.0);
       expect(keeper.dx, lessThan(w / 2));
       expect(ball.dx, greaterThan(w / 2));
       expect((keeper.dx - ball.dx).abs(), greaterThan(gw / 3),
@@ -214,6 +250,20 @@ void main() {
       // اگر ربات دوباره «یاد بگیرد»، این تست باید شکسته شود.
       const botIsRandom = true;
       expect(botIsRandom, isTrue);
+    });
+
+    test('ربات هر شش ناحیه را می‌زند — هیچ‌کدام بی‌دفاع نمی‌ماند', () {
+      // سرور `Math.floor(Math.random() * ZONES)` می‌زند. اگر کلاینت فقط
+      // پنج خانه بسازد یا یکی را جابه‌جا بکشد، ربات ناحیه‌ای را می‌زند که
+      // کاربر نمی‌تواند همان‌جا شیرجه برود — یعنی یک ضربهٔ تضمینی.
+      final rng = math.Random(7);
+      final seen = <int>{};
+      for (var i = 0; i < 600; i++) {
+        seen.add(rng.nextInt(kZoneCount));
+      }
+      expect(seen.length, kZoneCount,
+          reason: 'ربات باید به همهٔ ناحیه‌ها دسترسی داشته باشد');
+      expect(seen.every((z) => z >= 0 && z < kZoneCount), isTrue);
     });
   });
 }
