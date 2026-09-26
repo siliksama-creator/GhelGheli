@@ -94,7 +94,7 @@ BEGIN
       -- بدونِ ویژگیِ خاص. مدافعِ جوان، نه دیوارِ نخبه.
       ('Abdukodir Khusanov', 'Abdukodir Khusanov',
        'مدافع جوانِ در حال رشد؛ سرعت خوب، هنوز نه در سطحِ نخبه',
-       50, 78, 83, 68, 36, 82, 'none')
+       52, 78, 83, 68, 36, 82, 'none')
   ),
   updated AS (
     UPDATE card_types c
@@ -125,11 +125,19 @@ BEGIN
     RAISE EXCEPTION 'curated card stats matched % rows; expected 0 or 20', n;
   END IF;
 
+  -- حملهٔ ۵۰ به‌تنهایی پیش‌فرض نیست: خوسانوف مهاجم نیست و حملهٔ پایین واقعی است.
+  -- پیش‌فرضِ فرم یعنی هر پنج استات ۵۰ و انرژی ۱۰۰، با توضیحِ خالی.
   IF n = 20 AND EXISTS (
     SELECT 1 FROM card_types
      WHERE created_at >= TIMESTAMPTZ '2026-09-26 22:40:00+03:30'
        AND created_at <  TIMESTAMPTZ '2026-09-26 23:30:00+03:30'
-       AND (point_value <> 1000 OR duel_attack = 50 OR duel_energy = 100)
+       AND (
+         point_value <> 1000
+         OR description IS NULL
+         OR btrim(description) = ''
+         OR (duel_attack = 50 AND duel_defense = 50 AND duel_speed = 50
+             AND duel_technique = 50 AND duel_goal_chance = 50 AND duel_energy = 100)
+       )
   ) THEN
     RAISE EXCEPTION 'a newly registered card kept default stats or its points changed';
   END IF;
