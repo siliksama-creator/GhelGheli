@@ -103,8 +103,13 @@ ok(read('scripts/backup_telegram.sh').includes('nginx-snippets')
   && read('scripts/backup_telegram.sh').includes('usr-local-bin')
   && read('scripts/restore_from_backup.sh').includes('nginx-snippets'),
   'daily telegram backup and restore carry nginx snippets, systemd units and local bin');
-ok(read('userweb/src/main.jsx').includes('vite:preloadError')
-  && read('userweb/src/main.jsx').includes('gg-chunk-reload'),
+const chunkRecovery = read('userweb/src/lib/chunkRecovery.js');
+ok(read('userweb/src/main.jsx').includes('installChunkRecovery')
+  && chunkRecovery.includes('vite:preloadError')
+  && chunkRecovery.includes('gg-chunk-reload')
+  && chunkRecovery.includes('Failed to fetch dynamically imported module')
+  && read('admin/src/main.jsx').includes('installChunkRecovery')
+  && read('admin/src/lib/chunkRecovery.js') === chunkRecovery,
   'user web reloads once when a stale Vite chunk fails to load');
 
 // ── بند ۶الف/۶بِ ممیزیِ مستقلِ دوم: ایندکسِ جدول‌های پرترافیک و
