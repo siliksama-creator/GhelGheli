@@ -6,7 +6,14 @@
 // design system under lib/theme — see ARCHITECTURE.md for the full map.
 import 'dart:async';
 
+// `SystemChrome` / `SystemUiOverlayStyle` در `services.dart` هستند و
+// `defaultTargetPlatform` در `foundation.dart`؛ هیچ‌کدام با importِ
+// `material.dart` به‌تنهایی در دسترس نیستند (تحلیل‌گر آن‌ها را «تعریف‌نشده»
+// می‌بیند). برای تنظیمِ نوارهای سیستم به هر دو نیاز داریم.
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'api_client.dart';
