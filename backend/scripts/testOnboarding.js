@@ -324,9 +324,12 @@ check('هر `nav:…` نقشه در ترتیبِ نوار پایین هست', mi
 // الگوی خرابیِ ابزارِ پیچش: `return ColumnTourAnchor(` — پرانتزها تراز
 // می‌مانند، پس گاردِ تراز نمی‌گیرد؛ پس صریح چک می‌شود که هر `TourAnchor(`
 // انتهای خط باشد (سرِ نامِ ویجت درج شده، نه سرِ پرانتز).
+// نشانهٔ خرابی: `TourAnchor(` که **چسبیده به یک شناسه** آمده — مثلِ
+// `return ColumnTourAnchor(`. خودِ خطِ سازندهٔ کلاس (`const TourAnchor({…`)،
+// یا متنِ کامنت، گرفتار نمی‌شود چون کامنت‌ها پیش از آزمون پاک می‌شوند.
 const badWrap = dartFiles.flatMap((f) => read(f).split('\n')
   .map((l, i) => ({ f, l, i }))
-  .filter(({ l }) => l.includes('TourAnchor(') && !l.trim().endsWith('TourAnchor(')));
+  .filter(({ l }) => /[A-Za-z0-9_]TourAnchor\(/.test(strip(l))));
 check('پیچشِ لنگر سالم است (سرِ نامِ ویجت، نه سرِ پرانتز)', badWrap.length === 0,
   badWrap.map(({ f, i }) => `${path.basename(f)}:${i + 1}`).join(', '));
 
