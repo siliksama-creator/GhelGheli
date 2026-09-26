@@ -81,8 +81,9 @@ const webInv = read('userweb/src/screens/Inventory.jsx');
 ok(/<GrantChestOpener/.test(webInv),
   'وب صندوق جایزه را از کلکسیون با رونمایی سینمایی باز می‌کند');
 const droidInv = read('mobile/lib/screens/user/inventory_page.dart');
-ok(/\/api\/grants\/\$id\/open/.test(droidInv),
-  'اندروید صندوق جایزه را از کلکسیون باز می‌کند');
+const droidBox = read('mobile/lib/widgets/card_box.dart');
+ok(/openGrantChest\(/.test(droidInv) && /\/api\/grants\/\$\{widget\.grantId\}\/open/.test(droidBox),
+  'اندروید صندوق جایزه را از کلکسیون با رونمایی وسط صفحه باز می‌کند');
 
 const webWheelUi = read('userweb/src/screens/Wheel.jsx');
 ok(/<LiveWheelDisc\s+prizes/.test(webWheelUi) && /conic-gradient/.test(webWheelUi),
