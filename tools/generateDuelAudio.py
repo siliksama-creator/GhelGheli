@@ -451,6 +451,28 @@ def sfx_draw() -> np.ndarray:
     return delay(bus, .14, .16)
 
 
+
+def sfx_reward() -> np.ndarray:
+    """Original reward sting for the shared reward moment.
+
+    A short music-box phrase, not a spoken clip and not a sample. A private
+    RNG keeps this cue from shifting the byte-stable files written before it.
+    """
+    sec = 4.2
+    bus = np.zeros((int(sec * SR), 2))
+    for note, pan, gain in ((60, -.35, .07), (64, 0, .06), (67, .35, .07)):
+        add(bus, tone(midi(note), 3.7, "sine", .05, .9, .25, .5), .04, gain, pan)
+    phrase = [72, 76, 79, 84, 88, 84, 79, 84, 91, 88, 84]
+    for i, note in enumerate(phrase):
+        at = .08 + i * .24
+        pan = -.5 + (i % 5) * .25
+        add(bus, tone(midi(note), .62, "triangle", .004, .24, .05, .4), at, .30, pan)
+        add(bus, tone(midi(note + 12), .30, "sine", .002, .14, .03, .22), at + .01, .07, -pan)
+    for note, pan in ((72, -.45), (76, -.15), (79, .15), (84, .45)):
+        add(bus, tone(midi(note), 1.45, "triangle", .012, .55, .08, .48), 2.72, .15, pan)
+    return delay(bus, .11, .16)
+
+
 def main() -> None:
     # Top VBR tier for the only long, sustained, looping asset.
     write("duel_music.mp3", soundtrack(), quality=.0)
@@ -481,6 +503,7 @@ def main() -> None:
     write("win.mp3", sfx_win())
     write("lose.mp3", sfx_lose())
     write("draw.mp3", sfx_draw())
+    write("reward.mp3", sfx_reward())
 
     # Verify platform copies stay byte-identical.
     names = ["duel_music.mp3", "duel_lock.mp3", "duel_intro.mp3", "duel_round_win.mp3",
@@ -488,7 +511,7 @@ def main() -> None:
              "duel_final_draw.mp3", "duel_victory.mp3", "duel_defeat.mp3",
              "move.mp3", "move_opponent.mp3", "drop.mp3", "flip.mp3", "tap.mp3",
              "tick.mp3", "tick_urgent.mp3", "match_found.mp3", "your_turn.mp3",
-             "timeout.mp3", "win.mp3", "lose.mp3", "draw.mp3"]
+             "timeout.mp3", "win.mp3", "lose.mp3", "draw.mp3", "reward.mp3"]
     for name in names:
         assert (OUTS[0] / name).read_bytes() == (OUTS[1] / name).read_bytes()
         print(f"{name:22s} {(OUTS[0] / name).stat().st_size:>9,} B")

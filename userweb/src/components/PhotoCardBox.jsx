@@ -276,11 +276,40 @@ export default function PhotoCardBox({ token, onDone, setMsg }) {
       } catch { /* چهره اختیاری است */ }
       // Content-Type دستی ست نمی‌شود: مرورگر باید boundary را خودش
       // اضافه کند، وگرنه سرور بدنه را خالی می‌بیند.
-      const r = await fetch(`${API}/api/photo-cards/submit`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
+      // یک‌بار تلاشِ دوباره، فقط اگر اتصال قطع شود — همان قراردادِ
+      // اندروید. پاسخِ HTTP (کدِ غلط، قفل، ۴xx) دوباره فرستاده نمی‌شود.
+      // FormData هر بار تازه ساخته می‌شود چون بدنهٔ اول ممکن است مصرف
+      // شده باشد. ثبتِ سرور idempotent است، پس تکرارِ گم‌شده کارت را
+      // دوبار نمی‌سازد.
+      const postSubmit = async (body) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 60000);
+        try {
+          return await fetch(`${API}/api/photo-cards/submit`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+      const buildForm = () => {
+        const body = new FormData();
+        body.append('image', small);
+        body.append('code', code.trim());
+        if (fd.get('embedding')) body.append('embedding', fd.get('embedding'));
+        if (fd.get('faceEmbedding')) body.append('faceEmbedding', fd.get('faceEmbedding'));
+        return body;
+      };
+      let r;
+      try {
+        r = await postSubmit(buildForm());
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        r = await postSubmit(buildForm());
+      }
       const d = await r.json().catch(() => ({}));
 
       // ── قفل: کاربر تا چند ساعت نمی‌تواند تلاش کند ──

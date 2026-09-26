@@ -1,0 +1,48 @@
+# انتشارِ APKِ ساخته‌شده در build-apk، بدونِ به‌روزرسانیِ اجباری.
+# رانرِ خودمیزبان فایل را از artifact می‌گیرد و اسکریپتِ دیپلوی‌شده را
+# اجرا می‌کند. GITHUB_TOKEN فقط داخلِ همین job است و در لاگ نمی‌آید.
+
+name: Publish built APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: شناسهٔ اجرای build-apk
+        required: true
+        type: string
+      version:
+        description: نسخه، مثل 1.1.34
+        required: true
+        type: string
+      version_code:
+        description: کدِ نسخه، مثل 2036
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  publish:
+    runs-on: [self-hosted, ghelgheli-vps]
+    timeout-minutes: 20
+    steps:
+      - name: Download signed APK
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-apks
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: apk-in
+
+      - name: Publish without force-update
+        run: |
+          set -euo pipefail
+          APK=$(find apk-in -name '*.apk' -type f | head -1)
+          test -n "$APK"
+          node /var/www/GhelGheli/backend/scripts/publishApkFromFile.js \
+            "$APK" \
+            "${{ inputs.version }}" \
+            "${{ inputs.version_code }}"

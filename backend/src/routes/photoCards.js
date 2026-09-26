@@ -34,6 +34,7 @@ const cardFace = require('../services/cardFace');
 const FACE_AGREE_COS = 0.36;
 const imageQuality = require('../services/imageQuality');
 const cardDuel = require('../services/cardDuelService');
+const cardRarity = require('../lib/cardRarity');
 const cardCrop = require('../services/cardCrop');
 const cardPerspective = require('../services/cardPerspective');
 const lockout = require('../services/photoCardLockout');
@@ -1939,8 +1940,17 @@ module.exports = function createPhotoCardRoutes(deps) {
       const duelTechnique = req.body.duelTechnique != null ? parseFaNumber(req.body.duelTechnique) : null;
       const duelGoalChance = req.body.duelGoalChance != null ? parseFaNumber(req.body.duelGoalChance) : null;
       const duelEnergy = req.body.duelEnergy != null ? parseFaNumber(req.body.duelEnergy) : null;
-      const duelRarity = req.body.duelRarity || null;
-      const duelEffect = req.body.duelEffect || null;
+      // کلاس از امتیاز ساخته می‌شود، نه از duelRarity کلاینت. ویرایشِ امتیاز
+      // باید همان لحظه کلاسِ قرعه‌کشیِ جعبه را هم عوض کند؛ مقدارِ کهنهٔ فرم
+      // نباید کلاسِ ذخیره‌شده را نگه دارد.
+      const duelRarity = pointValue != null ? cardRarity.rarityForPoints(pointValue) : null;
+      const rawEffect = req.body.duelEffect ?? req.body.effect;
+      const duelEffect = rawEffect == null || String(rawEffect).trim() === ''
+        ? null
+        : (cardDuel.EFFECTS.includes(String(rawEffect).trim()) ? String(rawEffect).trim() : 'none');
+      const isCollectible = (req.body.isCollectible !== undefined || req.body.is_collectible !== undefined)
+        ? cardDuel.collectibleInput(req.body.isCollectible ?? req.body.is_collectible)
+        : null;
 
       // One statement keeps the catalogue type and every recognition side in
       // lockstep. A front/back card must never end up half active because the
@@ -1960,6 +1970,7 @@ module.exports = function createPhotoCardRoutes(deps) {
                   duel_energy = COALESCE($11, duel_energy),
                   duel_rarity = COALESCE($12, duel_rarity),
                   duel_effect = COALESCE($13, duel_effect),
+                  is_collectible = COALESCE($14::boolean, is_collectible),
                   updated_at = NOW()
             WHERE id = $5
           RETURNING *
@@ -1972,7 +1983,7 @@ module.exports = function createPhotoCardRoutes(deps) {
          SELECT * FROM updated_type`,
         [name, pointValue, cashAmount, isActive, req.params.id,
          duelAttack, duelDefense, duelSpeed, duelTechnique, duelGoalChance, duelEnergy,
-         duelRarity, duelEffect]
+         duelRarity, duelEffect, isCollectible]
       );
       if (!rows[0]) return res.status(404).json({ message: 'کارت پیدا نشد' });
       await audit(req.admin.id, 'update_photo_card_type', 'card_types', req.params.id, null, req.body);

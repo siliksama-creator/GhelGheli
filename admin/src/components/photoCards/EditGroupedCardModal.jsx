@@ -2,6 +2,15 @@ import { useState } from 'react';
 
 import { Button, Field, Input, Textarea } from '../ui.jsx';
 
+const EFFECTS = [
+  ['none', 'بدون افکت'],
+  ['finisher', 'فینیشر'],
+  ['wall', 'دیوار دفاعی'],
+  ['speedster', 'سرعتی'],
+  ['playmaker', 'بازی‌ساز'],
+  ['lucky_star', 'ستاره خوش‌شانس'],
+];
+
 function initialForm(card) {
   return {
     name: card.card_type_name || '',
@@ -21,6 +30,7 @@ function initialForm(card) {
     // سرور در فهرستِ طرح‌ها `is_collectible` را برمی‌گرداند. اگر یک روز
     // نفرستد، `!== true` امن‌ترین پیش‌فرض است: کارتِ بازی، یعنی رفتارِ قبلی.
     collectible: card.is_collectible === true,
+    effect: EFFECTS.some(([id]) => id === card.duel_effect) ? card.duel_effect : 'none',
   };
 }
 
@@ -47,6 +57,7 @@ export function EditGroupedCardModal({ card, request, notify, onClose, onSaved }
           duelGoalChance: Number(form.duel.goalChance || 50),
           duelEnergy: Number(form.duel.energy || 100),
           isCollectible: form.collectible,
+          duelEffect: form.effect || 'none',
         },
       });
       if (form.newCodes.trim()) {
@@ -108,6 +119,13 @@ export function EditGroupedCardModal({ card, request, notify, onClose, onSaved }
               </span>
             </label>
           </div>
+
+          <Field label="افکت خاص" hint="بعد از ثبت هم از همین‌جا عوض می‌شود. روی امتیازِ هر راند اثر دارد، نه روی استات‌ها.">
+            <select value={form.effect}
+              onChange={event => setForm({ ...form, effect: event.target.value })}>
+              {EFFECTS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            </select>
+          </Field>
 
           {!form.collectible && (
           <div className="card" style={{ padding: 10 }}>

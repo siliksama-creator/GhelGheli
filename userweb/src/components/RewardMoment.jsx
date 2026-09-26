@@ -3,6 +3,7 @@ import { SvgIcon } from './IconAsset.jsx';
 import { text, ruleNumber } from '../lib/liveConfig.js';
 import { fa } from '../lib/api.js';
 import { onRewardMoment, REWARD_MOMENTS } from '../lib/rewardMoment.js';
+import { play } from '../gameAudio.js';
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -248,6 +249,11 @@ export default function RewardMomentHost() {
   // عوض‌کردنِ صفحه وسطِ راه، کارتی روی صفحه جا نگذارد (درسِ حسابِ کهنه).
   useEffect(() => {
     if (!current) return undefined;
+    // آهنگِ کوتاهِ جایزه فقط برای دریافت و برد. باخت و تساوی لحنِ خودشان
+    // را دارند و این زنگ را نمی‌گیرند. پخش fire-and-forget است.
+    if (current.kind !== REWARD_MOMENTS.LOSS && current.kind !== REWARD_MOMENTS.DRAW) {
+      play('reward', 0.85);
+    }
     const show = Math.max(600, visibleMs() - LEAVE_MS);
     const t1 = setTimeout(() => setLeaving(true), show);
     const t2 = setTimeout(() => setCurrent(null), show + LEAVE_MS);

@@ -92,7 +92,8 @@ enum Sfx {
   cardSilver('card_silver.mp3'),
   cardGold('card_gold.mp3'),
   cardPremium('card_premium.mp3'),
-  cardLegend('card_legend.mp3');
+  cardLegend('card_legend.mp3'),
+  reward('reward.mp3');
 
   const Sfx(this.file);
   final String file;

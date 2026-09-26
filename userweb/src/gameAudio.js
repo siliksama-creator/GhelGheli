@@ -8,7 +8,7 @@ const FILES = [
   'duel_lock', 'duel_intro', 'duel_round_win', 'duel_round_lose',
   'duel_round_draw', 'duel_points', 'duel_final_draw', 'duel_victory', 'duel_defeat',
   'box_shake', 'box_open', 'card_normal', 'card_silver',
-  'card_gold', 'card_premium', 'card_legend',
+  'card_gold', 'card_premium', 'card_legend', 'reward',
 ];
 
 const KEY = 'game_sound_enabled';

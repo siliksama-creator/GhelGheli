@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../api_client.dart';
 import '../core/app_config.dart';
+import '../screens/user/games/game_audio.dart';
 import 'ui_icon.dart';
 
 /// ═══════════════════════════════════════════════════════════════════════════
@@ -218,6 +219,9 @@ class RewardMoment {
     final data = _queue.removeAt(0);
     _entry = OverlayEntry(builder: (_) => _RewardMomentOverlay(data: data));
     overlay.insert(_entry!);
+    if (data.kind == RewardKind.gain || data.kind == RewardKind.win) {
+      GameAudio.instance.play(Sfx.reward, volume: 0.85);
+    }
     final total = _visibleMs();
     _timer = Timer(Duration(milliseconds: math.max(600, total - _leaveMs)), () {
       // خروجِ نرم، بعد برداشتنِ لایه؛ اگر گره از درخت رفته باشد فقط صف را

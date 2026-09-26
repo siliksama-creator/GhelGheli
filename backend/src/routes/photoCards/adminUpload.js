@@ -313,21 +313,10 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
             if (!ok.rows[0]) {
               throw Object.assign(new Error('نوع کارت پیدا نشد'), { status: 404 });
             }
-            // امتیاز/استات فقط وقتی به‌روز می‌شود که مدیر صریحاً فرستاده باشد.
-            if (req.body.pointValue !== undefined || req.body.duelAttack !== undefined
-                || req.body.isCollectible !== undefined) {
-              await client.query(
-                `UPDATE card_types SET point_value=$1,
-                    duel_attack=$2, duel_defense=$3, duel_speed=$4,
-                    duel_technique=$5, duel_goal_chance=$6, duel_energy=$7,
-                    duel_rarity=$8, duel_effect=$9,
-                    is_collectible=$10, updated_at=NOW()
-                  WHERE id=$11`,
-                [points, duel.attack, duel.defense, duel.speed, duel.technique,
-                  duel.goalChance, duel.energy, duel.rarity, duel.effect,
-                  duel.collectible, cardTypeId],
-              );
-            }
+            // عکسِ تازه به همین نوع وصل می‌شود و استات‌ها دست نمی‌خورند.
+            // فرمِ ثبت همیشه امتیاز و استاتِ پیش‌فرض می‌فرستد؛ اگر اینجا
+            // بازنویسی می‌شد، «یک عکسِ دیگر» کارتِ موجود را صفر می‌کرد.
+            // تغییرِ امتیاز/افکت/کلکسیونی فقط از ویرایشِ کارت است.
           } else {
             // ═══════════════════════════════════════════════════════════
             // نامِ تکراری = **همان** کارت، نه یک کارتِ دوم
@@ -377,27 +366,13 @@ module.exports = function registerAdminPhotoCardUpload(deps) {
             );
             if (dup.rows[0]) {
               cardTypeId = dup.rows[0].id;
-              // ── چرا امتیاز فقط وقتی به‌روز می‌شود که صریح آمده باشد ──
+              // ── نامِ تکراری استات را عوض نمی‌کند ──
               //
-              // اگر مدیر فقط عکسِ تازه آپلود می‌کند و فیلدِ امتیاز را
-              // خالی گذاشته، `points` صفر می‌شود. بازنویسیِ کورکورانه
-              // یعنی کارتِ ۳۰۰۰ امتیازی بی‌سروصدا صفر می‌شد — و
-              // کاربرانی که بعدش ثبت می‌کردند هیچ امتیازی نمی‌گرفتند.
-              if (req.body.pointValue !== undefined
-                  || req.body.cashAmount !== undefined) {
-                await client.query(
-                  `UPDATE card_types
-                      SET point_value = $1, cash_amount = $2,
-                          duel_attack=$3, duel_defense=$4, duel_speed=$5,
-                          duel_technique=$6, duel_goal_chance=$7, duel_energy=$8,
-                          duel_rarity=$9, duel_effect=$10,
-                          is_collectible=$11, updated_at = NOW()
-                    WHERE id = $12`,
-                  [points, cash, duel.attack, duel.defense, duel.speed,
-                    duel.technique, duel.goalChance, duel.energy,
-                    duel.rarity, duel.effect, duel.collectible, cardTypeId],
-                );
-              }
+              // نامِ تکراری فقط طرحِ جدید را به همان کارت وصل می‌کند.
+              // امتیاز، استات، افکت و کلکسیونی همین‌جا عوض نمی‌شوند:
+              // فرمِ ثبت این فیلدها را همیشه می‌فرستد (حتی با مقدارِ
+              // پیش‌فرض)، و بازنویسی یعنی عکسِ دومِ همان بازیکن کارتِ
+              // قبلی را از نو می‌سازد. ویرایشِ مشخصات جای دیگری است.
             } else {
               // نوع کارت تازه در همان کاتالوگ موجود ساخته می‌شود، پس
               // اینونتوری و جوایز پلکانی بدون هیچ تغییری کار می‌کنند.
