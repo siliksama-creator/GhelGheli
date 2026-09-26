@@ -8,6 +8,9 @@ import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/state_views.dart';
+// آموزشِ صوتی: دکمهٔ «دوباره ببین» و لنگرِ سرصفحه برای تور.
+import '../../tour/tour_anchors.dart';
+import '../../tour/tour_service.dart';
 
 /// Private profile editor: dense 2-column layout + full avatar grid showing all 10 avatars and club crests.
 class ProfilePage extends StatefulWidget {
@@ -138,6 +141,43 @@ class _ProfilePageState extends State<ProfilePage> {
 
 
   @override
+  /// کارتِ «آموزش را دوباره ببین».
+  ///
+  /// چرا در پروفایل: همان‌جایی که کاربر دنبالِ تنظیماتِ حسابش می‌گردد — و
+  /// همان جای وب. بعد از دیدنِ اول، پرچم روی سرور است و تور خودش نمی‌آید؛
+  /// این تنها راهِ دیدنِ دوباره است.
+  Widget _tourCard() {
+    return AppCard(
+      child: Row(
+        children: <Widget>[
+          const Text('🎧', style: TextStyle(fontSize: 22)),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('آموزش صوتی قلقلی',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+                SizedBox(height: 3),
+                Text('دوباره از اول ببین؛ بخش‌به‌بخش با صدا.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9FB3C8))),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              TourBus.instance.requestReplay();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('آموزش از اول شروع شد')),
+              );
+            },
+            child: const Text('پخش'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget build(BuildContext context) {
     if (!_loaded) return const LoadingView();
     final theme = Theme.of(context);
@@ -155,11 +195,16 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
-    return AnimatedProfileBackground(
+    return TourAnchor(
+      id: 'profile:top',
+      child: AnimatedProfileBackground(
       slug: _cosmetics['profileBackground'] as String?,
       child: ListView(
       padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
       children: [
+        // ── آموزشِ صوتی — «دوباره ببین» ──
+        _tourCard(),
+        Gaps.vSm,
         // ── League History ──
         if (_leagueHistory.isNotEmpty) ...[
           AppCard(
@@ -393,7 +438,7 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
 
       ],
-    ));
+    )));
   }
 }
 

@@ -8,6 +8,9 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+// تورِ آموزشِ صوتی — زیرتب‌ها از بیرون و از راهِ همین گذرگاه عوض می‌شوند.
+import '../../tour/tour_anchors.dart';
+import '../../tour/tour_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/tokens.dart';
 import 'chat_page.dart';
@@ -69,6 +72,16 @@ class _SocialPageState extends State<SocialPage> {
   /// کاربر را از دست نمی‌دهد) — همان دلیلی که از اول `IndexedStack` بود.
   final Set<int> _visited = <int>{0};
 
+  /// ── پلِ زیرتب برای تورِ آموزشِ صوتی ──────────────────────────────
+  /// تور در شلِ خانه است و به State این صفحه دسترسی ندارد؛ برای «ماموریت» و
+  /// «گذر نبرد» باید خودِ این صفحه زیرتب را عوض کند — آینهٔ رویدادِ
+  /// `gg:tour-sub` وب.
+  void _onTourSub() {
+    final want = TourBus.instance.socialTab.value;
+    if (want == null || !mounted) return;
+    _goTo(want);
+  }
+
   /// رفتن به یک زیرتب + ثبتِ بازدیدش (تنها راهِ عوض‌کردنِ `_tab`).
   void _goTo(int index) {
     setState(() {
@@ -86,6 +99,13 @@ class _SocialPageState extends State<SocialPage> {
       _tab = 1;
       _visited.add(1);
     }
+    TourBus.instance.socialTab.addListener(_onTourSub);
+  }
+
+  @override
+  void dispose() {
+    TourBus.instance.socialTab.removeListener(_onTourSub);
+    super.dispose();
   }
 
   @override
@@ -107,10 +127,13 @@ class _SocialPageState extends State<SocialPage> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.xs, Gaps.md, Gaps.xs),
-          child: _Switcher(
+          child: TourAnchor(
+            id: 'club:subtabs',
+            child: _Switcher(
             index: _tab,
             onChanged: _goTo,
             passClaimable: widget.passClaimable,
+            ),
           ),
         ),
         Expanded(

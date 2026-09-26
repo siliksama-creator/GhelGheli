@@ -182,6 +182,104 @@ const offenders = texts.filter(t => badWords.some(w => t.includes(w)));
 check('متن‌ها «صفحه»/«است»/رسمیِ بدتلفظ ندارند', offenders.length === 0,
   offenders.map(t => t.slice(0, 26)).join(' | '));
 
+
+// ── ۸) پورتِ اندروید (فلاتر) ─────────────────────────────────────────────
+//
+// تورِ وب سه تکه دارد؛ با آمدنِ اندروید تکهٔ «لنگر» دو نسخه شد. این بخش
+// همان کاری را می‌کند که بخش‌های ۱–۶ برای وب می‌کردند: هر id سرور باید در
+// نقشهٔ فلاتر باشد، هر مقصد باید در نگاشتِ تبِ پوسته باشد، و مسیرِ صدا باید
+// همان `/api/onboarding/audio` باشد (باگِ خفه‌کنندهٔ صدا در وب از `/public`
+// می‌آمد — این خط همان را برای اپ قفل می‌کند).
+const MOB = path.join(ROOT, 'mobile', 'lib');
+const OV = read(path.join(MOB, 'tour', 'tour_overlay.dart'));
+const SVC2 = read(path.join(MOB, 'tour', 'tour_service.dart'));
+const ANC = read(path.join(MOB, 'tour', 'tour_anchors.dart'));
+const SHELL = read(path.join(MOB, 'screens', 'user', 'home_shell.dart'));
+const PROF = read(path.join(MOB, 'screens', 'user', 'profile_page.dart'));
+const SOC = read(path.join(MOB, 'screens', 'user', 'social_page.dart'));
+
+check('سه فایلِ تورِ اندروید موجود و پرِ محتواست',
+  OV.length > 8000 && SVC2.length > 2000 && ANC.length > 800,
+  `overlay=${OV.length} service=${SVC2.length} anchors=${ANC.length}`);
+
+check('اندروید هم وضعیت را از همان روتِ سرور می‌خواند و «دیده شد» را همان‌جا ثبت می‌کند',
+  SVC2.includes("'/api/onboarding'") && SVC2.includes("'/api/onboarding/seen'")
+  && SVC2.includes('version') && SVC2.includes('skipped'));
+
+check('صدای اندروید از پایهٔ api ساخته می‌شود، نه از مسیرِ /public',
+  OV.includes('ApiClient.defaultBaseUrl') && !OV.includes("'/public/"));
+
+// هر ۱۸ id سرور باید کلیدِ نقشهٔ فلاتر باشد و برعکس — وگرنه سرور بخشی را
+// می‌فرستد که اپ نمی‌داند کجا نشان دهد (و برعکسش کدِ مرده است).
+const dartIds = [...OV.matchAll(/^\s{4}'([a-z][a-z0-9_-]*)': TourPlan\(/gm)].map(m => m[1]);
+check('۱۸ بخشِ سرور در نقشهٔ فلاتر هست', svcIds.every(id => dartIds.includes(id)),
+  `سرور: ${svcIds.length} / فلاتر: ${dartIds.length} — گمشده: ${svcIds.filter(i => !dartIds.includes(i)).join(',')}`);
+check('نقشهٔ فلاتر id اضافه‌ای ندارد', dartIds.every(id => svcIds.includes(id)),
+  `اضافه: ${dartIds.filter(i => !svcIds.includes(i)).join(',')}`);
+
+// مقصدهای ناوبری: هر نامی که نقشه به آن اشاره می‌کند باید در نگاشتِ تبِ
+// پوسته ترجمه شده باشد، وگرنه تور پخش می‌شود ولی از جای اشتباه.
+const navNames = [...OV.matchAll(/TourPlan\('([a-z]+)'/g)].map(m => m[1]);
+const navSet = [...new Set(navNames)];
+const missingNav = navSet.filter(n => !SHELL.includes(`case '${n}':`));
+check('همهٔ مقصدهای تور در پوسته تب دارند', missingNav.length === 0,
+  `بی‌تب: ${missingNav.join(',')}`);
+check('لایهٔ تور در پوسته سوار شده و به نگاشت وصل است',
+  SHELL.includes('TourOverlay(') && SHELL.includes('indexFor: _tourIndexFor')
+  && SHELL.includes('onSubTab: TourBus.instance.setSocialTab'));
+check('زیرتب‌ها از بیرون قابلِ عوض‌کردن‌اند (پلِ ماموریت/گذر نبرد)',
+  SOC.includes('socialTab.addListener') && SOC.includes('tour_service.dart'));
+check('«دوباره ببین» در پروفایل هست', PROF.includes('requestReplay')
+  && PROF.includes("id: 'profile:top'"));
+check('شیتِ «بیشتر» لنگرِ ردیف دارد (انگشت روی همان ردیف می‌نشیند)',
+  SHELL.includes("id: 'more:${widget.tourNameOf(page)}'"));
+check('تور کلیک نمی‌کند (حلقه و انگشت لمس را نمی‌گیرند)',
+  OV.includes('IgnorePointer') && !OV.includes('child.onTap'));
+check('تورِ خودکارِ اندروید هم فقط از خانه شروع می‌شود',
+  OV.includes('_pendingAuto') && OV.includes('widget.currentIndex != 0'));
+
+// هندسهٔ «در» باید پیش از نخستین await حساب شود، وگرنه لینتِ
+// use_build_context_synchronously قرمز می‌شود و ممکن است روی قابِ
+// عوض‌شده حساب کند.
+const iSlot = OV.indexOf('_slotRect(slot)');
+const iAwait = OV.indexOf('await _player?.stop()');
+check('هندسهٔ در پیش از نخستین await حساب می‌شود',
+  iSlot > 0 && iAwait > 0 && iSlot < iAwait);
+
+// ترازِ پرانتز: فلاتر روی هاست نیست، پس سینتکسِ شکسته باید همین‌جا بگیرد.
+// (یک بار همین کلاسِ خطا در `profile_page.dart` رخ داد: یک `(` کم بود.)
+const strip = (src) => {
+  let out = '';
+  for (let i = 0; i < src.length; i += 1) {
+    const c = src[i];
+    if (c === '/' && src[i + 1] === '/') { const j = src.indexOf('\n', i); i = j < 0 ? src.length : j; continue; }
+    if (c === '/' && src[i + 1] === '*') { const j = src.indexOf('*/', i + 2); i = j < 0 ? src.length : j + 1; continue; }
+    if (c === '"' || c === "'") {
+      const raw = src[i - 1] === 'r';
+      i += 1;
+      while (i < src.length) {
+        if (!raw && src[i] === '\\') { i += 2; continue; }
+        if (src[i] === c) break;
+        i += 1;
+      }
+      continue;
+    }
+    out += c;
+  }
+  return out;
+};
+const files = ['tour/tour_overlay.dart', 'tour/tour_service.dart', 'tour/tour_anchors.dart',
+  'screens/user/home_shell.dart', 'screens/user/social_page.dart', 'screens/user/profile_page.dart'];
+const unbalanced = files.filter((f) => {
+  const s = strip(read(path.join(MOB, f)));
+  if (!s) return true;
+  return (s.split('(').length !== s.split(')').length)
+    || (s.split('{').length !== s.split('}').length)
+    || (s.split('[').length !== s.split(']').length);
+});
+check('ترازِ پرانتزِ شش فایلِ دست‌خوردهٔ اندروید', unbalanced.length === 0,
+  unbalanced.join(', '));
+
 console.log(fail === 0
   ? '[onboarding] همهٔ بررسی‌ها ✓'
   : `[onboarding] ${fail} بررسی ناموفق`);

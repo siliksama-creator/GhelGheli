@@ -32,6 +32,10 @@ import 'wheel_page.dart';
 import 'referral_page.dart';
 import 'points_ledger_page.dart';
 import 'recommended_apps_page.dart';
+// آموزشِ صوتیِ قلقلی — لایهٔ تور، لنگرها و گذرگاهِ «دوباره ببین».
+import '../../tour/tour_anchors.dart';
+import '../../tour/tour_overlay.dart';
+import '../../tour/tour_service.dart';
 
 /// Root shell for the regular user app: top bar + animated page switcher +
 /// bottom navigation. Functionally identical to the legacy `HomeShell`
@@ -513,6 +517,59 @@ class _HomeShellState extends State<HomeShell>
   /// شمارهٔ صفحهٔ کیف پول — از هدر داشبورد مستقیم به آن پرش می‌شود.
   static const _walletIndex = 2;
 
+  /// نگاشتِ «نامِ مقصدِ تور» به شمارهٔ صفحه — همان idهای وب تا دو کلاینت از
+  /// هم جدا نشوند (گاردِ `testOnboarding.js` همین نام‌ها را قفل می‌کند).
+  ///
+  /// چرا با نام و نه با شماره: متن و ترتیبِ آموزش روی سرور است؛ اگر سرور
+  /// بگوید «سراغِ فروشگاه برو»، اپ باید خودش بداند فروشگاه کدام شماره است —
+  /// نه اینکه سرور عددِ داخلیِ اپ را بداند.
+  int? _tourIndexFor(String name) {
+    switch (name) {
+      case 'home':
+        return 0;
+      case 'cardreg':
+        return cardRegIndex;
+      case 'league':
+        return 3;
+      case 'club':
+        return 4;
+      case 'support':
+        return 5;
+      case 'profile':
+        return 6;
+      case 'wheel':
+        return wheelIndex;
+      case 'invite':
+        return referralIndex;
+      case 'shop':
+        return shopIndex;
+      case 'pass':
+        return passIndex;
+      case 'wallet':
+        return _walletIndex;
+      default:
+        return null;
+    }
+  }
+
+  /// وارونِ بالا — شیتِ «بیشتر» با این نام، لنگرِ ردیفِ خودش را می‌سازد.
+  String _tourNameOfIndex(int i) {
+    switch (i) {
+      case 5:
+        return 'support';
+      case 6:
+        return 'profile';
+      default:
+        break;
+    }
+    if (i == wheelIndex) return 'wheel';
+    if (i == referralIndex) return 'invite';
+    if (i == shopIndex) return 'shop';
+    if (i == passIndex) return 'pass';
+    if (i == _walletIndex) return 'wallet';
+    return 'page$i';
+  }
+
   static const _destinations = [
     NavigationDestination(
       icon: Icon(Icons.home_outlined),
@@ -977,6 +1034,8 @@ class _HomeShellState extends State<HomeShell>
             ? (_destinations[i].selectedIcon as Icon).icon
             : (_destinations[i].icon as Icon).icon,
         onPick: (i) => Navigator.pop(sheetContext, i),
+        // نامِ توریِ هر ردیف — لنگرِ شیت با همین ساخته می‌شود.
+        tourNameOf: _tourNameOfIndex,
       ),
     );
     if (picked != null && mounted) {
@@ -1021,7 +1080,13 @@ class _HomeShellState extends State<HomeShell>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // آموزشِ صوتی روی **کلِ** شل می‌نشیند (شاملِ نوار پایین و نوار بالا)؛
+    // اگر داخلِ `body` بود، هالهٔ «درِ ورود» هیچ‌وقت روی تب‌های نوار پایین
+    // کشیده نمی‌شد و مهم‌ترین بخشِ روایت («چطور وارد این قسمت می‌شویم»)
+    // دیده نمی‌شد.
+    return Stack(
+      children: <Widget>[
+        Scaffold(
       appBar: AppBar(
         titleSpacing: 4,
         title: Row(
@@ -1134,6 +1199,20 @@ class _HomeShellState extends State<HomeShell>
           ),
         ],
       ),
+        ),
+        // ── آموزشِ صوتیِ قلقلی ───────────────────────────────────────
+        // چرا داخلِ شل و نه در `Overlay` سیستم: تور باید تب عوض کند و
+        // بداند کاربر کجاست — و این‌ها کارِ همین State است. `key` هم عوض
+        // نمی‌شود تا وضعیتِ تور با هر بازسازی از دست نرود.
+        TourOverlay(
+          api: widget.api,
+          currentIndex: _index,
+          indexFor: _tourIndexFor,
+          goIndex: (int i) => setState(() => _index = i),
+          onSubTab: TourBus.instance.setSocialTab,
+          slots: _navIndexes.length + 1,
+        ),
+      ],
     );
   }
 }
@@ -1619,6 +1698,7 @@ class _MoreSheet extends StatefulWidget {
     required this.selected,
     required this.iconOf,
     required this.onPick,
+    required this.tourNameOf,
   });
 
   /// با هر تغییرِ فهرست (مثلاً آماده شدنِ ردیفِ برنامه‌ها) بالا می‌رود.
@@ -1628,6 +1708,10 @@ class _MoreSheet extends StatefulWidget {
   final int selected;
   final IconData? Function(int index, bool selected) iconOf;
   final ValueChanged<int> onPick;
+
+  /// نامِ توریِ هر صفحه (مثل `wallet`) — با آن `more:wallet` ساخته می‌شود
+  /// تا انگشتِ تور روی همین ردیف بنشیند.
+  final String Function(int index) tourNameOf;
 
   @override
   State<_MoreSheet> createState() => _MoreSheetState();
@@ -1722,11 +1806,14 @@ class _MoreSheetState extends State<_MoreSheet> {
                       itemBuilder: (context, i) {
                         final page = items[i];
                         final isOn = widget.selected == page;
-                        return ListTile(
-                          leading: Icon(widget.iconOf(page, isOn)),
-                          title: Text(widget.titles[page]),
-                          selected: isOn,
-                          onTap: () => widget.onPick(page),
+                        return TourAnchor(
+                          id: 'more:${widget.tourNameOf(page)}',
+                          child: ListTile(
+                            leading: Icon(widget.iconOf(page, isOn)),
+                            title: Text(widget.titles[page]),
+                            selected: isOn,
+                            onTap: () => widget.onPick(page),
+                          ),
                         );
                       },
                     ),
