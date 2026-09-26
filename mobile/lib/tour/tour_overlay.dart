@@ -154,6 +154,7 @@ class TourOverlayState extends State<TourOverlay> {
   AudioPlayer? _player;
   StreamSubscription<void>? _completed;
   Timer? _advanceTimer;
+  Timer? _retryTimer;
 
   /// مستطیلِ جای هر تبِ نوار پایین (از راست). در `didChangeDependencies`
   /// پر می‌شود — نگاه کنید به توضیحِ `_rebuildSlots`.
@@ -178,6 +179,7 @@ class TourOverlayState extends State<TourOverlay> {
     TourBus.instance.removeListener(_onBus);
     _completed?.cancel();
     _advanceTimer?.cancel();
+    _retryTimer?.cancel();
     _player?.dispose();
     super.dispose();
   }
@@ -200,11 +202,26 @@ class TourOverlayState extends State<TourOverlay> {
   }
 
   /// راه‌اندازی: وضعیت را از سرور می‌خواند و در صورت لزوم شروع می‌کند.
-  Future<void> _boot() async {
-    if (_autoStarted || widget.api.token == null) return;
+  ///
+  /// `retry` = همان تلاشِ دومِ محدود. اگر خواندنِ اولیه شکست بخورد (اینترنتِ
+  /// لنگِ لحظهٔ ورود) کاربر آموزش را **هرگز** نمی‌دید؛ فقط با کشتن و بازکردنِ
+  /// دوبارهٔ اپ. حالا یک بار با تأخیرِ کوتاه دوباره تلاش می‌شود — آینهٔ
+  /// `BOOT_RETRY_MS` در وب.
+  Future<void> _boot({bool retry = false}) async {
+    if (widget.api.token == null) return;
+    if (!retry && _autoStarted) return;
     _autoStarted = true;
     final d = await fetchTour(widget.api);
-    if (!mounted || d == null) return;
+    if (!mounted) return;
+    if (d == null) {
+      if (!retry) {
+        _retryTimer?.cancel();
+        _retryTimer = Timer(const Duration(seconds: 6), () {
+          if (mounted && _data == null) unawaited(_boot(retry: true));
+        });
+      }
+      return;
+    }
     setState(() => _data = d);
     if (!d.enabled || d.seen) return;
     if (widget.currentIndex != 0) {

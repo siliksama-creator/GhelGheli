@@ -248,6 +248,10 @@ check('شیتِ «بیشتر» لنگرِ ردیف دارد (انگشت روی �
   SHELL.includes("id: 'more:${widget.tourNameOf(page)}'"));
 check('تور کلیک نمی‌کند (حلقه و انگشت لمس را نمی‌گیرند)',
   OV.includes('IgnorePointer') && !OV.includes('child.onTap'));
+check('اندروید: خواندنِ ناموفقِ وضعیت یک بار دوباره تلاش می‌شود',
+  OV.includes('_retryTimer') && OV.includes('_boot(retry: true)')
+  && OV.includes('_retryTimer?.cancel()'));
+
 check('تورِ خودکارِ اندروید هم فقط از خانه شروع می‌شود',
   OV.includes('_pendingAuto') && OV.includes('widget.currentIndex != 0'));
 
