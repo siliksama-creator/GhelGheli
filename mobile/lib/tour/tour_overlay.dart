@@ -269,7 +269,7 @@ class TourOverlayState extends State<TourOverlay> {
 
     // ── ۲) همان مسیری که کاربر می‌رفت ───────────────────────────────
     if (needTab) {
-      widget.goIndex(destIndex!);
+      widget.goIndex(destIndex);
       await Future<void>.delayed(_settleMs);
       if (!mounted || run != _run) return;
     }

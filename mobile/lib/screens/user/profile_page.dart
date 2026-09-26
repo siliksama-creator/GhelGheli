@@ -8,6 +8,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/avatar_image.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/ui_icon.dart';
 // آموزشِ صوتی: دکمهٔ «دوباره ببین» و لنگرِ سرصفحه برای تور.
 import '../../tour/tour_anchors.dart';
 import '../../tour/tour_service.dart';
@@ -149,7 +150,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return AppCard(
       child: Row(
         children: <Widget>[
-          const Text('🎧', style: TextStyle(fontSize: 22)),
+          const UiIcon('bulb', size: 22),
           const SizedBox(width: 10),
           const Expanded(
             child: Column(
