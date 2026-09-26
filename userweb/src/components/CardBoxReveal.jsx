@@ -261,7 +261,8 @@ export function GrantChestOpener({
         points: Number(r?.points || 0),
         distinct: r?.distinctCards === true,
       });
-      onOpened?.(r);
+      // فهرست را همین حالا عوض نکن. close() بعد از دیدنِ کارت‌ها صدا می‌زند.
+      resultRef.current = r;
       const shakeRemain = Math.max(0, 3000 - (Date.now() - t0));
       later(() => {
         stopShake();

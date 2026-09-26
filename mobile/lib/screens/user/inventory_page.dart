@@ -38,6 +38,7 @@ import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/card_box.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/player_card.dart'; // RarityCardFrame shared with detail/duel
 import '../../widgets/state_views.dart';
@@ -538,16 +539,10 @@ class _PendingChestsState extends State<_PendingChests> {
     if (_busy != null) return;
     setState(() => _busy = id);
     try {
-      final r = await widget.api.post('/api/grants/$id/open', const {});
+      // رونمایی وسطِ صفحه تمام شود، بعد فهرست تازه شود. اگر برعکس باشد
+      // این دکمه unmount می‌شود و کاربر فقط فلشِ رفرش می‌بیند.
+      await openGrantChest(context: context, api: widget.api, grantId: id);
       if (!mounted) return;
-      final cards = (r is Map ? r['cards'] as List? : null) ?? const [];
-      final names = cards
-          .whereType<Map>()
-          .map((c) => '${c['name'] ?? 'کارت'}')
-          .join('، ');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(names.isEmpty ? 'صندوق باز شد' : 'صندوق باز شد: $names'),
-      ));
       await widget.onOpened?.call();
     } catch (e) {
       if (mounted) {

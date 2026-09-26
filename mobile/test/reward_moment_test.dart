@@ -21,7 +21,9 @@ void main() {
   /// روی صفحه نباید برای همیشه بماند). پس هر تست بعد از دیدنِ کارت تا
   /// پایانِ آن پنجره جلو می‌رود — دقیقاً همان کاری که در اپِ واقعی رخ می‌دهد.
   Future<void> settle(WidgetTester tester) async {
-    await tester.pump(const Duration(milliseconds: 3200));
+    // پنجره: حداقل ۴ ثانیه کاملاً بالا، بعد ~۴۲۰ms محو. کمی بیشتر می‌رویم
+    // تا تایمرِ بستنِ overlay معلق نماند.
+    await tester.pump(const Duration(milliseconds: 4600));
     await tester.pump(const Duration(milliseconds: 600));
   }
 
@@ -200,7 +202,7 @@ void main() {
     expect(RewardMoment.queueLength, 1);
 
     // پس از پایانِ پنجرهٔ اولی، نوبتِ دومی می‌رسد.
-    await tester.pump(const Duration(milliseconds: 3200));
+    await tester.pump(const Duration(milliseconds: 4600));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('+۲۵ امتیاز'), findsOneWidget);
     expect(find.text('+۱۰ امتیاز'), findsNothing);
@@ -233,7 +235,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('+۵ امتیاز'), findsOneWidget);
 
-    // دکمه هنوز زیرِ کارت است؛ باید قابلِ کلیک بماند (IgnorePointer).
+    // فضای خالیِ جشن لمس را رد می‌کند. خودِ کارت لینک نیست و لمسش را
+    // می‌خورد؛ این دکمه زیرِ کارت نیست و باید بزند.
     await tester.tap(find.text('again'), warnIfMissed: false);
     await tester.pump();
     expect(taps, 1);

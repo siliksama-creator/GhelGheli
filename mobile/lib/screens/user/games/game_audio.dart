@@ -238,11 +238,19 @@ class GameAudio {
   void playShake() {
     if (!_enabled) return;
     try {
+      // بدونِ context، روی بعضی گوشی‌ها لرزشِ صندوق بی‌صدا می‌ماند
+      // (تمرکزِ صوتی را چیزِ دیگری گرفته و پکیج پخش را رد می‌کند).
+      _init();
       () async {
-        await _shakePlayer.stop();
-        await _shakePlayer.setReleaseMode(ReleaseMode.loop);
-        await _shakePlayer.setVolume(0.55);
-        await _shakePlayer.play(AssetSource('sfx/box_shake.mp3'));
+        try {
+          await _shakePlayer.setAudioContext(_mixWithOthers);
+          await _shakePlayer.stop();
+          await _shakePlayer.setReleaseMode(ReleaseMode.loop);
+          await _shakePlayer.setVolume(0.55);
+          await _shakePlayer.play(AssetSource('sfx/box_shake.mp3'));
+        } catch (e) {
+          debugPrint('shake sfx failed: $e');
+        }
       }();
     } catch (e) {
       debugPrint('shake sfx failed: $e');

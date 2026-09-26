@@ -58,6 +58,9 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
   const [history, setHistory] = useState(null);
   const [historyErr, setHistoryErr] = useState('');
   const timers = useRef([]);
+  // تازه‌سازیِ والد تا بعد از بسته‌شدنِ رونمایی عقب می‌افتد؛ وگرنه صفحه
+  // وسطِ لرزش عوض می‌شود و کاربر فقط فلشِ رفرش می‌بیند.
+  const pendingGrant = useRef(null);
 
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
@@ -105,6 +108,9 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
     setWon(null);
     setWonMeta(null);
     setRevealed(0);
+    const granted = pendingGrant.current;
+    pendingGrant.current = null;
+    if (granted) onGranted?.(granted);
   };
 
   const buy = async () => {
@@ -142,7 +148,8 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
         distinct: result?.distinctCards === true,
       });
       await load();
-      onGranted?.(result);
+      if (cards.length) pendingGrant.current = result;
+      else onGranted?.(result);
 
       // ترتیبِ نمایش، بعد از قطعی‌شدنِ تحویل: در باز می‌شود، نور می‌ترکد،
       // بعد کارت‌ها یکی‌یکی رو می‌آیند. هر کارت ۲۶۰ms فاصله دارد تا چشم
@@ -168,6 +175,30 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
     }
   };
 
+  // یک دکمه، دو کار: پولِ کافی در کیف باشد از کیف کم می‌شود؛ وگرنه درگاهِ
+  // بانکی. دو دکمه یعنی دو حالتِ خرید و همان چیزی است که مالک نخواست.
+  const openBox = async () => {
+    const price = Number(data?.price || 0);
+    const wallet = Number(data?.walletBalance || 0);
+    if (price > 0 && wallet >= price) {
+      await buyWithWallet();
+      return;
+    }
+    if (!zarinpalEnabled) {
+      setError('درگاه بانکی هنوز فعال نشده. وقتی فعال شد از همین دکمه پرداخت می‌کنی.');
+      return;
+    }
+    await buy();
+  };
+
+  const payHint = (() => {
+    const price = Number(data?.price || 0);
+    const wallet = Number(data?.walletBalance || 0);
+    if (price > 0 && wallet >= price) return 'از کیف پول پرداخت می‌شود';
+    if (zarinpalEnabled) return 'از درگاه بانکی پرداخت می‌شود';
+    return 'درگاه بانکی پس از فعال‌شدن باز می‌شود';
+  })();
+
   // خرید مستقیم با موجودیِ کیف پول: سرور همان‌جا کسر و تحویل می‌دهد؛
   // درگاهی در کار نیست و کلاینت فقط نتیجه را نمایش می‌دهد.
   const buyWithWallet = async () => {
@@ -187,7 +218,8 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
         distinct: result?.distinctCards === true,
       });
       await load();
-      onGranted?.(result);
+      if (cards.length) pendingGrant.current = result;
+      else onGranted?.(result);
       const shakeRemain = Math.max(0, 3000 - (Date.now() - t0));
       later(() => {
         stopShakeSound();
@@ -461,21 +493,13 @@ export default function CardBox({ token, compact = false, onGranted, zarinpalEna
             </p>
           ) : (
             <div className="cardBoxBuyRow" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <button type="button" className="cardBoxBtn" onClick={buy} disabled={busy}>
-                {busy ? 'در حال باز کردن…' : (zarinpalEnabled ? 'پرداخت با زرین‌پال' : 'باز کردن صندوق')}
+              <button type="button" className="cardBoxBtn" onClick={openBox} disabled={busy}>
+                {busy ? 'در حال باز کردن…' : 'باز کردن صندوق'}
               </button>
-              {typeof data.walletBalance === 'number' && (
-                <button type="button" className="cardBoxBtn cardBoxBtnWallet"
-                  style={{ fontSize: 11, padding: '8px 12px',
-                    opacity: busy || data.walletBalance < data.price ? 0.55 : 1 }}
-                  onClick={buyWithWallet}
-                  disabled={busy || data.walletBalance < data.price}>
-                  خرید با کیف پول
-                  <small style={{ display: 'block', opacity: 0.75, fontWeight: 400 }}>
-                    موجودی: {money(data.walletBalance)}
-                  </small>
-                </button>
-              )}
+              <small style={{ display: 'block', opacity: 0.75, fontWeight: 700, fontSize: 11 }}>
+                {payHint}
+                {typeof data.walletBalance === 'number' ? ` · موجودی: ${money(data.walletBalance)}` : ''}
+              </small>
             </div>
           )}
         </div>

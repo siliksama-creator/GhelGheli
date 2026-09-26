@@ -130,6 +130,10 @@ class _CardBoxState extends State<CardBox>
         // (همان دیالوگی که خریدِ کیف‌پولی می‌دید) وگرنه فقط پیام + رفرش.
         final box = order['box'];
         if (box is Map && (box['cards'] as List?)?.isNotEmpty == true) {
+          // پرداخت بیرون از اپ بوده؛ سه ثانیهٔ لرزش را دوباره تحمیل نکن،
+          // ولی صدای باز شدن و رونماییِ وسطِ صفحه باید همین‌جا باشد.
+          _shakeStart = DateTime.now().subtract(const Duration(seconds: 3));
+          GameAudio.instance.play(Sfx.boxOpen);
           await _reveal({
             'cards': box['cards'],
             'points': box['points'],
@@ -206,43 +210,54 @@ class _CardBoxState extends State<CardBox>
 
   Future<void> _reveal(Map<String, dynamic> result) async {
     final cards = (result['cards'] as List?) ?? const [];
+    // ناوبریِ ریشه را قبل از هر تأخیر می‌گیریم. اگر فروشگاه وسطِ راه
+    // رفرش شود و این ویجت unmount شود، رونمایی باز هم وسطِ صفحه می‌ماند —
+    // همان portal وب. تازه‌سازیِ والد تا بعد از بسته‌شدنِ رونمایی عقب
+    // می‌افتد؛ وگرنه FutureBuilder کلِ صفحه را با لودر عوض می‌کند و
+    // کاربر فقط یک فلش می‌بیند.
+    final nav = Navigator.of(context, rootNavigator: true);
+    final baseUrl = widget.api.baseUrl;
+    final onGranted = widget.onGranted;
     final elapsed = DateTime.now().difference(_shakeStart).inMilliseconds;
     final remain = 3000 - elapsed;
     if (remain > 0) {
       await Future<void>.delayed(Duration(milliseconds: remain));
     }
     unawaited(GameAudio.instance.stopShake());
-    _shakeCtrl.stop();
-    setState(() => _phase = _Phase.bursting);
-    unawaited(_burstCtrl.forward(from: 0));
-    await _load();
-    if (_showHistory) {
-      await _loadHistory();
-    } else {
-      _history = const [];
+    if (mounted) _shakeCtrl.stop();
+    if (mounted) {
+      setState(() => _phase = _Phase.bursting);
+      unawaited(_burstCtrl.forward(from: 0));
     }
-    widget.onGranted?.call();
     await Future<void>.delayed(const Duration(milliseconds: 620));
-    if (!mounted) return;
-    if (cards.isNotEmpty) {
-      await showGeneralDialog<void>(
-        context: context,
+    if (cards.isNotEmpty && nav.mounted) {
+      // push روی خودِ NavigatorState، نه contextِ ویجت: اگر فروشگاه وسطِ
+      // لرزش عوض شود، رونمایی وسطِ صفحه می‌ماند.
+      await nav.push<void>(PageRouteBuilder<void>(
+        opaque: false,
         barrierDismissible: false,
-        barrierLabel: 'کارت‌های صندوق',
         barrierColor: Colors.transparent,
         transitionDuration: const Duration(milliseconds: 300),
         pageBuilder: (_, __, ___) => _RevealScreen(
           cards: cards,
           points: (result['points'] as num?)?.toInt() ?? 0,
           distinct: result['distinctCards'] == true,
-          baseUrl: widget.api.baseUrl,
+          baseUrl: baseUrl,
         ),
-        transitionBuilder: (_, anim, __, child) =>
+        transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
-      );
+      ));
     }
-    if (!mounted) return;
-    setState(() => _phase = _Phase.idle);
+    if (mounted) {
+      await _load();
+      if (_showHistory) {
+        await _loadHistory();
+      } else {
+        _history = const [];
+      }
+      if (mounted) setState(() => _phase = _Phase.idle);
+      onGranted?.call();
+    }
   }
 
   Future<void> _buyWithWallet() async {
@@ -254,6 +269,8 @@ class _CardBoxState extends State<CardBox>
     });
     unawaited(_shakeCtrl.repeat());
     _shakeStart = DateTime.now();
+    // همان دو صدای وب: باز شدن، بعد لرزشِ پیوسته تا ترکیدنِ در.
+    GameAudio.instance.play(Sfx.boxOpen);
     GameAudio.instance.playShake();
     try {
       final result = Map<String, dynamic>.from(
@@ -271,25 +288,47 @@ class _CardBoxState extends State<CardBox>
         });
       }
     } finally {
-      _shakeCtrl.stop();
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        _shakeCtrl.stop();
+        setState(() => _busy = false);
+      }
     }
   }
 
-  Future<void> _buy() async {
+  /// یک دکمه، دو کار: پولِ کافی در کیف باشد از کیف کم می‌شود؛ وگرنه
+  /// درگاهِ بانکی (زرین‌پال) باز می‌شود. دو دکمهٔ جدا یعنی دو حالتِ خرید
+  /// و همان چیزی است که مالک نخواست.
+  Future<void> _open() async {
+    if (_busy) return;
+    final price = (_data?['price'] as num?)?.toInt() ?? 0;
+    final wallet = (_data?['walletBalance'] as num?)?.toInt() ?? 0;
+    if (price > 0 && wallet >= price) {
+      await _buyWithWallet();
+      return;
+    }
+    if (!widget.zarinpalEnabled) {
+      setState(() {
+        _error = 'درگاه بانکی هنوز فعال نشده. وقتی فعال شد از همین دکمه پرداخت می‌کنی.';
+      });
+      return;
+    }
+    await _buyWithGateway();
+  }
+
+  String _payHint() {
+    final price = (_data?['price'] as num?)?.toInt() ?? 0;
+    final wallet = (_data?['walletBalance'] as num?)?.toInt() ?? 0;
+    if (price > 0 && wallet >= price) return 'از کیف پول پرداخت می‌شود';
+    if (widget.zarinpalEnabled) return 'از درگاه بانکی پرداخت می‌شود';
+    return 'درگاه بانکی پس از فعال‌شدن باز می‌شود';
+  }
+
+  Future<void> _buyWithGateway() async {
     if (_busy) return;
     setState(() {
       _busy = true;
       _error = '';
-      _phase = _Phase.shaking;
     });
-    // `repeat()` یک Future برمی‌گرداند که تا وقتی انیمیشن ادامه دارد
-    // کامل نمی‌شود؛ منتظر ماندنش یعنی هرگز به مرحلهٔ خرید نمی‌رسیم.
-    // پس مثل `_burstCtrl` پایین‌تر، عمداً رهایش می‌کنیم.
-    unawaited(_shakeCtrl.repeat());
-    // صدای لرزشِ پیوسته (فایلِ مخصوص با loop) — هم‌زمان با انیمیشن.
-    _shakeStart = DateTime.now();
-    GameAudio.instance.playShake();
     try {
       if (widget.zarinpalEnabled) {
         // وب‌مرورگر و اندروید هر دو یک جریان واحد دارند: سفارش سمتِ سرور،
@@ -325,43 +364,14 @@ class _CardBoxState extends State<CardBox>
         'purchaseToken': token,
       }) as Map);
       if (!mounted) return;
-
-      final cards = (result['cards'] as List?) ?? const [];
-      // حداقل ۳ ثانیه لرزش جذاب با صدا، حتی اگر پرداخت سریع باشد.
-      final elapsed = DateTime.now().difference(_shakeStart).inMilliseconds;
-      final remain = 3000 - elapsed;
-      if (remain > 0) {
-        await Future<void>.delayed(Duration(milliseconds: remain));
-      }
-      unawaited(GameAudio.instance.stopShake());
-      _shakeCtrl.stop();
-      setState(() => _phase = _Phase.bursting);
-      unawaited(_burstCtrl.forward(from: 0));
-      await _load();
-      widget.onGranted?.call();
-
-      // در باز می‌شود، نور می‌ترکد، بعد صحنهٔ رونمایی می‌آید.
-      await Future<void>.delayed(const Duration(milliseconds: 620));
-      if (!mounted) return;
-      if (cards.isNotEmpty) {
-        await showGeneralDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          barrierLabel: 'کارت‌های صندوق',
-          barrierColor: Colors.transparent,
-          transitionDuration: const Duration(milliseconds: 300),
-          pageBuilder: (_, __, ___) => _RevealScreen(
-            cards: cards,
-            points: (result['points'] as num?)?.toInt() ?? 0,
-            distinct: result['distinctCards'] == true,
-            baseUrl: widget.api.baseUrl,
-          ),
-          transitionBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
-        );
-      }
-      if (!mounted) return;
-      setState(() => _phase = _Phase.idle);
+      // لرزش از همین‌جا شروع می‌شود تا رونماییِ بازار هم صدا و حداقل
+      // سه ثانیه انتظار داشته باشد، مثل خریدِ کیف‌پولی.
+      setState(() => _phase = _Phase.shaking);
+      unawaited(_shakeCtrl.repeat());
+      _shakeStart = DateTime.now();
+      GameAudio.instance.play(Sfx.boxOpen);
+      GameAudio.instance.playShake();
+      await _reveal(result);
     } on BillingUnavailable {
       unawaited(GameAudio.instance.stopShake());
       if (mounted) {
@@ -379,8 +389,10 @@ class _CardBoxState extends State<CardBox>
         });
       }
     } finally {
-      _shakeCtrl.stop();
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        _shakeCtrl.stop();
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -646,7 +658,7 @@ class _CardBoxState extends State<CardBox>
                               ],
                       ),
                       child: ElevatedButton(
-                        onPressed: _busy ? null : _buy,
+                        onPressed: _busy ? null : _open,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _gold,
                           foregroundColor: const Color(0xFF1A0F02),
@@ -658,18 +670,21 @@ class _CardBoxState extends State<CardBox>
                           textStyle: const TextStyle(
                               fontWeight: FontWeight.w900, fontSize: 13.5),
                         ),
-                        child: Text(
-                            _busy ? 'در حال باز کردن…' : (widget.zarinpalEnabled ? 'پرداخت با زرین‌پال' : 'باز کردن صندوق')),
+                        child: Text(_busy ? 'در حال باز کردن…' : 'باز کردن صندوق'),
                       ),
                     ),
-                    if (((data['walletBalance'] as num?)?.toInt() ?? 0) >=
-                        ((data['price'] as num?)?.toInt() ?? 0))
-                      TextButton(
-                        onPressed: _busy ? null : _buyWithWallet,
-                        child: const Text('خرید با کیف پول',
-                            style: TextStyle(
-                                fontSize: 11.5, fontWeight: FontWeight.w800)),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        _payHint(),
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF8FA0B4),
+                        ),
                       ),
+                    ),
                     ],
                     ],
                     ),
@@ -954,8 +969,7 @@ class _RevealScreenState extends State<_RevealScreen> {
   @override
   void initState() {
     super.initState();
-    // صدای بازشدنِ صندوق
-    GameAudio.instance.play(Sfx.boxOpen);
+    // box_open موقعِ کلیک پخش شده. اینجا فقط صدای هر کارت، مثلِ وب.
     for (var i = 0; i < widget.cards.length; i++) {
       final rarity =
           normalizeRarity((widget.cards[i] as Map)['rarity']);
@@ -1403,6 +1417,192 @@ class _OddChip extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 9.5, color: Color(0xFF9AA8BA))),
         ],
+      ),
+    );
+  }
+}
+
+
+/// باز کردنِ صندوقِ جایزه (گردونه یا لیگ) با همان رونماییِ وسطِ صفحه.
+///
+/// این تابع فهرست را تازه نمی‌کند. صداکننده باید *بعد* از برگشتنِ Future
+/// تازه کند. اگر وسطِ لرزش تازه شود، دکمه unmount می‌شود و کاربر فقط
+/// فلشِ رفرش می‌بیند — همان باگی که وب با عقب‌انداختنِ `onOpened` بست.
+Future<bool> openGrantChest({
+  required BuildContext context,
+  required ApiClient api,
+  required String grantId,
+}) async {
+  final nav = Navigator.of(context, rootNavigator: true);
+  final ok = await nav.push<bool>(PageRouteBuilder<bool>(
+    opaque: false,
+    barrierDismissible: false,
+    barrierColor: Colors.transparent,
+    transitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (_, __, ___) => _GrantOpenScreen(api: api, grantId: grantId),
+    transitionsBuilder: (_, anim, __, child) =>
+        FadeTransition(opacity: anim, child: child),
+  ));
+  // رونمایی با pop() بدون مقدار بسته می‌شود؛ فقط بستنِ خطا false است.
+  return ok != false;
+}
+
+/// لرزشِ وسطِ صفحه، بعد رونماییِ کارت‌ها. مستقل از ویجتِ فروشگاه است تا
+/// رفرشِ والد نتواند صحنه را ببلعد.
+class _GrantOpenScreen extends StatefulWidget {
+  const _GrantOpenScreen({required this.api, required this.grantId});
+
+  final ApiClient api;
+  final String grantId;
+
+  @override
+  State<_GrantOpenScreen> createState() => _GrantOpenScreenState();
+}
+
+class _GrantOpenScreenState extends State<_GrantOpenScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shake = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  )..repeat();
+  String _error = '';
+  bool _opening = true;
+  List<dynamic> _cards = const [];
+  int _points = 0;
+  bool _distinct = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_run());
+  }
+
+  Future<void> _run() async {
+    GameAudio.instance.play(Sfx.boxOpen);
+    GameAudio.instance.playShake();
+    final t0 = DateTime.now();
+    try {
+      final r = await widget.api.post('/api/grants/${widget.grantId}/open', const {});
+      final map = r is Map ? Map<String, dynamic>.from(r) : <String, dynamic>{};
+      final cards = (map['cards'] as List?) ?? const [];
+      final elapsed = DateTime.now().difference(t0).inMilliseconds;
+      final remain = 3000 - elapsed;
+      if (remain > 0) {
+        await Future<void>.delayed(Duration(milliseconds: remain));
+      }
+      await GameAudio.instance.stopShake();
+      if (!mounted) return;
+      _shake.stop();
+      setState(() {
+        _cards = cards;
+        _points = (map['points'] as num?)?.toInt() ?? 0;
+        _distinct = map['distinctCards'] == true;
+        _opening = false;
+      });
+    } catch (e) {
+      await GameAudio.instance.stopShake();
+      if (!mounted) return;
+      _shake.stop();
+      setState(() {
+        _error = apiError(e);
+        _opening = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(GameAudio.instance.stopShake());
+    _shake.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_opening && _error.isEmpty && _cards.isNotEmpty) {
+      return _RevealScreen(
+        cards: _cards,
+        points: _points,
+        distinct: _distinct,
+        baseUrl: widget.api.baseUrl,
+      );
+    }
+    return PopScope(
+      canPop: false,
+      child: Material(
+      color: Colors.transparent,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, -0.16),
+            radius: 1.0,
+            colors: [Color(0xF02A1140), Color(0xF704080F)],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_opening)
+                    AnimatedBuilder(
+                      animation: _shake,
+                      builder: (_, child) {
+                        final s = _shake.value * 2 * math.pi;
+                        return Transform.translate(
+                          offset: Offset(3 * math.sin(s), 1.6 * math.sin(s * 2)),
+                          child: Transform.rotate(
+                            angle: 0.05 * math.sin(s),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Image.asset(
+                        'assets/shop/card_box_closed.webp',
+                        width: 180,
+                        height: 180,
+                      ),
+                    )
+                  else
+                    Image.asset(
+                      'assets/shop/card_box_open.webp',
+                      width: 180,
+                      height: 180,
+                    ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _opening
+                        ? 'صندوق داره باز می‌شه…'
+                        : (_error.isEmpty ? 'صندوق خالی بود' : _error),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFFFFD166),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      decoration: TextDecoration.none,
+                      fontFamily: 'Vazirmatn',
+                    ),
+                  ),
+                  if (!_opening) ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () =>
+                          Navigator.of(context).pop(_error.isEmpty),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFD166),
+                        foregroundColor: const Color(0xFF1A0F02),
+                      ),
+                      child: const Text('بستن'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
       ),
     );
   }

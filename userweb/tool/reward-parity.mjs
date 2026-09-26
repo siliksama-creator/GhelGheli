@@ -230,6 +230,10 @@ ok('اندروید: لحظه ایموجی ندارد', !EMOJI.test(code(appSrc))
   ok('وب: خروجِ نرم دارد', /\.momentCard\.isLeaving/.test(css));
   ok('اندروید: لایه لمس را نمی‌خورد', /IgnorePointer\(/.test(code(appSrc)));
   ok('اندروید: خروجِ نرم دارد', /_out\.forward\(\)/.test(code(appSrc)));
+  // زیرخطِ زردِ «لینک» از نبودِ Material/decoration می‌آمد. کارت نباید لینک باشد.
+  ok('اندروید: متنِ کارت زیرخط ندارد', /TextDecoration\.none/.test(appSrc));
+  ok('اندروید: کارت حداقل ۴ ثانیه کاملاً دیده می‌شود', /math\.max\(4000,/.test(appSrc));
+  ok('وب: کارت حداقل ۴ ثانیه کاملاً دیده می‌شود', /Math\.max\(4000,/.test(webSrc));
   // و کارت باید در هر دو کلاینت عرضِ ایمن داشته باشد (درسِ سرریزِ ۳۶۰px).
   ok('وب: عرضِ کارت روی گوشیِ باریک بیرون نمی‌زند', /width:\s*min\(/.test(host + css));
 }

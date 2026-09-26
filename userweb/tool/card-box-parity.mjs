@@ -197,4 +197,15 @@ ok('رونمایی جایزه همان گام ۲۶۰ms خرید را دارد',
 ok('رونمایی جایزه لرزش و تصویر صندوق دارد',
   /shaking/.test(webReveal) && /card_box_closed/.test(webReveal));
 
+// اندروید نباید جای رونمایی، فقط یک اسنک‌بار نشان بدهد و همان لحظه
+// فهرست را تازه کند — آن رفرش صحنه را می‌بلعد.
+const andInv = read('mobile/lib/screens/user/inventory_page.dart');
+const andWheel = read('mobile/lib/screens/user/wheel_page.dart');
+ok('اندروید کلکسیون صندوق را با رونماییِ وسطِ صفحه باز می‌کند',
+  /openGrantChest\(/.test(andInv) && !/صندوق باز شد:/.test(andInv));
+ok('اندروید گردونه صندوق را با رونماییِ وسطِ صفحه باز می‌کند',
+  /openGrantChest\(/.test(andWheel) && !/صندوق باز شد:/.test(andWheel));
+ok('اندروید خرید را با یک دکمه انجام می‌دهد، نه دو حالت',
+  !/خرید با کیف پول/.test(andBox) && /_open\(/.test(andBox));
+
 console.log(`\n✅ ${pass} تست صندوقِ کارت موفق بود\n`);

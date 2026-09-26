@@ -43,13 +43,17 @@ import { onRewardMoment, REWARD_MOMENTS } from '../lib/rewardMoment.js';
  */
 const QUEUE_LIMIT = 4;
 
-/** مدتِ نمایش: از پنل (قاعدهٔ `rewardSeconds`) با فول‌بکِ امروزِ محصول. */
-function visibleMs() {
-  return Math.max(1500, ruleNumber('rewardSeconds', 4) * 1000);
-}
-
+/**
+ * مدتِ نمایش: از پنل (قاعدهٔ `rewardSeconds`) با فول‌بکِ امروزِ محصول.
+ * حداقل ۴ ثانیه کاملاً دیده شود (خواستهٔ مالک)، بعد محو. پنل می‌تواند
+ * بیشتر بگوید، نه کمتر.
+ */
 /** بهانهٔ خروجِ نرم: قبل از برداشتنِ کارت، محو می‌شود. */
 const LEAVE_MS = 420;
+
+function visibleMs() {
+  return Math.max(4000, ruleNumber('rewardSeconds', 4) * 1000) + LEAVE_MS;
+}
 
 /** عنوانِ هر منبع، از قراردادِ متنِ زنده (شکلِ فراخوانی، نه نگاشت). */
 function sourceTitle(source) {

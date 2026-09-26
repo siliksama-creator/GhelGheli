@@ -50,7 +50,9 @@ import 'ui_icon.dart';
 ///
 /// ── چهار قاعده‌ای که «بی‌اختلال بودن» را می‌سازند ─────────────────────────
 ///
-///  ۱. `IgnorePointer` دورِ کلِ لایه: هیچ لمسی را نمی‌خورد.
+///  ۱. فضای خالی لمس را رد می‌کند (`IgnorePointer`). خودِ کارت لینک نیست:
+///     لمسش را می‌خورد و هیچ کاری نمی‌کند، تا دکمهٔ زیرش باز نشود و زیرخطِ
+///     زردِ «لینک» نیاید.
 ///  ۲. `Overlay` (نه `SnackBar`): به `Scaffold`ِ یک صفحه چسبیده نیست، پس با
 ///     عوض‌کردنِ تب یا رفتن به بازیِ تمام‌صفحه ناپدید نمی‌شود.
 ///  ۳. هیچ‌وقت بیش از یکی روی صفحه نیست (صف) و صف سقف دارد.
@@ -134,7 +136,9 @@ const int _leaveMs = 420;
 /// مدتِ نمایش از پنل (قاعدهٔ `rewardSeconds`) با فول‌بکِ امروزِ محصول.
 int _visibleMs() {
   final sec = AppConfig.instance.rule('rewardSeconds', 4);
-  return math.max(1500, sec * 1000);
+  // حداقل ۴ ثانیه کاملاً دیده شود، بعد محو. پنل می‌تواند بیشتر بگوید، نه کمتر.
+  // (خواستهٔ مالک: کارتِ جایزه زود نپرد و لینک هم نباشد.)
+  return math.max(4000, sec * 1000) + _leaveMs;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -643,8 +647,14 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
       if (d.item != null && d.item!.isNotEmpty) _chip('item', d.item!),
     ];
 
-    return IgnorePointer(
-      child: Align(
+    // فضای خالی لمس را رد می‌کند (IgnorePointer) تا جشن کلِ صفحه را قفل
+    // نکند. خودِ کارت لینک نیست: Material لمس را می‌خورد و هیچ کاری نمی‌کند،
+    // پس زیرخطِ زرد و باز شدنِ چیزی که زیرِ کارت است دیگر پیش نمی‌آید.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const IgnorePointer(child: SizedBox.expand()),
+        Align(
         alignment: Alignment.topCenter,
         child: Padding(
           padding: EdgeInsets.only(top: topPad),
@@ -692,7 +702,19 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                   ),
                 );
               },
-              child: Semantics(
+              child: Material(
+                type: MaterialType.transparency,
+                child: DefaultTextStyle(
+                  // بدونِ این، متنِ overlay خطِ زردِ «لینک» می‌گیرد: یا
+                  // decoration از والد به ارث می‌رسد، یا فونتِ وزیرمتن به
+                  // لایه نمی‌رسد و گلیفِ جاافتاده زیرخط می‌کشد.
+                  style: const TextStyle(
+                    fontFamily: 'Vazirmatn',
+                    decoration: TextDecoration.none,
+                    color: Color(0xFFEAF6FF),
+                    fontSize: 14,
+                  ),
+                  child: Semantics(
                 liveRegion: true,
                 label: _titleOf(d),
                 child: Container(
@@ -825,6 +847,8 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
+                                            fontFamily: 'Vazirmatn',
+                                            decoration: TextDecoration.none,
                                             fontSize: titleSize,
                                             fontWeight: FontWeight.w900,
                                             color: const Color(0xFFEAF6FF))),
@@ -833,6 +857,8 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
+                                            fontFamily: 'Vazirmatn',
+                                            decoration: TextDecoration.none,
                                             fontSize: 12,
                                             // وب: `.momentSub` وزنِ ۸۰۰ دارد
                                             // ولی فولادی ۷۰۰ — لحنِ آرامِ
@@ -869,6 +895,8 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                                         padding: const EdgeInsets.only(top: 6),
                                         child: Text(d.note!,
                                             style: const TextStyle(
+                                                fontFamily: 'Vazirmatn',
+                                                decoration: TextDecoration.none,
                                                 fontSize: 12.5,
                                                 fontWeight: FontWeight.w900,
                                                 color: Color(0xFFFFD166))),
@@ -883,11 +911,14 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                     ),
                   ),
                 ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -921,6 +952,8 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
             const SizedBox(width: 5),
             Text(label,
                 style: TextStyle(
+                    fontFamily: 'Vazirmatn',
+                    decoration: TextDecoration.none,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w900,
                     color: highlight ? const Color(0xFFFFE6A8) : Colors.white,

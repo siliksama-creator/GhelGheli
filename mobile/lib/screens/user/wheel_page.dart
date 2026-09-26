@@ -28,6 +28,7 @@ import '../../api_client.dart';
 import '../../core/app_config.dart';
 import '../../utils/fa_date.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/card_box.dart';
 import '../../widgets/reward_moment.dart';
 import 'games/game_audio.dart';
 
@@ -966,20 +967,13 @@ class _ResultCardState extends State<_ResultCard>
             FilledButton(
               onPressed: () async {
                 try {
-                  final r = await widget.api!
-                      .post('/api/grants/${prize.grantId}/open', const {});
+                  final opened = await openGrantChest(
+                    context: context,
+                    api: widget.api!,
+                    grantId: prize.grantId!,
+                  );
                   if (!context.mounted) return;
-                  final cards =
-                      (r is Map ? r['cards'] as List? : null) ?? const [];
-                  final names = cards
-                      .whereType<Map>()
-                      .map((c) => '${c['name'] ?? 'کارت'}')
-                      .join('، ');
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(
-                        names.isEmpty ? 'صندوق باز شد' : 'صندوق باز شد: $names'),
-                  ));
-                  widget.onOpened?.call();
+                  if (opened) widget.onOpened?.call();
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
