@@ -99,6 +99,7 @@ object UpdateInstaller {
         }
         val sessionId = installer.createSession(params)
         val session = installer.openSession(sessionId)
+        var committed = false
         try {
             session.openWrite("base.apk", 0, file.length()).use { out ->
                 file.inputStream().use { input -> input.copyTo(out) }
@@ -109,11 +110,14 @@ object UpdateInstaller {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
             val pending = PendingIntent.getBroadcast(activity, sessionId, callback, flags)
             session.commit(pending.intentSender)
+            committed = true
         } catch (e: Exception) {
-            session.abandon()
+            if (!committed) {
+                try { session.abandon() } catch (_: Exception) {}
+            }
             throw e
         } finally {
-            session.close()
+            try { session.close() } catch (_: Exception) {}
         }
     }
 
