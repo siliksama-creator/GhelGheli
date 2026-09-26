@@ -76,6 +76,42 @@ void main() {
   // اپ از حالت سرد با لینک باز شود، کد اتاق برای صفحهٔ بازی‌ها ذخیره
   // می‌شود؛ اگر اپ باز باشد از استریم می‌رسد. شکستش بی‌اثر است.
   unawaited(DeepLinks.instance.start());
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // نوارِ ناوبریِ خودِ گوشی (home / back / برنامه‌های اخیر)
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // این برنامه هیچ تنظیمی روی نوارهای سیستم نداشت، پس اندروید آن‌ها را با
+  // رنگِ پیش‌فرضِ خودش روی اپ می‌کشید: یک نوارِ مشکیِ بی‌ربط چسبیده به
+  // نوارِ پایینِ قلقلی که هم با تمِ اپ جور نبود و هم ارتفاعِ مفیدِ صفحه
+  // را می‌خورد.
+  //
+  // روی اندروید ۱۵ (API ۳۵) وضعیت بدتر هم می‌شود: سیستم برای اپ‌هایی که
+  // ۳۵ را هدف گرفته‌اند «لبه‌به‌لبه» را **اجبار** می‌کند. یعنی اپ ما در
+  // عمل همین حالا هم روی گوشی‌های جدید زیرِ نوارِ ناوبری رفته بود، و چون
+  // هیچ جا فضای امن را رعایت نکرده‌ایم، نوارِ سیستم عملاً روی نوارِ پایین
+  // افتاده و جلوی لمسِ آخرین تب را گرفته بود — همان «مانع می‌شود»ای که
+  // گزارش شده.
+  //
+  // پس دو کار لازم است و هر دو انجام می‌شوند:
+  //   ۱. اینجا: نوارها را شفاف کنیم تا رنگِ خودِ اپ از زیرشان رد شود
+  //      (`contrastEnforced: false` لایهٔ خاکستری‌ای را که اندروید ۱۰+ برای
+  //      خوانایی روی نوار می‌کشد حذف می‌کند).
+  //   ۲. در شل: به اندازهٔ `MediaQuery.viewPaddingOf(context).bottom`
+  //      padding بدهیم تا محتوا بالای ناوبریِ سیستم بماند.
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        systemStatusBarContrastEnforced: false,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarContrastEnforced: false,
+      ),
+    );
+  }
+
   runApp(const GhelGheliApp());
 }
 

@@ -86,14 +86,29 @@ class TourPlan {
 /// طولِ نوارِ پایین — همان ۶۸ که `NavigationBar(height: 68)` می‌دهد.
 const double _barHeight = 68;
 const Duration _advance = Duration(milliseconds: 700);
-const Duration _doorMs = Duration(milliseconds: 1500);
-const Duration _enterMs = Duration(milliseconds: 1700);
-const Duration _settleMs = Duration(milliseconds: 620);
+
+/// ── زمان‌بندیِ «پیش از صدا» ─────────────────────────────────────────────
+///
+/// این عددها فقط طولِ انیمیشن نیستند؛ **تأخیرِ پیش از پخشِ صدا** هستند.
+/// در `_runStep` صدا بعد از مکثِ «در»، سکونِ ناوبری و سفرِ انگشت می‌آید.
+/// با مقادیرِ قبلی یعنی ۱٫۵ + ۰٫۶۲ + ۱٫۷ ≈ ۳٫۸ ثانیه سکوت، و تازه دانلودِ
+/// فایلِ صوتی هم روی همان مسیر می‌نشست. کاربر نزدیکِ چهار ثانیه تصویرِ
+/// بی‌صدا می‌دید.
+///
+/// کوتاه‌تر شدند بی‌آن‌که روایت از هم بپاشد: حرکت هنوز خوانده می‌شود، فقط
+/// کش‌دار نیست. همراه با پیش‌بارگیری در `_runStep`، زمانِ دانلود هم از
+/// مسیرِ بحرانی بیرون رفته است. اعداد با وب (`userweb/src/tour/Tour.jsx`)
+/// هم‌راستا نگه داشته شده‌اند تا تجربهٔ دو سکو یکی باشد.
+const Duration _doorMs = Duration(milliseconds: 900);
+const Duration _enterMs = Duration(milliseconds: 900);
+const Duration _settleMs = Duration(milliseconds: 380);
 /// چند بار برای پیدا شدنِ لنگرِ یک بخش صبر کنیم و با چه فاصله‌ای —
-/// ۳۶ × ۹۰ms ≈ ۳٫۲ ثانیه (همان سقفِ قبلی، این بار بر حسبِ «تلاش» تا در
-/// تستِ ویجت هم قطعی باشد).
-const int _anchorTries = 36;
-const Duration _anchorPollMs = Duration(milliseconds: 90);
+/// ۴۴ × ۵۰ms ≈ ۲٫۲ ثانیه. چرا «تعدادِ تلاش» و نه ساعتِ دیوار: در تستِ
+/// ویجت زمانِ شبیه‌سازی‌شده جلو می‌رود ولی ساعتِ واقعی نه، پس سقفِ
+/// زمانی عملاً بی‌پایان می‌شد. فاصله هم از ۹۰ به ۵۰ رسید تا لنگر زودتر
+/// دیده شود و سقفِ کل از ۳٫۲ ثانیه پایین‌تر بیاید.
+const int _anchorTries = 44;
+const Duration _anchorPollMs = Duration(milliseconds: 50);
 
 /// سقفِ کادرِ تمرکز — هاله باید روی «یک تکه» بنشیند، نه روی کلِ صفحه.
 ///
@@ -107,7 +122,7 @@ const double _focusMaxH = 0.46; // از ارتفاعِ قاب
 const double _focusMin = 44;    // کوچک‌تر از این دیگر چیزی نشان نمی‌دهد
 /// چند تلاشِ نخست فقط لنگرهای اصلی دیده می‌شوند (تا صفحه برسد)؛ بعد از آن
 /// جانشینِ همیشه‌حاضرِ `nav:…` هم آزاد است تا هاله هرگز گم نشود.
-const int _coreTries = 16; // ۱۶ × ۹۰ms ≈ ۱٫۴ ثانیه
+const int _coreTries = 30; // ۳۰ × ۵۰ms ≈ ۱٫۵ ثانیه
 
 /// پخشِ صدا با همان محافظِ `game_audio.dart`: صدا هرگز چیزی را نمی‌شکند.
 AudioPlayer? _safePlayer() {
@@ -171,6 +186,12 @@ class TourOverlayState extends State<TourOverlay> {
   StreamSubscription<void>? _completed;
   Timer? _advanceTimer;
   Timer? _retryTimer;
+
+  /// نشانی‌ای که منبعش از پیش ست و بافر شده است (در صورتِ موفقیتِ
+  /// `_prepareAudio`). اگر با نشانیِ بخشِ جاری یکی باشد، `_play` به‌جای
+  /// `play(UrlSource(...))` فقط `resume` می‌گیرد و فایل بی‌درنگ پخش می‌شود.
+  /// mismatched بودنش هم بی‌خطر است: `_play` به مسیرِ عادی برمی‌گردد.
+  String? _preparedUrl;
 
   /// مستطیلِ جای هر تبِ نوار پایین (از راست). در `didChangeDependencies`
   /// پر می‌شود — نگاه کنید به توضیحِ `_rebuildSlots`.
@@ -326,6 +347,20 @@ class TourOverlayState extends State<TourOverlay> {
     await _player?.stop();
     if (!mounted || run != _run) return;
 
+    // ── صدا را همین حالا بیاور، نه بعد از انیمیشن ──────────────────────
+    //
+    // پایینِ همین تابع، پیش از پخش، چند انتظارِ پشت‌سرهم داریم: مکثِ «در»،
+    // سکونِ ناوبری، جست‌وجویِ لنگر و سفرِ انگشت. اگر دانلودِ فایلِ صوتی
+    // بعد از همهٔ این‌ها شروع شود، کاربر مدتِ انیمیشن **به‌علاوهٔ** مدتِ
+    // دانلود سکوت می‌شنود — و روی اینترنتِ واقعیِ موبایل، همین بخشِ دوم
+    // بود که «صدا خیلی دیر می‌آید» را می‌ساخت.
+    //
+    // اینجا دانلود با آن انتظارها موازی می‌شود. `unawaited` عمدی است: منتظر
+    // ماندنش همان تأخیری را برمی‌گرداند که داریم حذفش می‌کنیم، و شکستش
+    // هم بی‌اثر است چون `_play` در آن صورت با `UrlSource` سراغِ همان
+    // نشانی می‌رود.
+    unawaited(_prepareAudio(step));
+
     if (door != null) {
       await Future<void>.delayed(_doorMs);
       if (!mounted || run != _run) return;
@@ -384,6 +419,42 @@ class TourOverlayState extends State<TourOverlay> {
     return null;
   }
 
+  /// نشانیِ کامل و قابل‌پخشِ فایلِ صوتیِ یک بخش.
+  ///
+  /// یک‌جا نگه داشته شده چون دو نقطه به آن نیاز دارند (`_prepareAudio` و
+  /// `_play`) و اگر هر کدام نشانی را جداگانه می‌ساختند، تفاوتِ یک حرف
+  /// می‌توانست باعث شود پیش‌بارگیری بی‌اثر شود بی‌آن‌که کسی بفهمد.
+  String _audioUrlOf(TourStep step) {
+    final base = widget.api.baseUrl.isNotEmpty
+        ? widget.api.baseUrl
+        : ApiClient.defaultBaseUrl;
+    return step.audioUrl.startsWith('http')
+        ? step.audioUrl
+        : '$base${step.audioUrl}';
+  }
+
+  /// فایلِ صوتیِ [step] را از همین حالا می‌آورد و بافر می‌کند.
+  ///
+  /// فقط `setSourceUrl` را صدا می‌زند — پخشی در کار نیست. مستنداتِ
+  /// `audioplayers`: «منابع از لحظه‌ای که این متد را صدا بزنید شروع به
+  /// دریافت و بافر شدن می‌کنند». شکستش عمداً بی‌صدا است: نه این‌جا
+  /// `throw` می‌کنیم و نه فازی عوض می‌کنیم؛ `_play` خودش در صورتِ نبودِ
+  /// منبعِ آماده مسیرِ عادی را می‌رود. آموزش هرگز نباید اپ را متوقف کند.
+  Future<void> _prepareAudio(TourStep step) async {
+    if (!step.audioReady || step.audioUrl.isEmpty) return;
+    _player ??= _safePlayer();
+    final player = _player;
+    if (player == null) return;
+    final url = _audioUrlOf(step);
+    try {
+      await player.setReleaseMode(ReleaseMode.stop);
+      await player.setSourceUrl(url);
+      _preparedUrl = url;
+    } catch (e) {
+      debugPrint('[tour] پیش‌بارگیریِ صدا ناموفق: $e');
+    }
+  }
+
   Future<void> _play(TourStep step) async {
     final d = _data;
     if (d == null) return;
@@ -409,14 +480,26 @@ class TourOverlayState extends State<TourOverlay> {
       debugPrint('[tour] آماده‌سازیِ صدا ناموفق: $e');
     }
     try {
-      final base = widget.api.baseUrl.isNotEmpty
-          ? widget.api.baseUrl
-          : ApiClient.defaultBaseUrl;
-      final url = step.audioUrl.startsWith('http')
-          ? step.audioUrl
-          : '$base${step.audioUrl}';
-      await player.stop();
-      await player.play(UrlSource(url));
+      final url = _audioUrlOf(step);
+      if (_preparedUrl == url) {
+        // از پیش آماده شده: `setSourceUrl` در ابتدای `_show` فایل را آورده
+        // و بافر کرده است. اینجا فقط به ابتدای فایل برمی‌گردیم و پخش
+        // می‌کنیم — و دیگر `stop()` نمی‌زنیم، چون اگرچه منبع را آزاد
+        // نمی‌کند، جایگاه را از دست می‌دهیم و کلِ پیش‌بارگیری بی‌اثر
+        // می‌شد. مستنداتِ `audioplayers` هم دقیقاً همین را توصیه می‌کند:
+        // «برای کاهش تأخیرِ آماده‌سازی، منبع را از پیش ست کن و جداگانه
+        // resume بگیر».
+        // جایگاه همین حالا صفر است: `stop()` در ابتدای `_show`، پیش از
+        // پیش‌بارگیری، صدا زده شده. پس اینجا `seek` لازم نیست — و در
+        // واقع زیان‌آور است، چون `seek` منتظرِ رویدادِ seek-complete
+        // می‌ماند و اگر پلیر هنوز آن را نفرستاده باشد تا پایانِ مهلت
+        // معطل می‌ماند و با خطا بیرون می‌آید؛ یعنی به‌جای صدایِ سریع،
+        // بی‌صدا می‌شدیم.
+        await player.resume();
+      } else {
+        await player.stop();
+        await player.play(UrlSource(url));
+      }
       if (!mounted) return;
       setState(() => _phase = 'playing');
     } catch (e) {

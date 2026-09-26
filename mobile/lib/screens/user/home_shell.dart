@@ -278,7 +278,35 @@ class _HomeShellState extends State<HomeShell>
   ///
   /// `_buildPersistentPages` پایین همهٔ صفحه‌های بازشده را با Offstage در
   /// درخت نگه می‌دارد و TickerMode انیمیشنِ تب پنهان را متوقف می‌کند.
-  Widget _pageAt(int i) => _pageCache.putIfAbsent(i, () => _buildPage(i));
+  /// آخرین `nonce`ای که صفحهٔ بازی‌ها با آن واقعاً ساخته شده است.
+  ///
+  /// چرا وجود دارد: این صفحه‌ها **یک بار** ساخته و در `_pageCache` نگه
+  /// داشته می‌شوند تا State زنده بماند (sessionِ بازیِ ضربه‌زن و تصویرهای
+  /// آماده با هر تعویضِ تب دور ریخته نشوند). اما همین کش یک اشکالِ نامرئی
+  /// داشت: کاشیِ «بازی ضربه‌زن» در تبِ خانه، `_pendingGameId` را ست
+  /// می‌کرد و تب را به بازی‌ها می‌برد، ولی چون ویجتِ صفحهٔ ۴ از قبل در کش
+  /// بود، `putIfAbsent` همان نمونهٔ قدیمی را برمی‌گرداند — نمونه‌ای که با
+  /// `externalGameId: null` ساخته شده بود. نتیجه: نشانیِ تازه هرگز به
+  /// `SocialPage` نمی‌رسید و کاربر فقط تبِ بازی‌ها را می‌دید، نه خودِ
+  /// بازی را. با مقایسهٔ nonce، صفحه فقط در لحظه‌ای بازسازی می‌شود که
+  /// واقعاً درخواستِ تازه‌ای برای باز کردنِ بازی رسیده باشد.
+  int _builtGameNonce = 0;
+
+  Widget _pageAt(int i) {
+    if (i == gamesIndex && _pageCache.containsKey(gamesIndex)) {
+      // فقط وقتی nonce حرکت کرده بازسازی کن؛ وگرنه هر build یعنی یک
+      // SocialPage تازه و پریدنِ Stateِ چت.
+      if (_pendingGameNonce != _builtGameNonce) {
+        _pageCache[gamesIndex] = _buildPage(gamesIndex);
+        _builtGameNonce = _pendingGameNonce;
+      }
+    } else if (i == gamesIndex) {
+      // اولین ساخت: nonce را همان‌جا ثبت کن تا بعداً بازسازیِ بی‌دلیل
+      // رخ ندهد.
+      _builtGameNonce = _pendingGameNonce;
+    }
+    return _pageCache.putIfAbsent(i, () => _buildPage(i));
+  }
 
   /// وقتی bootstrap کلکسیون تازه‌ای آورد، config ویجتِ «ثبت کارت» (که
   /// کلکسیون داخلش نشسته) عوض می‌شود ولی slot/key ثابت می‌ماند؛ بنابراین
@@ -312,7 +340,7 @@ class _HomeShellState extends State<HomeShell>
           onOpenReferral: () => setState(() => _index = referralIndex),
           onOpenInventory: () => setState(() => _index = cardRegIndex),
           onOpenTap: () => setState(() {
-            _index = 4;
+            _index = gamesIndex;
             _pendingGameId = 'tap';
             _pendingGameNonce = DateTime.now().microsecondsSinceEpoch;
           }),
@@ -333,7 +361,7 @@ class _HomeShellState extends State<HomeShell>
         return WalletPage(api: widget.api, reloadProfile: _loadProfile);
       case 3:
         return LeaguePage(api: widget.api);
-      case 4:
+      case gamesIndex:
         return SocialPage(
           api: widget.api,
           externalGameId: _pendingGameId,
@@ -408,6 +436,14 @@ class _HomeShellState extends State<HomeShell>
   /// «جوایز» شد؛ ایندکس ۱ عمداً همان است تا بقیهٔ شماره‌ها جابه‌جا نشوند
   /// (همان درسِ RangeError که navigation_test گرفت).
   static const cardRegIndex = 1;
+
+  /// شمارهٔ صفحهٔ «اجتماع/بازی‌ها» — مقصدِ کاشیِ «بازی ضربه‌زن» در خانه.
+  ///
+  /// چرا یک ثابت با نام: این شماره در دو جا مصرف می‌شود (ساختِ صفحه در
+  /// `_buildPage` و باطل‌کردنِ کش در `_pageAt`) و اگر در یکی از آن‌ها عددِ
+  /// خام بماند، اولین تغییرِ ترتیبِ تب‌ها یکی از دو مسیر را خراب می‌کند —
+  /// همان خطای خاموشی که تا وقتی کاربر کاشی را لمس نکند دیده نمی‌شود.
+  static const gamesIndex = 4;
 
   /// شمارهٔ صفحهٔ گردونه — از آیکون نوار بالا مستقیم به آن پرش می‌شود.
   static const wheelIndex = 7;
@@ -1179,25 +1215,29 @@ class _HomeShellState extends State<HomeShell>
           ],
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        // Taller bar + always-visible labels: the default height with seven
-        // items clipped the Persian text.
-        height: 68,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        selectedIndex: _barSelection,
-        onDestinationSelected: _onNavTap,
-        destinations: [
-          for (final i in _navIndexes) _destinations[i],
-          NavigationDestination(
-            icon: Icon(
-              _moreIndexes.contains(_index)
-                  ? Icons.more_horiz_rounded
-                  : Icons.more_horiz_outlined,
+      // نوار پایین تا لبهٔ پایینِ صفحه کشیده می‌شود ولی **محتوایش** بالای
+      // ناوبریِ سیستم می‌ماند — جزئیات و دلیل در `_BottomBarWithInset`.
+      bottomNavigationBar: _BottomBarWithInset(
+        child: NavigationBar(
+          // Taller bar + always-visible labels: the default height with seven
+          // items clipped the Persian text.
+          height: 68,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          selectedIndex: _barSelection,
+          onDestinationSelected: _onNavTap,
+          destinations: [
+            for (final i in _navIndexes) _destinations[i],
+            NavigationDestination(
+              icon: Icon(
+                _moreIndexes.contains(_index)
+                    ? Icons.more_horiz_rounded
+                    : Icons.more_horiz_outlined,
+              ),
+              selectedIcon: const Icon(Icons.more_horiz_rounded),
+              label: 'بیشتر',
             ),
-            selectedIcon: const Icon(Icons.more_horiz_rounded),
-            label: 'بیشتر',
-          ),
-        ],
+          ],
+        ),
       ),
         ),
         // ── آموزشِ صوتیِ قلقلی ───────────────────────────────────────
@@ -1866,6 +1906,41 @@ class _MoreSheetState extends State<_MoreSheet> {
           ),
         );
       },
+    );
+  }
+}
+
+/// نوار پایین را تا لبهٔ پایینِ صفحه می‌کشد، ولی محتوایش را بالای ناوبریِ
+/// سیستم نگه می‌دارد.
+///
+/// چرا لازم شد: اندروید ۱۵ برای اپ‌هایی که API ۳۵ را هدف گرفته‌اند
+/// «لبه‌به‌لبه» را اجبار می‌کند، و ما هم در `main()` نوارهای سیستم را شفاف
+/// کردیم. در این حالت `Scaffold` خودبه‌خود فضای امن را رعایت **نمی‌کند**؛
+/// پس بدون این wrapper، نوارِ پایینِ قلقلی تا زیرِ دکمهٔ home می‌رفت و
+/// لیبلِ آخرین تب عملاً پشتِ ناوبریِ سیستم پنهان می‌شد (گزارشِ «مانع
+/// می‌شود»).
+///
+/// چرا رنگ را این‌جا می‌کشیم: اگر فقط `Padding` می‌دادیم، نوارِ باریکِ زیرِ
+/// `NavigationBar` با رنگِ scaffold پر می‌شد و یک درزِ ناهمرنگِ محسوس زیر
+/// نوارِ پایین می‌ماند. رنگِ پس‌زمینه دقیقاً همان رنگی است که خودِ
+/// `NavigationBar` از تم می‌گیرد، پس درز دیده نمی‌شود.
+class _BottomBarWithInset extends StatelessWidget {
+  const _BottomBarWithInset({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final inset = MediaQuery.viewPaddingOf(context).bottom;
+    final scheme = Theme.of(context).colorScheme;
+    final background =
+        Theme.of(context).navigationBarTheme.backgroundColor ?? scheme.surface;
+    return DecoratedBox(
+      decoration: BoxDecoration(color: background),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: inset),
+        child: child,
+      ),
     );
   }
 }

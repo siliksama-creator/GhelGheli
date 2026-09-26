@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
@@ -221,6 +222,38 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
     duration: const Duration(milliseconds: _leaveMs),
   );
 
+  // ── پاپِ نشان ──────────────────────────────────────────────────────────
+  // در وب `.momentIcon` با `momentPop` می‌آید: از مقیاسِ ۰٫۴ شروع می‌کند،
+  // تا ۱٫۱۴ از مقصد رد می‌شود و می‌نشیند روی ۱ — و این همان چیزی است که
+  // «جشن» را از «یک کارت که ظاهر شد» جدا می‌کند. اندروید این انیمیشن را
+  // نداشت و نشان هم‌زمان با خودِ کارت می‌آمد، بی‌هیچ تأکیدی.
+  //
+  // حالتِ فولادی در وب کوتاه‌تر است (`.42s` در برابر `.6s`): باخت نباید
+  // به اندازهٔ برد جشن گرفته شود.
+  // ⚠️ `late final` اینجا یک جزئیاتِ ظریف ولی حیاتی است، نه سلیقه.
+  // `StatefulElement` ابتدا `createState()` را صدا می‌زند و **بعد**، در
+  // بدنهٔ constructor، `state._widget = widget` را ست می‌کند. یعنی هر
+  // مقداردهیِ فیلدی که در لحظهٔ ساخت اجرا شود، `widget` را null می‌بیند و
+  // `State.widget` با خطای null برمی‌گرداند. چون این فیلدها `late`اند،
+  // مقداردهی تا اولین خواندن (در `build`) عقب می‌افتد و آن‌جا `widget` ست
+  // است. اگر روزی `late` را بردارید، همین خط اپ را روی ویجتِ اول می‌کشد.
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: Duration(
+        milliseconds: widget.data.kind == RewardKind.loss ? 420 : 600),
+  )..forward();
+
+  /// مقیاسِ نشان. منحنی عمداً از ۱ هم می‌گذرد (`y1 = 1.5`) تا همان جهشِ
+  /// ۱٫۱۴ وب را بسازد — بدون نیاز به keyframeهای دستی.
+  late final Animation<double> _popScale = Tween<double>(begin: 0.4, end: 1.0)
+      .animate(
+          CurvedAnimation(parent: _pop, curve: const Cubic(0.2, 1.5, 0.4, 1)));
+
+  /// نشان تا ۶۰٪ِ انیمیشن کامل دیده می‌شود (همان `60%{opacity:1}` وب).
+  late final Animation<double> _popFade = Tween<double>(begin: 0.0, end: 1.0)
+      .animate(CurvedAnimation(
+          parent: _pop, curve: const Interval(0.0, 0.6)));
+
   /// قلابِ محوِ خروج — تا در `dispose` بتوانیم مطمئن شویم قلابِ روی صف
   /// **مالِ همین کارت** است و قلابِ کارتِ بعدی را پاک نمی‌کنیم (صف کارت‌ها را
   /// پشت‌سرهم نشان می‌دهد). tear-offِ یک متدِ نمونه در دارت canonicalize
@@ -243,6 +276,7 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
     _rise.dispose();
     _sweep.dispose();
     _out.dispose();
+    _pop.dispose();
     super.dispose();
   }
 
@@ -435,13 +469,31 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
               scale: Tween<double>(begin: 0.9, end: 1).animate(curve),
               child: AnimatedBuilder(
                 animation: _out,
-                builder: (_, child) => Opacity(
-                  opacity: 1 - _out.value,
-                  child: Transform.translate(
-                    offset: Offset(0, -12 * _out.value),
-                    child: child,
-                  ),
-                ),
+                builder: (_, child) {
+                  final t = _out.value;
+                  // وب هنگامِ رفتن، کارت را علاوه بر محو شدن **تار** و کمی
+                  // کوچک هم می‌کند (`filter:blur(3px)` و `scale(.965)`)؛
+                  // اندروید فقط محو و جابه‌جا می‌شد و همین باعث می‌شد رفتنش
+                  // «بریدن» به‌نظر برسد نه «دور شدن».
+                  Widget out = child!;
+                  if (t > 0) {
+                    out = ImageFiltered(
+                      imageFilter:
+                          ImageFilter.blur(sigmaX: 3 * t, sigmaY: 3 * t),
+                      child: out,
+                    );
+                  }
+                  return Opacity(
+                    opacity: 1 - t,
+                    child: Transform.translate(
+                      offset: Offset(0, -12 * t),
+                      child: Transform.scale(
+                        scale: 1 - 0.035 * t,
+                        child: out,
+                      ),
+                    ),
+                  );
+                },
                 child: Semantics(
                   liveRegion: true,
                   label: _titleOf(d),
@@ -478,20 +530,28 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                           Positioned(
                             top: -46,
                             right: -38,
-                            child: RotationTransition(
-                              turns: _spin,
-                              child: Container(
-                                width: 152,
-                                height: 152,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: SweepGradient(colors: [
-                                    _subColor.withValues(alpha: isLoss ? 0.16 : 0.47),
-                                    Colors.transparent,
-                                    _iconGradient.last.withValues(alpha: isLoss ? 0.12 : 0.43),
-                                    Colors.transparent,
-                                    _subColor.withValues(alpha: isLoss ? 0.16 : 0.47),
-                                  ]),
+                            child: Opacity(
+                              // وب: `.momentHalo{opacity:.5}` و برای فولادی
+                              // `.22`. اینجا هم همان دو عددند تا شدتِ هاله در
+                              // دو سکو یکی باشد.
+                              opacity: isLoss ? 0.22 : 0.5,
+                              child: RotationTransition(
+                                turns: _spin,
+                                child: Container(
+                                  width: 152,
+                                  height: 152,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: SweepGradient(colors: [
+                                      // 0xaa در وب = ۰٫۶۶۷؛ شفافیتِ بالا این
+                                      // عدد را به همان شدتِ وب می‌رساند.
+                                      _subColor.withValues(alpha: 0.667),
+                                      Colors.transparent,
+                                      _iconGradient.last.withValues(alpha: 0.667),
+                                      Colors.transparent,
+                                      _subColor.withValues(alpha: 0.667),
+                                    ]),
+                                  ),
                                 ),
                               ),
                             ),
@@ -504,26 +564,51 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                               ),
                             ),
                           ),
+                          // هایلایتِ داخلیِ لبهٔ بالا — همان
+                          // `inset 0 1px 0 #ffffff1f` وب که به کارت عمق
+                          // می‌دهد و لبه‌اش را از زمینه جدا می‌کند. در
+                          // اندروید نبود، برای همین کارت تخت و «بریده»
+                          // دیده می‌شد. ClipRRectِ بیرونی آن را در گوشه‌های
+                          // گرد کوتاه می‌کند، دقیقاً مثلِ یک inset.
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: IgnorePointer(
+                              child: Container(
+                                height: 1,
+                                color: isLoss
+                                    ? const Color(0x14FFFFFF)
+                                    : const Color(0x1FFFFFFF),
+                              ),
+                            ),
+                          ),
                           Padding(
                             padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: RadialGradient(
-                                      center: const Alignment(-0.4, -0.5),
-                                      colors: _iconGradient,
+                                ScaleTransition(
+                                  scale: _popScale,
+                                  child: FadeTransition(
+                                    opacity: _popFade,
+                                    child: Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: RadialGradient(
+                                          center: const Alignment(-0.4, -0.5),
+                                          colors: _iconGradient,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(color: _iconGradient.last.withValues(alpha: 0.35), blurRadius: 26),
+                                        ],
+                                      ),
+                                      child: Center(
+                                        child: UiIcon(icon, size: 28, color: _iconInk),
+                                      ),
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(color: _iconGradient.last.withValues(alpha: 0.35), blurRadius: 26),
-                                    ],
-                                  ),
-                                  child: Center(
-                                    child: UiIcon(icon, size: 28, color: _iconInk),
                                   ),
                                 ),
                                 const SizedBox(width: 13),
@@ -557,7 +642,14 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
                                           child: Wrap(
                                               spacing: 6,
                                               runSpacing: 6,
-                                              children: chips),
+                                              children: [
+                                                for (var i = 0; i < chips.length; i++)
+                                                  _MomentChipIn(
+                                                    index: i,
+                                                    animation: _in,
+                                                    child: chips[i],
+                                                  ),
+                                              ]),
                                         ),
                                       if (d.note != null && d.note!.isNotEmpty)
                                         Padding(
@@ -669,4 +761,60 @@ class _MomentShine extends CustomPainter {
 
   @override
   bool shouldRepaint(_MomentShine old) => old.p != p;
+}
+
+/// ورودِ پله‌ایِ چیپ‌ها — همان `momentChipIn` وب.
+///
+/// در وب، چیپ‌هایِ لحظهٔ جایزه یکی‌یکی و با تأخیرِ ۰/۰٫۰۷/۰٫۱۴/۰٫۲۱ ثانیه
+/// می‌آیند (`.momentRow .momentChip:nth-child(n)`). این پله‌ای بودن بخشِ
+/// زیادی از جذابیتِ کارت است: چشم دنبالِ چیپِ بعدی می‌رود و هر کدام جداگانه
+/// «ثبت» می‌شود. در اندروید همه با هم ظاهر می‌شدند و کارت ساکن به‌نظر
+/// می‌رسید — همان تفاوتی که «تو وب عالیه، تو اندروید زشته» از آن می‌آید.
+///
+/// تأخیرها بر حسبِ **کسرِ** انیمیشنِ ورودِ کارت (۵۲۰ms) بیان شده‌اند، نه
+/// میلی‌ثانیه، تا با هر تغییری در طولِ ورودِ کارت هماهنگ بمانند.
+class _MomentChipIn extends StatelessWidget {
+  const _MomentChipIn({
+    required this.index,
+    required this.animation,
+    required this.child,
+  });
+
+  final int index;
+  final Animation<double> animation;
+  final Widget child;
+
+  /// طولِ هر پله بر حسبِ کسر: ۰٫۳۴ ثانیه از ۰٫۵۲ ثانیه.
+  static const double _span = 0.34 / 0.52;
+
+  /// گامِ تأخیر: ۰٫۰۷ ثانیه از ۰٫۵۲ ثانیه.
+  static const double _step = 0.07 / 0.52;
+
+  @override
+  Widget build(BuildContext context) {
+    // وب فقط برای چهار چیپِ اول تأخیر تعریف کرده. از پنجم به بعد همان
+    // آخرین پله را می‌گیریم تا چیپی دیرتر از خودِ کارت نیاید و ناگهان
+    // تنها در قاب ظاهر نشود.
+    final step = index <= 3 ? index : 3;
+    final start = (step * _step).clamp(0.0, 1.0);
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Interval(
+        start,
+        (start + _span).clamp(0.0, 1.0),
+        // همان `cubic-bezier(.2,1.3,.4,1)` وب: کمی از مقصد رد می‌شود و
+        // برمی‌گردد.
+        curve: const Cubic(0.2, 1.3, 0.4, 1),
+      ),
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position:
+            Tween<Offset>(begin: const Offset(0, 0.35), end: Offset.zero)
+                .animate(curved),
+        child: child,
+      ),
+    );
+  }
 }

@@ -164,6 +164,14 @@ jobs:
       - name: Generate splash screen
         run: cd mobile && dart run flutter_native_splash:create || true
 
+      # The phone's own home/back/recents bar was painting a flat black strip
+      # over the app's bottom navigation — and on Android 15 (which forces
+      # edge-to-edge for API 35 targets) it was swallowing taps on the last
+      # tab. Must run AFTER the splash step: flutter_native_splash rewrites
+      # res/values*/styles.xml and would discard anything written earlier.
+      - name: Make system bars transparent (edge-to-edge)
+        run: cd mobile && bash tool/patch_system_bars.sh
+
       # `flutter create` drops a placeholder widget_test.dart that references
       # a MyApp class this project doesn't have, so it fails to compile.
       # Delete ONLY that file — the real tests under mobile/test/ must run.
