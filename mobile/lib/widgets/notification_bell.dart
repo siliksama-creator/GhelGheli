@@ -88,8 +88,8 @@ class _NotificationBellState extends State<NotificationBell>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    Gaps.lg, 0, Gaps.lg, Gaps.sm),
+                padding:
+                    const EdgeInsets.fromLTRB(Gaps.lg, 0, Gaps.lg, Gaps.sm),
                 child: Text('اعلان‌ها',
                     style: Theme.of(ctx)
                         .textTheme
@@ -101,8 +101,11 @@ class _NotificationBellState extends State<NotificationBell>
                     ? const Center(child: Text('اعلانی نداری.'))
                     : ListView.separated(
                         controller: controller,
-                        padding: const EdgeInsets.fromLTRB(
-                            Gaps.md, 0, Gaps.md, Gaps.xl),
+                        // لبه‌به‌لبه: آخرین اعلان زیرِ نوارِ ناوبریِ سیستم
+                        // نماند (روی گوشیِ سه‌دکمه لمسِ آن ردیف خوردهٔ
+                        // سیستم است، نه اپ).
+                        padding: EdgeInsets.fromLTRB(Gaps.md, 0, Gaps.md,
+                            Gaps.xl + MediaQuery.viewPaddingOf(ctx).bottom),
                         itemCount: _items.length,
                         separatorBuilder: (_, __) => Gaps.vXs,
                         itemBuilder: (_, i) {
@@ -110,7 +113,8 @@ class _NotificationBellState extends State<NotificationBell>
                           final unread = n['is_read'] != true;
                           return Material(
                             color: unread
-                                ? const Color(0xFF84CC16).withValues(alpha: 0.12)
+                                ? const Color(0xFF84CC16)
+                                    .withValues(alpha: 0.12)
                                 : Theme.of(ctx)
                                     .colorScheme
                                     .onSurface
@@ -125,8 +129,7 @@ class _NotificationBellState extends State<NotificationBell>
                               child: Padding(
                                 padding: const EdgeInsets.all(Gaps.sm),
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text('${n['title'] ?? ''}',
                                         style: Theme.of(ctx)
@@ -136,9 +139,8 @@ class _NotificationBellState extends State<NotificationBell>
                                                 fontWeight: FontWeight.w800)),
                                     Gaps.vXxs,
                                     Text('${n['body'] ?? ''}',
-                                        style: Theme.of(ctx)
-                                            .textTheme
-                                            .bodySmall),
+                                        style:
+                                            Theme.of(ctx).textTheme.bodySmall),
                                   ],
                                 ),
                               ),

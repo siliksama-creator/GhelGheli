@@ -130,11 +130,18 @@ class _PassPageState extends State<PassPage>
           points: kind == 'points' ? amount : 0,
           coins: kind == 'coins' ? amount : 0,
           xp: kind == 'xp' ? amount : 0,
-          item: const ['item', 'shop', 'shop_item', 'cosmetic', 'frame', 'avatar']
-                  .contains(kind)
+          item: const [
+            'item',
+            'shop',
+            'shop_item',
+            'cosmetic',
+            'frame',
+            'avatar'
+          ].contains(kind)
               ? (g['label']?.toString() ?? 'آیتم')
               : null,
-          note: g['label'] != null && !const ['points', 'coins', 'xp'].contains(kind)
+          note: g['label'] != null &&
+                  !const ['points', 'coins', 'xp'].contains(kind)
               ? g['label'].toString()
               : null,
         ),
@@ -161,8 +168,8 @@ class _PassPageState extends State<PassPage>
           context,
           RewardMomentData(
             source: RewardSource.pass,
-            note: AppConfig.instance.text('reward.passAll',
-                '${faNum(claimed)} جایزهٔ گذر نبرد',
+            note: AppConfig.instance.text(
+                'reward.passAll', '${faNum(claimed)} جایزهٔ گذر نبرد',
                 vars: {'count': claimed}),
           ),
         );
@@ -179,9 +186,12 @@ class _PassPageState extends State<PassPage>
   void _toast(String text, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-      content: Text(text, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
+      content: Text(text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.w800)),
       behavior: SnackBarBehavior.floating,
-      backgroundColor: error ? Theme.of(context).colorScheme.error : const Color(0xFF10B981),
+      backgroundColor:
+          error ? Theme.of(context).colorScheme.error : const Color(0xFF10B981),
       duration: const Duration(milliseconds: 2000),
     ));
   }
@@ -220,269 +230,331 @@ class _PassPageState extends State<PassPage>
       final free = row['free'] is Map ? row['free'] as Map : null;
       final plus = row['plus'] is Map ? row['plus'] as Map : null;
       final freeDone = free == null || free['claimed'] == true;
-      final plusDone = plus == null || plus['claimed'] == true || plus['locked'] == true;
+      final plusDone =
+          plus == null || plus['claimed'] == true || plus['locked'] == true;
       return row['unlocked'] == true && freeDone && plusDone && tNum < tier;
     }
 
     final claimedCount = allTiers.where(isTierDone).length;
-    final displayTiers = allTiers.where((r) => _showClaimed || !isTierDone(r)).toList();
+    final displayTiers =
+        allTiers.where((r) => _showClaimed || !isTierDone(r)).toList();
 
     return TourAnchor(
-      id: 'club:tab:pass',
-      child: RefreshIndicator(
-      onRefresh: () => _load(jump: false),
-      child: ListView(
-        controller: _scroll,
-        padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
-        children: [
-          // ── Compact Season Hero ──
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: const LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [Color(0xFF16325C), Color(0xFF0A1526)],
-              ),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Image.asset('assets/pass/streak_icon.webp', width: 38, height: 38, cacheWidth: 100,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.emoji_events_rounded, color: _plusGold, size: 30)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${season['name'] ?? 'فصل اول — شروع قلقلی'}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: Colors.white),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${faNum(season['daysLeft'])} روز تا پایان فصل · پله ${faNum(tier)} از ${faNum(tierCount)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.70), fontSize: 11),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // ── XP Progress Bar ──
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: (d['tierNeeds'] as num? ?? 0) > 0
-                        ? ((d['intoTier'] as num? ?? 0) / (d['tierNeeds'] as num)).clamp(0.0, 1.0)
-                        : 1.0,
-                    minHeight: 7,
-                    backgroundColor: Colors.white.withValues(alpha: 0.10),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22E7A6)),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'امروز ${faNum(d['tiersToday'])} از ${faNum(d['maxTiersPerDay'])} پله باز شد',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    Text(
-                      '${faNum(d['intoTier'])} / ${faNum(d['tierNeeds'])} XP',
-                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF38BDF8), fontWeight: FontWeight.w800),
-                    ),
-                  ],
-                ),
-
-                if (claimable > 0) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 36,
-                    child: ElevatedButton(
-                      onPressed: _busy ? null : _claimAll,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF22E7A6),
-                        foregroundColor: const Color(0xFF04291D),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: Text('دریافت ${faNum(claimable)} جایزه آماده',
-                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // ── Visual XP Infographic ──
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              color: Colors.white.withValues(alpha: 0.04),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.bolt_rounded, color: Color(0xFFFFD166), size: 15),
-                    SizedBox(width: 4),
-                    Expanded(
-                      child: Text('راه‌های سریع کسب تجربه (XP):',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Colors.white)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 5,
-                  runSpacing: 5,
-                  children: [
-                    for (final pill in _xpPillsFrom(d))
-                      _XpPill(label: pill[0], xp: pill[1]),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          if (!hasPlus) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2E2407), Color(0xFF141A29)],
-                ),
-                border: Border.all(color: _plusGold.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                children: [
-                  const Text('★', style: TextStyle(color: _plusGold, fontSize: 20)),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('مسیر طلایی قفل است',
-                            style: TextStyle(color: _plusGold, fontWeight: FontWeight.w900, fontSize: 12.5)),
-                        Text('جوایز نقدی، چرخش گردونه و آیتم‌های ویژه',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: Colors.white70, fontSize: 10.5)),
-                      ],
-                    ),
-                  ),
-                  ElevatedButton(
-                    onPressed: widget.onOpenShop,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _plusGold,
-                      foregroundColor: const Color(0xFF291B00),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                    ),
-                    child: const Text('بازکردن', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 8),
-
-          // ── Track Legend & Fold Button ──
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 6,
-            runSpacing: 4,
+        id: 'club:tab:pass',
+        child: RefreshIndicator(
+          onRefresh: () => _load(jump: false),
+          child: ListView(
+            controller: _scroll,
+            padding:
+                const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _freeColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _freeColor.withValues(alpha: 0.4)),
-                    ),
-                    child: const Text('رایگان',
-                        style: TextStyle(color: _freeColor, fontSize: 10, fontWeight: FontWeight.w800)),
+              // ── Compact Season Hero ──
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                    colors: [Color(0xFF16325C), Color(0xFF0A1526)],
                   ),
-                  const SizedBox(width: 5),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _plusGold.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _plusGold.withValues(alpha: 0.4)),
-                    ),
-                    child: const Text('★ پلاس',
-                        style: TextStyle(color: _plusGold, fontSize: 10, fontWeight: FontWeight.w800)),
-                  ),
-                ],
-              ),
-              if (claimedCount > 0)
-                InkWell(
-                  onTap: () => setState(() => _showClaimed = !_showClaimed),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
                       children: [
-                        Icon(_showClaimed ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 16, color: Colors.white70),
-                        const SizedBox(width: 2),
-                        Text(
-                          _showClaimed ? 'بستن قبلی‌ها' : 'پله‌های قبل (${faNum(claimedCount)})',
-                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Colors.white70),
+                        Image.asset('assets/pass/streak_icon.webp',
+                            width: 38,
+                            height: 38,
+                            cacheWidth: 100,
+                            errorBuilder: (_, __, ___) => const Icon(
+                                Icons.emoji_events_rounded,
+                                color: _plusGold,
+                                size: 30)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${season['name'] ?? 'فصل اول — شروع قلقلی'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14.5,
+                                    color: Colors.white),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${faNum(season['daysLeft'])} روز تا پایان فصل · پله ${faNum(tier)} از ${faNum(tierCount)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.70),
+                                    fontSize: 11),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 10),
+
+                    // ── XP Progress Bar ──
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: (d['tierNeeds'] as num? ?? 0) > 0
+                            ? ((d['intoTier'] as num? ?? 0) /
+                                    (d['tierNeeds'] as num))
+                                .clamp(0.0, 1.0)
+                            : 1.0,
+                        minHeight: 7,
+                        backgroundColor: Colors.white.withValues(alpha: 0.10),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            Color(0xFF22E7A6)),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'امروز ${faNum(d['tiersToday'])} از ${faNum(d['maxTiersPerDay'])} پله باز شد',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 10.5,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Text(
+                          '${faNum(d['intoTier'])} / ${faNum(d['tierNeeds'])} XP',
+                          style: const TextStyle(
+                              fontSize: 10.5,
+                              color: Color(0xFF38BDF8),
+                              fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+
+                    if (claimable > 0) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 36,
+                        child: ElevatedButton(
+                          onPressed: _busy ? null : _claimAll,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF22E7A6),
+                            foregroundColor: const Color(0xFF04291D),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: Text('دریافت ${faNum(claimable)} جایزه آماده',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900, fontSize: 12)),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // ── Visual XP Infographic ──
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: Colors.white.withValues(alpha: 0.04),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.bolt_rounded,
+                            color: Color(0xFFFFD166), size: 15),
+                        SizedBox(width: 4),
+                        Expanded(
+                          child: Text('راه‌های سریع کسب تجربه (XP):',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 5,
+                      runSpacing: 5,
+                      children: [
+                        for (final pill in _xpPillsFrom(d))
+                          _XpPill(label: pill[0], xp: pill[1]),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              if (!hasPlus) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2E2407), Color(0xFF141A29)],
+                    ),
+                    border: Border.all(color: _plusGold.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text('★',
+                          style: TextStyle(color: _plusGold, fontSize: 20)),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('مسیر طلایی قفل است',
+                                style: TextStyle(
+                                    color: _plusGold,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12.5)),
+                            Text('جوایز نقدی، چرخش گردونه و آیتم‌های ویژه',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 10.5)),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: widget.onOpenShop,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _plusGold,
+                          foregroundColor: const Color(0xFF291B00),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6)),
+                        ),
+                        child: const Text('بازکردن',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w900, fontSize: 11)),
+                      ),
+                    ],
                   ),
                 ),
+              ],
+
+              const SizedBox(height: 8),
+
+              // ── Track Legend & Fold Button ──
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _freeColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: _freeColor.withValues(alpha: 0.4)),
+                        ),
+                        child: const Text('رایگان',
+                            style: TextStyle(
+                                color: _freeColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800)),
+                      ),
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _plusGold.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: _plusGold.withValues(alpha: 0.4)),
+                        ),
+                        child: const Text('★ پلاس',
+                            style: TextStyle(
+                                color: _plusGold,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800)),
+                      ),
+                    ],
+                  ),
+                  if (claimedCount > 0)
+                    InkWell(
+                      onTap: () => setState(() => _showClaimed = !_showClaimed),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 2, horizontal: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                                _showClaimed
+                                    ? Icons.expand_less_rounded
+                                    : Icons.expand_more_rounded,
+                                size: 16,
+                                color: Colors.white70),
+                            const SizedBox(width: 2),
+                            Text(
+                              _showClaimed
+                                  ? 'بستن قبلی‌ها'
+                                  : 'پله‌های قبل (${faNum(claimedCount)})',
+                              style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 6),
+
+              // ── Tiers List ──
+              for (final row in displayTiers) ...[
+                _PassRow(
+                  data: row,
+                  busy: _busy,
+                  pulse: _pulse,
+                  onClaim: _claim,
+                  onOpenShop: widget.onOpenShop,
+                ),
+                const SizedBox(height: 6),
+              ],
             ],
           ),
-
-          const SizedBox(height: 6),
-
-          // ── Tiers List ──
-          for (final row in displayTiers) ...[
-            _PassRow(
-              data: row,
-              busy: _busy,
-              pulse: _pulse,
-              onClaim: _claim,
-              onOpenShop: widget.onOpenShop,
-            ),
-            const SizedBox(height: 6),
-          ],
-        ],
-      ),
-    ));
+        ));
   }
 }
 
@@ -502,9 +574,17 @@ class _XpPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: const TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w600)),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 10.5,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(width: 3),
-          Text(xp, style: const TextStyle(fontSize: 10.5, color: Color(0xFF22E7A6), fontWeight: FontWeight.w900)),
+          Text(xp,
+              style: const TextStyle(
+                  fontSize: 10.5,
+                  color: Color(0xFF22E7A6),
+                  fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -539,7 +619,9 @@ class _PassRow extends StatelessWidget {
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: isMilestone ? const Color(0xFF1E293B).withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.03),
+        color: isMilestone
+            ? const Color(0xFF1E293B).withValues(alpha: 0.7)
+            : Colors.white.withValues(alpha: 0.03),
         border: Border.all(
           color: isMilestone
               ? _plusGold.withValues(alpha: 0.3)
@@ -553,14 +635,21 @@ class _PassRow extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
-              color: unlocked ? _readyColor.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
-              border: Border.all(color: unlocked ? _readyColor : Colors.white24),
+              color: unlocked
+                  ? _readyColor.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.05),
+              border:
+                  Border.all(color: unlocked ? _readyColor : Colors.white24),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(unlocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
-                    size: 12, color: unlocked ? _readyColor : Colors.white38),
+                Icon(
+                    unlocked
+                        ? Icons.lock_open_rounded
+                        : Icons.lock_outline_rounded,
+                    size: 12,
+                    color: unlocked ? _readyColor : Colors.white38),
                 const SizedBox(height: 2),
                 Text(faNum(tNum),
                     style: TextStyle(
@@ -572,7 +661,6 @@ class _PassRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 5),
-
           Expanded(
             child: _CompactRewardTile(
               data: free,
@@ -585,7 +673,6 @@ class _PassRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 5),
-
           Expanded(
             child: _CompactRewardTile(
               data: plus,
@@ -626,21 +713,29 @@ class _CompactRewardTile extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0E1826),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
+        // لبه‌به‌لبه: دکمهٔ «ورود به فروشگاه» آخرین عنصرِ شیت است و نباید
+        // زیرِ نوارِ ناوبریِ خودِ گوشی برود (گوشیِ سه‌دکمه لمسش را می‌خورد).
+        padding: EdgeInsets.fromLTRB(
+            20, 20, 20, 20 + MediaQuery.viewPaddingOf(ctx).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                const Icon(Icons.stars_rounded, size: 26, color: Color(0xFFFFD166)),
+                const Icon(Icons.stars_rounded,
+                    size: 26, color: Color(0xFFFFD166)),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'جایزه طلایی قلقلی پلاس',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white),
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white),
                   ),
                 ),
                 IconButton(
@@ -652,7 +747,8 @@ class _CompactRewardTile extends StatelessWidget {
             const SizedBox(height: 12),
             const Text(
               'این جایزه مربوط به مسیر طلایی بتل پس است. با فعال‌سازی اشتراک پلاس، تمام جوایز طلایی این فصل فوراً برای شما باز می‌شود و می‌توانید آن‌ها را دریافت کنید!',
-              style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13, height: 1.5),
+              style: TextStyle(
+                  color: Color(0xFFCBD5E1), fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 20),
             AnimePlusButton(
@@ -711,11 +807,13 @@ class _CompactRewardTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         color: ready
             ? _readyColor.withValues(alpha: 0.18)
-            : (isPlus ? _plusGold : _freeColor).withValues(alpha: claimed ? 0.04 : 0.08),
+            : (isPlus ? _plusGold : _freeColor)
+                .withValues(alpha: claimed ? 0.04 : 0.08),
         border: Border.all(
           color: ready
               ? _readyColor
-              : (isPlus ? _plusGold : _freeColor).withValues(alpha: claimed ? 0.15 : 0.35),
+              : (isPlus ? _plusGold : _freeColor)
+                  .withValues(alpha: claimed ? 0.15 : 0.35),
           width: ready ? 1.4 : 1,
         ),
       ),
@@ -751,11 +849,23 @@ class _CompactRewardTile extends StatelessWidget {
                     ),
                   ),
                   if (claimed)
-                    const Text('✓ گرفتی', style: TextStyle(fontSize: 8.5, color: _readyColor, fontWeight: FontWeight.w800))
+                    const Text('✓ گرفتی',
+                        style: TextStyle(
+                            fontSize: 8.5,
+                            color: _readyColor,
+                            fontWeight: FontWeight.w800))
                   else if (locked)
-                    Text('فقط پلاس', style: TextStyle(fontSize: 8.5, color: context.gold, fontWeight: FontWeight.w800))
+                    Text('فقط پلاس',
+                        style: TextStyle(
+                            fontSize: 8.5,
+                            color: context.gold,
+                            fontWeight: FontWeight.w800))
                   else if (ready)
-                    const Text('برای گرفتن بزن', style: TextStyle(fontSize: 8.5, color: _readyColor, fontWeight: FontWeight.w900)),
+                    const Text('برای گرفتن بزن',
+                        style: TextStyle(
+                            fontSize: 8.5,
+                            color: _readyColor,
+                            fontWeight: FontWeight.w900)),
                 ],
               ),
             ),
@@ -808,7 +918,10 @@ class _NoSeason extends StatelessWidget {
             const Icon(Icons.shield_outlined, size: 48, color: Colors.white24),
             Gaps.vMd,
             Text('فصلی فعال نیست',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w800)),
             Gaps.vXs,
             Text('فصل جدید به‌زودی آغاز می‌شود.',
                 textAlign: TextAlign.center,
@@ -903,10 +1016,13 @@ class _AnimePlusButtonState extends State<AnimePlusButton>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.auto_awesome_rounded, size: 20, color: Color(0xFF1E0A00)),
+                      const Icon(Icons.auto_awesome_rounded,
+                          size: 20, color: Color(0xFF1E0A00)),
                       const SizedBox(width: 8),
                       Text(
-                        widget.busy ? 'در حال باز کردن فروشگاه...' : widget.label,
+                        widget.busy
+                            ? 'در حال باز کردن فروشگاه...'
+                            : widget.label,
                         style: const TextStyle(
                           color: Color(0xFF1E0A00),
                           fontSize: 15,
@@ -946,11 +1062,13 @@ List<List<String>> _xpPillsFrom(Map d) {
     }
     return null;
   }
+
   String lab(String key, String fb) => '${by(key)?['label'] ?? fb}';
   String xp(String key, String fb) {
     final n = (by(key)?['xp'] as num?)?.toInt();
     return n == null ? fb : '+${faNum(n)}';
   }
+
   final play = (by('game_play')?['xp'] as num?)?.toInt() ?? 15;
   final win = (by('game_win')?['xp'] as num?)?.toInt() ?? 25;
   return [
@@ -961,4 +1079,3 @@ List<List<String>> _xpPillsFrom(Map d) {
     [lab('daily_login', 'ورود روزانه'), xp('daily_login', '+۲۰')],
   ];
 }
-

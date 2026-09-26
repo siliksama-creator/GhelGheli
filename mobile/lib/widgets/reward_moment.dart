@@ -16,12 +16,37 @@ import 'ui_icon.dart';
 /// می‌آورد، دیگه یه گوشه ننویسه "شما ۱۰۰۰ امتیاز دریافت کردید" یا "شما بازی
 /// رو بردید"/"شما باختید". به‌جاش یه سیستمِ خوشگلِ زیبای انیمیشنیِ جذاب،
 /// یکپارچه در وب و اندروید، که یه لحظه اون چیزی که به دست آورده رو نشون بده،
-/// یه جشنِ کوچیک براش بگیره، بعد چند ثانیه بره — و اصلاً اگه یکم دیرتر هم
+/// یه جشنِ کوچیک براش بگیره، بعد چند ثانیه بره — و اصلاً اگه یه کم دیرتر هم
 /// بره هیچ اختلالی در ادامهٔ کارِ کاربر ایجاد نکنه.»
 ///
 /// آینهٔ وب: `userweb/src/components/RewardMoment.jsx` + استایل‌های
 /// `.moment*` در `userweb/src/styles/brand-mark.css`. گاردِ
 /// `userweb/tool/reward-parity.mjs` این دو را با هم می‌سنجد.
+///
+/// ── هم‌سانیِ عددی با وب (بازبینی ۴ مهر) ─────────────────────────────────
+///
+/// هر عددِ این فایل از CSS وب *استخراج* شده است، نه حدس زده:
+///   • ورودِ کارت: `momentIn .52s cubic-bezier(.16,1,.3,1)` با
+///     `translateY(20px) scale(.9)` و opacity روی همان منحنی.
+///   • پاپِ نشان: keyframeهای `momentPop` — `.4 → 1.14 (در ۶۰٪) → 1` با
+///     bezier(.2,1.5,.4,1) روی هر دو بازه و ۴۰ms تأخیر (فولادی ۴۲۰ms).
+///   • چیپ‌ها: `momentChipIn .34s cubic-bezier(.2,1.3,.4,1)` با
+///     `translateY(6px) scale(.86)` و پله‌های ۰/۷۰/۱۴۰/۲۱۰ms — و در وب فقط
+///     `nth-child(2..4)` تأخیر دارند، پس چیپِ پنجم به بعد بدونِ تأخیر است.
+///   • خروج: `transition`های `isLeaving` — opacity با `ease`، ترنسفورم با
+///     `cubic-bezier(.4,0,1,1)` و blur با `ease`، هر سه ۴۲۰ms.
+///   • هاله/درخشش/ذره‌ها: رنگ‌ها، مکان‌ها و پنجرهٔ زمانیِ ۲٫۶ ثانیه‌ایِ ذره‌ها
+///     عیناً از `.momentHalo`/`.momentShine`/`.momentParticles`.
+///   • `prefers-reduced-motion` وب = `MediaQuery.disableAnimationsOf` اینجا.
+///   • رسانهٔ `max-width:400px` وب = `compact` اینجا.
+///
+/// ── لحن‌ها (KIND_TONE وب) ────────────────────────────────────────────────
+///
+/// در وب `KIND_TONE = { gain:'gold', win:'gold', draw:'sky', loss:'steel' }`
+/// است و `data-tone` همیشه ست می‌شود — یعنی پالتِ لایمِ پایهٔ `.momentCard`
+/// در وب **هرگز رندر نمی‌شود**. اندروید قبلاً gain را لایم می‌کشید (از همان
+/// پالتِ پایه خوانده بود) و کارتِ جایزهٔ معمولی در دو سکو دو رنگِ متفاوت
+/// داشت — همان واگراییِ «یکپارچه نبودن». حالا gain و win هر دو طلایی‌اند.
 ///
 /// ── چهار قاعده‌ای که «بی‌اختلال بودن» را می‌سازند ─────────────────────────
 ///
@@ -88,10 +113,16 @@ class RewardMomentData {
 
   /// نتیجهٔ بازی (برد/باخت/تساوی) خودش پیام است و بی‌عدد هم نمایش داده
   /// می‌شود — همان قاعدهٔ `rewardMoment.js` در وب.
-  bool get isResult => kind == RewardKind.win || kind == RewardKind.loss || kind == RewardKind.draw;
+  bool get isResult =>
+      kind == RewardKind.win ||
+      kind == RewardKind.loss ||
+      kind == RewardKind.draw;
 
   bool get isWorthShowing =>
-      isResult || hasAmount || (note != null && note!.isNotEmpty) || (item != null && item!.isNotEmpty);
+      isResult ||
+      hasAmount ||
+      (note != null && note!.isNotEmpty) ||
+      (item != null && item!.isNotEmpty);
 }
 
 /// سقفِ صف — همان عددی که وب (`QUEUE_LIMIT`) دارد.
@@ -105,6 +136,48 @@ int _visibleMs() {
   final sec = AppConfig.instance.rule('rewardSeconds', 4);
   return math.max(1500, sec * 1000);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ثابت‌های حرکت — مستقیماً از `brand-mark.css` وب خوانده شده‌اند.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// `momentIn .52s cubic-bezier(.16,1,.3,1)` — منحنیِ استانداردِ موشنِ وب.
+/// برخلافِ easeOutBack از مقصد رد نمی‌شود؛ ورودِ کارت در وب overshoot ندارد.
+const Cubic _kInCurve = Cubic(0.16, 1.0, 0.3, 1.0);
+const int _kInMs = 520;
+
+/// `momentPop .6s .04s cubic-bezier(.2,1.5,.4,1)` (فولادی: `.42s`).
+/// CSS این bezier را بینِ **هر جفت** keyframe اعمال می‌کند، پس بازهٔ دوم
+/// (۱٫۱۴ → ۱) هم همان منحنی را دارد و کمی زیرِ ۱ می‌زند و می‌نشیند.
+const Cubic _kPopCurve = Cubic(0.2, 1.5, 0.4, 1.0);
+const int _kPopDelayMs = 40;
+const int _kPopMs = 600;
+const int _kPopMsSteel = 420;
+
+/// `momentChipIn .34s cubic-bezier(.2,1.3,.4,1)` با پله‌های ۷۰ms.
+/// تأخیرها بر حسبِ **کسرِ** انیمیشنِ ورودِ کارت بیان شده‌اند تا با هر
+/// تغییری در طولِ ورود هماهنگ بمانند.
+const Cubic _kChipCurve = Cubic(0.2, 1.3, 0.4, 1.0);
+const int _kChipMs = 340;
+const int _kChipStepMs = 70;
+const int _kChipTimelineMs =
+    _kChipMs + 3 * _kChipStepMs; // تا پایانِ چیپِ چهارم: 550ms
+const double _kChipSpan = _kChipMs / _kChipTimelineMs;
+const double _kChipStep = _kChipStepMs / _kChipTimelineMs;
+
+/// `transition`های خروجِ `.momentCard.isLeaving`:
+/// `opacity .4s ease`، `transform .4s cubic-bezier(.4,0,1,1)`، `filter .4s ease`.
+const Cubic _kOutTransform = Cubic(0.4, 0.0, 1.0, 1.0);
+
+/// `momentSweep 1.15s .12s ease-out 1 both`.
+const int _kSweepDelayMs = 120;
+const int _kSweepMs = 1150;
+
+/// `momentRise 1.5s ease-out calc(var(--i)*.05s + var(--d)) both` با
+/// `--d: (i%6)*.09s`. بزرگ‌ترین تأخیرِ ذره‌ها ۱٫۱ ثانیه است، پس پنجرهٔ
+/// کاملِ میدانِ ذره ۲٫۶ ثانیه می‌شود — نه ۱٫۵ تا.
+const double _kRiseSec = 1.5;
+const int _kRiseTotalMs = 2600;
 
 /// صفِ لحظه‌ها — یک منبعِ واحد برای کلِ اپ (آینهٔ `rewardMoment.js` در وب).
 class RewardMoment {
@@ -201,58 +274,47 @@ class _RewardMomentOverlay extends StatefulWidget {
 
 class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
     with TickerProviderStateMixin {
-  late final AnimationController _in = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 520),
-  )..forward();
-  late final AnimationController _spin = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 4200),
-  )..repeat();
-  late final AnimationController _rise = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1500),
-  )..forward();
-  late final AnimationController _sweep = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1150),
-  )..forward();
-  late final AnimationController _out = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: _leaveMs),
-  );
-
-  // ── پاپِ نشان ──────────────────────────────────────────────────────────
-  // در وب `.momentIcon` با `momentPop` می‌آید: از مقیاسِ ۰٫۴ شروع می‌کند،
-  // تا ۱٫۱۴ از مقصد رد می‌شود و می‌نشیند روی ۱ — و این همان چیزی است که
-  // «جشن» را از «یک کارت که ظاهر شد» جدا می‌کند. اندروید این انیمیشن را
-  // نداشت و نشان هم‌زمان با خودِ کارت می‌آمد، بی‌هیچ تأکیدی.
+  // ── کنترلرهای انیمیشن ────────────────────────────────────────────────────
   //
-  // حالتِ فولادی در وب کوتاه‌تر است (`.42s` در برابر `.6s`): باخت نباید
-  // به اندازهٔ برد جشن گرفته شود.
   // ⚠️ `late final` اینجا یک جزئیاتِ ظریف ولی حیاتی است، نه سلیقه.
   // `StatefulElement` ابتدا `createState()` را صدا می‌زند و **بعد**، در
   // بدنهٔ constructor، `state._widget = widget` را ست می‌کند. یعنی هر
   // مقداردهیِ فیلدی که در لحظهٔ ساخت اجرا شود، `widget` را null می‌بیند و
   // `State.widget` با خطای null برمی‌گرداند. چون این فیلدها `late`اند،
-  // مقداردهی تا اولین خواندن (در `build`) عقب می‌افتد و آن‌جا `widget` ست
-  // است. اگر روزی `late` را بردارید، همین خط اپ را روی ویجتِ اول می‌کشد.
+  // مقداردهی تا اولین خواندن عقب می‌افتد و آن‌جا `widget` ست است.
+  //
+  // شروعِ حرکت‌ها در `didChangeDependencies` است (نه `initState`) چون
+  // `MediaQuery.disableAnimationsOf` یک inherited widget است و در initState
+  // خوانده نمی‌شود.
+
+  /// آینهٔ `prefers-reduced-motion` وب: کاربر «حذفِ انیمیشن» را خواسته است.
+  /// وب در این حالت کارت را بی‌حرکت می‌کند (animation-duration:.01s)، هاله
+  /// ساکن می‌ماند و درخشش/ذره‌ها `display:none` می‌شوند — ولی خودِ کارت
+  /// **حذف نمی‌شود** (تنها نشانهٔ «چیزی گرفتم» است).
+  late final bool _reduced;
+  bool _started = false;
+
+  Duration _d(int ms) => Duration(milliseconds: _reduced ? 10 : ms);
+
+  late final AnimationController _in =
+      AnimationController(vsync: this, duration: _d(_kInMs));
+  late final AnimationController _spin = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 4200));
+  late final AnimationController _rise = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: _kRiseTotalMs));
+  late final AnimationController _sweep = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _kSweepDelayMs + _kSweepMs));
+  // CSS چیپ‌ها مستقل از ورودِ کارت زمان‌بندی شده‌اند: انیمیشنِ .34s با
+  // پلهٔ آخرِ .21s یعنی کل خط زمانی دقیقاً .55s است.
+  late final AnimationController _chips = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: _kChipTimelineMs));
+  late final AnimationController _out = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: _leaveMs));
   late final AnimationController _pop = AnimationController(
-    vsync: this,
-    duration: Duration(
-        milliseconds: widget.data.kind == RewardKind.loss ? 420 : 600),
-  )..forward();
-
-  /// مقیاسِ نشان. منحنی عمداً از ۱ هم می‌گذرد (`y1 = 1.5`) تا همان جهشِ
-  /// ۱٫۱۴ وب را بسازد — بدون نیاز به keyframeهای دستی.
-  late final Animation<double> _popScale = Tween<double>(begin: 0.4, end: 1.0)
-      .animate(
-          CurvedAnimation(parent: _pop, curve: const Cubic(0.2, 1.5, 0.4, 1)));
-
-  /// نشان تا ۶۰٪ِ انیمیشن کامل دیده می‌شود (همان `60%{opacity:1}` وب).
-  late final Animation<double> _popFade = Tween<double>(begin: 0.0, end: 1.0)
-      .animate(CurvedAnimation(
-          parent: _pop, curve: const Interval(0.0, 0.6)));
+      vsync: this,
+      duration: _d(_kPopDelayMs +
+          (widget.data.kind == RewardKind.loss ? _kPopMsSteel : _kPopMs)));
 
   /// قلابِ محوِ خروج — تا در `dispose` بتوانیم مطمئن شویم قلابِ روی صف
   /// **مالِ همین کارت** است و قلابِ کارتِ بعدی را پاک نمی‌کنیم (صف کارت‌ها را
@@ -269,12 +331,33 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    _reduced = MediaQuery.disableAnimationsOf(context);
+    _in.forward();
+    _pop.forward();
+    _chips.forward();
+    if (!_reduced) {
+      // وب با reduced-motion: هاله `animation:none` (ساکن)، درخشش و ذره‌ها
+      // `display:none`. اینجا یعنی این سه کنترلر اصلاً حرکت نمی‌کنند:
+      // _spin روی صفر می‌ماند (هاله ثابت)، _sweep/_rise روی صفر می‌مانند و
+      // نقاشِ هر دو در مقدارِ صفر چیزی بیرونِ قاب/نامرئی می‌کشد.
+      _spin.repeat();
+      _sweep.forward();
+      _rise.forward();
+    }
+  }
+
+  @override
   void dispose() {
     if (identical(RewardMoment._exit, _exitHook)) RewardMoment._exit = null;
     _in.dispose();
     _spin.dispose();
     _rise.dispose();
     _sweep.dispose();
+    _chips.dispose();
     _out.dispose();
     _pop.dispose();
     super.dispose();
@@ -323,13 +406,16 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
 
   String _subtitleOf(RewardMomentData d) {
     if (d.kind == RewardKind.loss) {
-      return AppConfig.instance.text('reward.lossLine', 'سکه‌هایت سرِ جایشان است — چیزی از دست ندادی');
+      return AppConfig.instance.text(
+          'reward.lossLine', 'سکه‌هایت سرِ جایشان است — چیزی از دست ندادی');
     }
     if (d.kind == RewardKind.draw) {
-      return AppConfig.instance.text('reward.drawLine', 'هیچ‌کس کم نیاورد؛ یک دستِ دیگر؟');
+      return AppConfig.instance
+          .text('reward.drawLine', 'هیچ‌کس کم نیاورد؛ یک دستِ دیگر؟');
     }
     if (d.kind == RewardKind.win) {
-      return AppConfig.instance.text('reward.winLine', 'حسابِ این برد در پروفایلت ثبت شد');
+      return AppConfig.instance
+          .text('reward.winLine', 'حسابِ این برد در پروفایلت ثبت شد');
     }
     return AppConfig.instance.text('reward.received', 'دریافت شد');
   }
@@ -357,71 +443,154 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
     RewardKind.gain: 'gift',
   };
 
-  /// پالتِ هر حالت — هیچ رنگِ قرمزِ تندی برای باخت (تصمیمِ مالک).
+  // ── پالت — آینهٔ `KIND_TONE` وب: gain/win طلایی، draw آسمانی، loss فولادی ──
+  //
+  // هیچ رنگِ قرمزِ تندی برای باخت (تصمیمِ مالک). پالتِ لایمِ پایهٔ CSS در وب
+  // هرگز رندر نمی‌شود (data-tone همیشه ست است)؛ پس اینجا هم gain طلایی است،
+  // نه لایم — «یکپارچه دقیقاً مثلِ وب».
+
+  bool get _isLoss => widget.data.kind == RewardKind.loss;
+  bool get _isDraw => widget.data.kind == RewardKind.draw;
+
   Color get _border {
-    switch (widget.data.kind) {
-      case RewardKind.loss:
-        return const Color(0x4494A3B8);
-      case RewardKind.draw:
-        return const Color(0x6638BDF8);
-      case RewardKind.win:
-        return const Color(0x66FFD166);
-      case RewardKind.gain:
-        return const Color(0x55B5EF58);
-    }
+    if (_isLoss) return const Color(0x4494A3B8); // #94a3b844
+    if (_isDraw) return const Color(0x6638BDF8); // #38bdf866
+    return const Color(0x66FFD166); // #ffd16666 (طلاییِ gain/win)
   }
 
-  List<Color> get _gradient {
-    switch (widget.data.kind) {
-      case RewardKind.loss:
-        return const [Color(0xFF161C26), Color(0xFF0B1520), Color(0xFF141A22)];
-      case RewardKind.draw:
-        return const [Color(0xFF0D2740), Color(0xFF0A2033), Color(0xFF151B3A)];
-      case RewardKind.win:
-        return const [Color(0xFF2A2410), Color(0xFF0A2033), Color(0xFF0D2A20)];
-      case RewardKind.gain:
-        return const [Color(0xFF0F2F27), Color(0xFF0A2033), Color(0xFF132038)];
+  LinearGradient get _cardGradient {
+    // `linear-gradient(135deg,…)` = از گوشهٔ بالا-چپ به پایین-راست.
+    // stop میانی در وب برای هر لحن یک عددِ متفاوت است: ۵۸٪ / ۶۰٪ / ۶۲٪.
+    if (_isLoss) {
+      return const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF161C26), Color(0xFF0B1520), Color(0xFF141A22)],
+        stops: [0.0, 0.62, 1.0],
+      );
     }
+    if (_isDraw) {
+      return const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF0D2740), Color(0xFF0A2033), Color(0xFF151B3A)],
+        stops: [0.0, 0.60, 1.0],
+      );
+    }
+    return const LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [Color(0xFF2A2410), Color(0xFF0A2033), Color(0xFF0D2A20)],
+      stops: [0.0, 0.58, 1.0],
+    );
   }
 
-  List<Color> get _iconGradient {
-    switch (widget.data.kind) {
-      case RewardKind.loss:
-        return const [Color(0xFFE2E8F0), Color(0xFF8FA3B8)];
-      case RewardKind.draw:
-        return const [Color(0xFFBFE9FF), Color(0xFF0B8ED0)];
-      case RewardKind.win:
-        return const [Color(0xFFFFE9A3), Color(0xFFE0A51D)];
-      case RewardKind.gain:
-        return const [Color(0xFFB5EF58), Color(0xFF00D49A)];
+  /// سایهٔ بیرونیِ کارت: فولادی در وب کوتاه‌تر و سبک‌تر است
+  /// (`0 22px 54px #000000b0` در برابرِ `0 26px 66px #000000c4`).
+  List<BoxShadow> get _cardShadow => _isLoss
+      ? const [
+          BoxShadow(
+              color: Color(0xB0000000), blurRadius: 54, offset: Offset(0, 22)),
+        ]
+      : const [
+          BoxShadow(
+              color: Color(0xC4000000), blurRadius: 66, offset: Offset(0, 26)),
+        ];
+
+  RadialGradient get _iconFill {
+    // `radial-gradient(circle at 30% 24%, c1, c2 72%)` — مرکزِ ۳۰٪/۲۴٪ یعنی
+    // `Alignment(-0.4, -0.52)`؛ و «۷۲٪» در CSS نسبت به شعاعِ
+    // farthest-corner است (≈۱٫۰۳ برابرِ ضلعِ جعبه از آن مرکز)، نه نسبت به
+    // نصفِ عرض. شعاعِ ۰٫۵ در فلاتر رنگِ دوم را زودتر از وب می‌نشاند.
+    if (_isLoss) {
+      return const RadialGradient(
+        center: Alignment(-0.4, -0.52),
+        radius: 1.033,
+        colors: [Color(0xFFE2E8F0), Color(0xFF8FA3B8)],
+        stops: [0.0, 0.74],
+      );
     }
+    if (_isDraw) {
+      return const RadialGradient(
+        center: Alignment(-0.4, -0.52),
+        radius: 1.033,
+        colors: [Color(0xFFBFE9FF), Color(0xFF0B8ED0)],
+        stops: [0.0, 0.72],
+      );
+    }
+    return const RadialGradient(
+      center: Alignment(-0.4, -0.52),
+      radius: 1.033,
+      colors: [Color(0xFFFFE9A3), Color(0xFFE0A51D)],
+      stops: [0.0, 0.72],
+    );
   }
 
   Color get _iconInk {
-    switch (widget.data.kind) {
-      case RewardKind.loss:
-        return const Color(0xFF0D1620);
-      case RewardKind.draw:
-        return const Color(0xFF04202E);
-      case RewardKind.win:
-        return const Color(0xFF2A1A00);
-      case RewardKind.gain:
-        return const Color(0xFF06220F);
-    }
+    if (_isLoss) return const Color(0xFF0D1620);
+    if (_isDraw) return const Color(0xFF04202E);
+    return const Color(0xFF2A1A00);
   }
 
-  Color get _subColor {
-    switch (widget.data.kind) {
-      case RewardKind.loss:
-        return const Color(0xFFA8B8C8);
-      case RewardKind.draw:
-        return const Color(0xFF8ED8F8);
-      case RewardKind.win:
-        return const Color(0xFFFFD166);
-      case RewardKind.gain:
-        return const Color(0xFFB5EF58);
+  /// سایهٔ نشان — در وب هر لحن هالهٔ رنگیِ خودش را دارد به‌علاوهٔ یک drop
+  /// مشترک (`0 6px 18px #00000055`)؛ فولادی هیچ هالهٔ رنگی ندارد و به‌جایش
+  /// یک حلقهٔ داخلیِ ۱ پیکسلی `inset 0 0 0 1px #ffffff33` می‌گیرد.
+  List<BoxShadow> get _iconShadow {
+    const drop = BoxShadow(
+        color: Color(0x55000000), blurRadius: 18, offset: Offset(0, 6));
+    if (_isLoss) return const [drop];
+    if (_isDraw) {
+      return const [BoxShadow(color: Color(0x5538BDF8), blurRadius: 26), drop];
     }
+    return const [BoxShadow(color: Color(0x66FFD166), blurRadius: 26), drop];
   }
+
+  /// حلقهٔ داخلیِ نشانِ فولادی (فلاتر inset-shadow ندارد؛ `Border` داخلیِ
+  /// BoxDecoration دقیقاً همان `inset 0 0 0 1px` است).
+  BoxBorder? get _iconBorder =>
+      _isLoss ? Border.all(color: const Color(0x33FFFFFF), width: 1) : null;
+
+  Color get _subColor {
+    if (_isLoss) return const Color(0xFFA8B8C8);
+    if (_isDraw) return const Color(0xFF8ED8F8);
+    return const Color(0xFFFFD166);
+  }
+
+  /// رنگ‌های هالهٔ چرخان — در وب **ثابت** است و از لحنِ کارت نمی‌آید:
+  /// `conic-gradient(from 0deg,#ffd16600,#ffd166aa,#22e7a600,#38bdf8aa,#ffd16600)`
+  /// برای همهٔ لحن‌ها، و فقط فولادی
+  /// `conic-gradient(from 0deg,#94a3b800,#cbd5e1aa,#94a3b800)` می‌گیرد.
+  /// `from 0deg` یعنی از بالا، ساعت‌گرد — در فلاتر `startAngle: -pi/2`.
+  List<Color> get _haloColors => _isLoss
+      ? const [Color(0x0094A3B8), Color(0xAACBD5E1), Color(0x0094A3B8)]
+      : const [
+          Color(0x00FFD166),
+          Color(0xAAFFD166),
+          Color(0x0022E7A6),
+          Color(0xAA38BDF8),
+          Color(0x00FFD166),
+        ];
+
+  /// موقعیتِ پیشرفتِ پاپِ نشان (۰..۱) با احتسابِ تأخیرِ ۴۰ms وب.
+  double get _popT {
+    if (_reduced) return 1.0;
+    final dur = _isLoss ? _kPopMsSteel : _kPopMs;
+    return ((_pop.value * (_kPopDelayMs + dur) - _kPopDelayMs) / dur)
+        .clamp(0.0, 1.0);
+  }
+
+  /// بازسازیِ دقیقِ `@keyframes momentPop`:
+  /// `0%{scale(.4)} 60%{scale(1.14)} 100%{scale(1)}` با bezier(.2,1.5,.4,1)
+  /// روی هر بازه. یک tweenِ سادهٔ `.4→1` با این منحنی فقط تا ≈۱٫۰۵ بالا
+  /// می‌رفت — همان «پاپِ بی‌جون»ی که از وب کم داشت.
+  double _popScaleAt(double t) => t <= 0.6
+      ? 0.4 + (1.14 - 0.4) * _kPopCurve.transform(t / 0.6)
+      : 1.14 + (1.0 - 1.14) * _kPopCurve.transform((t - 0.6) / 0.4);
+
+  /// `0%{opacity:0} 60%{opacity:1}` — همان منحنیِ بازه (می‌تواند بالای ۱
+  /// بزند؛ CSS هم clamp می‌کند، پس اینجا هم clamp).
+  double _popOpacityAt(double t) =>
+      t <= 0.6 ? _kPopCurve.transform(t / 0.6).clamp(0.0, 1.0) : 1.0;
 
   @override
   Widget build(BuildContext context) {
@@ -431,20 +600,40 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
         ? (_sourceIcons[d.source] ?? 'gift')
         : (_kindIcons[d.kind] ?? 'gift');
 
+    // ── رسانهٔ `max-width:400px` وب: کارت روی گوشیِ باریک جمع‌تر می‌شود ──
+    final screen = MediaQuery.sizeOf(context);
+    final compact = screen.width <= 400;
+    final iconSize = compact ? 44.0 : 50.0;
+    final radius = compact ? 19.0 : 22.0;
+    final cardMargin = compact ? 9.0 : 13.0;
+    final cardPadding = compact
+        ? const EdgeInsets.fromLTRB(12, 12, 13, 12)
+        : const EdgeInsets.fromLTRB(14, 14, 16, 14);
+    final titleSize = compact ? 14.0 : 15.0;
+    // `.momentHost{padding-top:max(64px,18vh)}` — لبهٔ بالای کارت، نه مرکزش.
+    final topPad = math.max(64.0, 0.18 * screen.height);
+
     // ⚠️ فول‌بکِ هر چیپ عمداً خودش عدد را دارد و نه `{amount}`: `text()` وقتی
     // قالبِ زندهٔ سرور نرسیده باشد فول‌بک را بی‌دست‌زدن برمی‌گرداند، پس
     // قالبِ ناپر روی صفحهٔ کاربرِ آفلاین به‌صورت آکولاد چاپ می‌شد. `vars`
     // می‌ماند تا وقتی ادمین قالب را از پنل عوض می‌کند همان‌جا پر شود.
     final chips = <Widget>[
       if (d.points > 0)
-        _chip('star', AppConfig.instance.text('reward.points',
-            '+${faNum(d.points)} امتیاز', vars: {'amount': d.points})),
+        _chip(
+            'star',
+            AppConfig.instance.text(
+                'reward.points', '+${faNum(d.points)} امتیاز',
+                vars: {'amount': d.points})),
       if (d.coins > 0)
-        _chip('coins', AppConfig.instance.text('reward.coins',
-            '+${faNum(d.coins)} سکه', vars: {'amount': d.coins})),
+        _chip(
+            'coins',
+            AppConfig.instance.text('reward.coins', '+${faNum(d.coins)} سکه',
+                vars: {'amount': d.coins})),
       if (d.xp > 0)
-        _chip('bolt', AppConfig.instance.text('reward.xp',
-            '+${faNum(d.xp)} تجربه', vars: {'amount': d.xp})),
+        _chip(
+            'bolt',
+            AppConfig.instance.text('reward.xp', '+${faNum(d.xp)} تجربه',
+                vars: {'amount': d.xp})),
       if (d.level > 0)
         _chip(
             'medal',
@@ -454,220 +643,243 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
       if (d.item != null && d.item!.isNotEmpty) _chip('item', d.item!),
     ];
 
-    final curve = CurvedAnimation(parent: _in, curve: Curves.easeOutBack);
     return IgnorePointer(
       child: Align(
-        // ۱۸٪ از بالای صفحه: بالاتر از نوارِ ناوبریِ پایین و از نوارِ
-        // پیشرفتِ بازی‌ها (همان `padding-top: max(64px,18vh)` وب).
-        alignment: const Alignment(0, -0.62),
-        child: FadeTransition(
-          opacity: _in,
-          child: SlideTransition(
-            position: Tween<Offset>(begin: const Offset(0, 0.18), end: Offset.zero)
-                .animate(curve),
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.9, end: 1).animate(curve),
-              child: AnimatedBuilder(
-                animation: _out,
-                builder: (_, child) {
-                  final t = _out.value;
-                  // وب هنگامِ رفتن، کارت را علاوه بر محو شدن **تار** و کمی
-                  // کوچک هم می‌کند (`filter:blur(3px)` و `scale(.965)`)؛
-                  // اندروید فقط محو و جابه‌جا می‌شد و همین باعث می‌شد رفتنش
-                  // «بریدن» به‌نظر برسد نه «دور شدن».
-                  Widget out = child!;
-                  if (t > 0) {
-                    out = ImageFiltered(
-                      imageFilter:
-                          ImageFilter.blur(sigmaX: 3 * t, sigmaY: 3 * t),
-                      child: out,
-                    );
-                  }
-                  return Opacity(
-                    opacity: 1 - t,
-                    child: Transform.translate(
-                      offset: Offset(0, -12 * t),
-                      child: Transform.scale(
-                        scale: 1 - 0.035 * t,
-                        child: out,
-                      ),
-                    ),
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: EdgeInsets.only(top: topPad),
+          // ── ورودِ کارت: `momentIn .52s cubic-bezier(.16,1,.3,1) both` ──
+          // opacity و transform هر دو روی **همان منحنی** (وب یک animation
+          // دارد که هر دو را با هم می‌برد؛ پیاده‌سازیِ قبلی opacity را خطی
+          // و حرکت را با easeOutBackِ overshoot‌دار می‌برد).
+          child: AnimatedBuilder(
+            animation: _in,
+            builder: (_, child) {
+              final t = _kInCurve.transform(_in.value);
+              return Opacity(
+                opacity: t.clamp(0.0, 1.0),
+                child: Transform.translate(
+                  offset: Offset(0, 20 * (1 - t)),
+                  child: Transform.scale(scale: 0.9 + 0.1 * t, child: child),
+                ),
+              );
+            },
+            child: AnimatedBuilder(
+              animation: _out,
+              builder: (_, child) {
+                final t = _out.value;
+                // وب هنگامِ رفتن سه transition جدا دارد: opacity با `ease`،
+                // transform با `cubic-bezier(.4,0,1,1)` و blur با `ease`.
+                // پیاده‌سازیِ قبلی هر سه را خطی می‌برد.
+                final te = Curves.ease.transform(t);
+                final tt = _kOutTransform.transform(t);
+                Widget out = child!;
+                if (t > 0) {
+                  out = ImageFiltered(
+                    imageFilter:
+                        ImageFilter.blur(sigmaX: 3 * te, sigmaY: 3 * te),
+                    child: out,
                   );
-                },
-                child: Semantics(
-                  liveRegion: true,
-                  label: _titleOf(d),
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 430),
-                    margin: const EdgeInsets.symmetric(horizontal: 13),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: _gradient,
-                      ),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: _border),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0xC4000000), blurRadius: 66, offset: Offset(0, 26)),
-                      ],
+                }
+                return Opacity(
+                  opacity: (1 - te).clamp(0.0, 1.0),
+                  child: Transform.translate(
+                    offset: Offset(0, -12 * tt),
+                    child: Transform.scale(
+                      scale: 1 - 0.035 * tt,
+                      child: out,
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(21),
-                      child: Stack(
-                        children: [
-                          // ذره‌ها فقط برای برد و جایزه — برای باخت هیچ حرکتِ
-                          // شادی نیست تا حسِ مسخره‌شدن ندهد.
-                          if (!isLoss)
-                            Positioned.fill(
-                              child: AnimatedBuilder(
-                                animation: _rise,
-                                builder: (_, __) => CustomPaint(
-                                  painter: _MomentParticles(p: _rise.value),
-                                ),
+                  ),
+                );
+              },
+              child: Semantics(
+                liveRegion: true,
+                label: _titleOf(d),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 430),
+                  margin: EdgeInsets.symmetric(horizontal: cardMargin),
+                  decoration: BoxDecoration(
+                    gradient: _cardGradient,
+                    borderRadius: BorderRadius.circular(radius),
+                    border: Border.all(color: _border),
+                    boxShadow: _cardShadow,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(radius - 1),
+                    child: Stack(
+                      children: [
+                        // ذره‌ها فقط برای برد و جایزه — برای باخت هیچ حرکتِ
+                        // شادی نیست تا حسِ مسخره‌شدن ندهد.
+                        if (!isLoss)
+                          Positioned.fill(
+                            child: AnimatedBuilder(
+                              animation: _rise,
+                              builder: (_, __) => CustomPaint(
+                                painter: _MomentParticles(p: _rise.value),
                               ),
                             ),
-                          Positioned(
-                            top: -46,
-                            right: -38,
-                            child: Opacity(
-                              // وب: `.momentHalo{opacity:.5}` و برای فولادی
-                              // `.22`. اینجا هم همان دو عددند تا شدتِ هاله در
-                              // دو سکو یکی باشد.
-                              opacity: isLoss ? 0.22 : 0.5,
+                          ),
+                        // هالهٔ چرخان — `top:-42px;right:-34px;150px` با
+                        // `opacity:.5` (فولادی `.22`) و `filter:blur(2px)`.
+                        Positioned(
+                          top: -42,
+                          right: -34,
+                          child: Opacity(
+                            opacity: isLoss ? 0.22 : 0.5,
+                            child: ImageFiltered(
+                              imageFilter:
+                                  ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                               child: RotationTransition(
                                 turns: _spin,
                                 child: Container(
-                                  width: 152,
-                                  height: 152,
+                                  width: 150,
+                                  height: 150,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: SweepGradient(colors: [
-                                      // 0xaa در وب = ۰٫۶۶۷؛ شفافیتِ بالا این
-                                      // عدد را به همان شدتِ وب می‌رساند.
-                                      _subColor.withValues(alpha: 0.667),
-                                      Colors.transparent,
-                                      _iconGradient.last.withValues(alpha: 0.667),
-                                      Colors.transparent,
-                                      _subColor.withValues(alpha: 0.667),
-                                    ]),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned.fill(
-                            child: AnimatedBuilder(
-                              animation: _sweep,
-                              builder: (_, __) => CustomPaint(
-                                painter: _MomentShine(p: _sweep.value),
-                              ),
-                            ),
-                          ),
-                          // هایلایتِ داخلیِ لبهٔ بالا — همان
-                          // `inset 0 1px 0 #ffffff1f` وب که به کارت عمق
-                          // می‌دهد و لبه‌اش را از زمینه جدا می‌کند. در
-                          // اندروید نبود، برای همین کارت تخت و «بریده»
-                          // دیده می‌شد. ClipRRectِ بیرونی آن را در گوشه‌های
-                          // گرد کوتاه می‌کند، دقیقاً مثلِ یک inset.
-                          Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            child: IgnorePointer(
-                              child: Container(
-                                height: 1,
-                                color: isLoss
-                                    ? const Color(0x14FFFFFF)
-                                    : const Color(0x1FFFFFFF),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                ScaleTransition(
-                                  scale: _popScale,
-                                  child: FadeTransition(
-                                    opacity: _popFade,
-                                    child: Container(
-                                      width: 50,
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: RadialGradient(
-                                          center: const Alignment(-0.4, -0.5),
-                                          colors: _iconGradient,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(color: _iconGradient.last.withValues(alpha: 0.35), blurRadius: 26),
-                                        ],
-                                      ),
-                                      child: Center(
-                                        child: UiIcon(icon, size: 28, color: _iconInk),
-                                      ),
+                                    gradient: SweepGradient(
+                                      // `conic-gradient(from 0deg,…)` = از
+                                      // بالا، ساعت‌گرد.
+                                      startAngle: -math.pi / 2,
+                                      colors: _haloColors,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 13),
-                                Expanded(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(_titleOf(d),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w900,
-                                              color: Color(0xFFEAF6FF))),
-                                      const SizedBox(height: 2),
-                                      Text(_subtitleOf(d),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w800,
-                                              color: _subColor)),
-                                      // مقدار همیشه دیده می‌شود؛ `note`
-                                      // فقط یک سطرِ توضیحیِ اضافه است.
-                                      // قبلاً این سه `else if` بودند و
-                                      // وجودِ note مقدارها را خاموش می‌کرد.
-                                      if (chips.isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 6),
-                                          child: Wrap(
-                                              spacing: 6,
-                                              runSpacing: 6,
-                                              children: [
-                                                for (var i = 0; i < chips.length; i++)
-                                                  _MomentChipIn(
-                                                    index: i,
-                                                    animation: _in,
-                                                    child: chips[i],
-                                                  ),
-                                              ]),
-                                        ),
-                                      if (d.note != null && d.note!.isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 6),
-                                          child: Text(d.note!,
-                                              style: TextStyle(
-                                                  fontSize: 12.5,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: _subColor)),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        // درخششِ کشیده — `momentSweep 1.15s .12s ease-out`.
+                        Positioned.fill(
+                          child: AnimatedBuilder(
+                            animation: _sweep,
+                            builder: (_, __) => CustomPaint(
+                              painter: _MomentShine(
+                                p: ((_sweep.value *
+                                                (_kSweepDelayMs + _kSweepMs) -
+                                            _kSweepDelayMs) /
+                                        _kSweepMs)
+                                    .clamp(0.0, 1.0),
+                                steel: isLoss,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // هایلایتِ داخلیِ لبهٔ بالا — همان
+                        // `inset 0 1px 0 #ffffff1f` وب (فولادی `#ffffff14`)
+                        // که به کارت عمق می‌دهد. ClipRRectِ بیرونی آن را در
+                        // گوشه‌های گرد کوتاه می‌کند، دقیقاً مثلِ یک inset.
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: SizedBox(
+                            height: 1,
+                            child: ColoredBox(
+                              color: isLoss
+                                  ? const Color(0x14FFFFFF)
+                                  : const Color(0x1FFFFFFF),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: cardPadding,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // ── پاپِ نشان: momentPop با تأخیرِ ۴۰ms ──
+                              AnimatedBuilder(
+                                animation: _pop,
+                                builder: (_, child) {
+                                  final t = _popT;
+                                  return Opacity(
+                                    opacity: _popOpacityAt(t),
+                                    child: Transform.scale(
+                                      scale: _popScaleAt(t),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: iconSize,
+                                  height: iconSize,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: _iconFill,
+                                    border: _iconBorder,
+                                    boxShadow: _iconShadow,
+                                  ),
+                                  child: Center(
+                                    child: UiIcon(icon,
+                                        size: compact ? 27 : 30,
+                                        color: _iconInk),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 13),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(_titleOf(d),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontSize: titleSize,
+                                            fontWeight: FontWeight.w900,
+                                            color: const Color(0xFFEAF6FF))),
+                                    const SizedBox(height: 2),
+                                    Text(_subtitleOf(d),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            // وب: `.momentSub` وزنِ ۸۰۰ دارد
+                                            // ولی فولادی ۷۰۰ — لحنِ آرامِ
+                                            // باخت از تایپوگرافی هم می‌آید.
+                                            fontWeight: isLoss
+                                                ? FontWeight.w700
+                                                : FontWeight.w800,
+                                            color: _subColor)),
+                                    // مقدار همیشه دیده می‌شود؛ `note`
+                                    // فقط یک سطرِ توضیحیِ اضافه است.
+                                    // قبلاً این سه `else if` بودند و
+                                    // وجودِ note مقدارها را خاموش می‌کرد.
+                                    if (chips.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 6),
+                                        child: Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: [
+                                              for (var i = 0;
+                                                  i < chips.length;
+                                                  i++)
+                                                _MomentChipIn(
+                                                  index: i,
+                                                  animation: _chips,
+                                                  child: chips[i],
+                                                ),
+                                            ]),
+                                      ),
+                                    // `.momentNote` وب **همیشه** طلایی است
+                                    // (#ffd166) و رنگِ لحن را نمی‌گیرد.
+                                    if (d.note != null && d.note!.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 6),
+                                        child: Text(d.note!,
+                                            style: const TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.w900,
+                                                color: Color(0xFFFFD166))),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -680,11 +892,20 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
   }
 
   /// [highlight] برای دستاورد (لول) — باید از موجودی (امتیاز/سکه) متمایز
-  /// باشد. آینهٔ `.momentChip[data-kind='level']` در وب.
-  Widget _chip(String icon, String label, {bool highlight = false}) => Container(
+  /// باشد. آینهٔ `.momentChip[data-kind='level']` در وب: پس‌زمینهٔ
+  /// **گرادیانِ** طلایی→نارنجی (`#ffd16636 → #f9731626`)، نه رنگِ تخت.
+  Widget _chip(String icon, String label, {bool highlight = false}) =>
+      Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: highlight ? const Color(0x2EFFD166) : const Color(0x12FFFFFF),
+          gradient: highlight
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0x36FFD166), Color(0x26F97316)],
+                )
+              : null,
+          color: highlight ? null : const Color(0x12FFFFFF),
           border: Border.all(
               color: highlight
                   ? const Color(0x73FFD166)
@@ -709,7 +930,14 @@ class _RewardMomentOverlayState extends State<_RewardMomentOverlay>
       );
 }
 
-/// ۱۴ ذرهٔ ریزِ بالا‌رونده. بی‌تصادفِ زمانِ اجرا تا اسکرین‌شات‌ها یکسان بمانند.
+/// ۱۴ ذرهٔ ریزِ بالا‌رونده. بی‌تصادفِ زمانِ اجرا تا اسکرین‌شات‌ها یکسان بماند.
+///
+/// آینهٔ دقیقِ `.momentParticles span` وب:
+///   • `left: (i*41)%100٪` و `bottom:-6px` (مرکزِ ذره ۳٫۵ پیکسل زیرِ لبهٔ
+///     پایین شروع می‌شود و با `translateY(-70px)` بالا می‌رود)،
+///   • تأخیرِ هر ذره `i*.05s + (i%6)*.09s` — پس میدانِ کامل ۲٫۶ ثانیه است،
+///   • `momentRise`: opacity در دو بازهٔ ease-out (اوجِ ۰٫۹ در ۲۲٪) و
+///     جای/مقیاس در یک بازهٔ ease-out از ۰٪ تا ۱۰۰٪ (`scale(.6)→(1.05)`).
 class _MomentParticles extends CustomPainter {
   _MomentParticles({required this.p});
 
@@ -725,15 +953,22 @@ class _MomentParticles extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final elapsed = p * (_kRiseTotalMs / 1000.0); // ثانیه
     for (var i = 0; i < 14; i++) {
-      final start = ((i % 6) * 0.09) + (i * 0.05);
-      final t = ((p - start) / 0.72).clamp(0.0, 1.0);
-      if (t <= 0) continue;
-      final opacity = t < 0.25 ? t / 0.25 : (1 - (t - 0.25) / 0.75);
-      final paint = Paint()..color = _colors[i % _colors.length].withValues(alpha: opacity * 0.86);
-      final x = ((i * 41) % 100) / 100 * size.width;
-      final y = size.height - 6 - (t * 70);
-      canvas.drawCircle(Offset(x, y), 2.5, paint);
+      final delay = i * 0.05 + (i % 6) * 0.09;
+      final raw = (elapsed - delay) / _kRiseSec;
+      if (raw <= 0) continue;
+      final t = raw.clamp(0.0, 1.0);
+      final e = Curves.easeOut.transform(t);
+      final opacity = t < 0.22
+          ? 0.9 * Curves.easeOut.transform(t / 0.22)
+          : 0.9 * (1 - Curves.easeOut.transform((t - 0.22) / 0.78));
+      if (opacity <= 0.002) continue;
+      final paint = Paint()
+        ..color = _colors[i % _colors.length].withValues(alpha: opacity);
+      final x = ((i * 41) % 100) / 100 * size.width + 2.5;
+      final y = size.height + 3.5 - 70 * e;
+      canvas.drawCircle(Offset(x, y), 2.5 * (0.6 + 0.45 * e), paint);
     }
   }
 
@@ -742,37 +977,51 @@ class _MomentParticles extends CustomPainter {
 }
 
 /// درخششِ کشیده روی سطحِ کارت — یک بار، سریع، بی‌تکرار.
+///
+/// هندسهٔ وب: باندی به عرضِ ۳۸٪ کارت که از `translateX(-140%)` به
+/// `translateX(+140%)` می‌رود (درصد نسبت به **عرضِ خودِ باند**) با
+/// `ease-out` و ۱۲۰ms تأخیر؛ و چون `fill: both` است، در پایان همان‌جا سمتِ
+/// راست می‌ایستد (لبهٔ چپش در ۵۳٪ عرضِ کارت). فولادی
+/// `#ffffff1a` است و بقیه `#ffffff2e`.
 class _MomentShine extends CustomPainter {
-  _MomentShine({required this.p});
+  _MomentShine({required this.p, required this.steel});
 
   final double p;
+  final bool steel;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (p <= 0 || p >= 1) return;
+    final t = Curves.easeOut.transform(p);
     final w = size.width * 0.38;
-    final x = -w + (p * (size.width + w * 2));
-    final rect = Rect.fromLTWH(x, 0, w, size.height);
+    final left = (-1.4 + 2.8 * t) * w;
+    final rect = Rect.fromLTWH(left, 0, w, size.height);
     final paint = Paint()
-      ..shader = const LinearGradient(colors: [Color(0x00FFFFFF), Color(0x2EFFFFFF), Color(0x00FFFFFF)])
-          .createShader(rect);
+      ..shader = LinearGradient(colors: [
+        const Color(0x00FFFFFF),
+        steel ? const Color(0x1AFFFFFF) : const Color(0x2EFFFFFF),
+        const Color(0x00FFFFFF),
+      ]).createShader(rect);
     canvas.drawRect(rect, paint);
   }
 
   @override
-  bool shouldRepaint(_MomentShine old) => old.p != p;
+  bool shouldRepaint(_MomentShine old) => old.p != p || old.steel != steel;
 }
 
 /// ورودِ پله‌ایِ چیپ‌ها — همان `momentChipIn` وب.
 ///
 /// در وب، چیپ‌هایِ لحظهٔ جایزه یکی‌یکی و با تأخیرِ ۰/۰٫۰۷/۰٫۱۴/۰٫۲۱ ثانیه
-/// می‌آیند (`.momentRow .momentChip:nth-child(n)`). این پله‌ای بودن بخشِ
-/// زیادی از جذابیتِ کارت است: چشم دنبالِ چیپِ بعدی می‌رود و هر کدام جداگانه
-/// «ثبت» می‌شود. در اندروید همه با هم ظاهر می‌شدند و کارت ساکن به‌نظر
-/// می‌رسید — همان تفاوتی که «تو وب عالیه، تو اندروید زشته» از آن می‌آید.
+/// می‌آیند (`.momentRow .momentChip:nth-child(n)`) و هر کدام از
+/// `translateY(6px) scale(.86)` با bezier(.2,1.3,.4,1) — که کمی از مقصد رد
+/// می‌شود و می‌نشیند — به `none` می‌رسند. این پله‌ای بودن بخشِ زیادی از
+/// جذابیتِ کارت است: چشم دنبالِ چیپِ بعدی می‌رود و هر کدام جداگانه «ثبت»
+/// می‌شود.
 ///
-/// تأخیرها بر حسبِ **کسرِ** انیمیشنِ ورودِ کارت (۵۲۰ms) بیان شده‌اند، نه
-/// میلی‌ثانیه، تا با هر تغییری در طولِ ورودِ کارت هماهنگ بمانند.
+/// دو نکتهٔ هم‌سانی که قبلاً رعایت نشده بود:
+///   ۱. وب برای چیپِ پنجم به بعد **هیچ** تأخیری تعریف نکرده (فقط
+///      `nth-child(2..4)`) — یعنی چیپِ پنجم با تأخیرِ صفر می‌آید. قبلاً
+///      اندروید آن را روی آخرین پله می‌گذاشت.
+///   ۲. scale(.86) و جابه‌جاییِ ۶ پیکسلیِ ثابت؛ قبلاً فقط slideِ درصدی بود.
 class _MomentChipIn extends StatelessWidget {
   const _MomentChipIn({
     required this.index,
@@ -785,36 +1034,40 @@ class _MomentChipIn extends StatelessWidget {
   final Widget child;
 
   /// طولِ هر پله بر حسبِ کسر: ۰٫۳۴ ثانیه از ۰٫۵۲ ثانیه.
-  static const double _span = 0.34 / 0.52;
+  static const double _span = _kChipSpan;
 
   /// گامِ تأخیر: ۰٫۰۷ ثانیه از ۰٫۵۲ ثانیه.
-  static const double _step = 0.07 / 0.52;
+  static const double _step = _kChipStep;
 
   @override
   Widget build(BuildContext context) {
-    // وب فقط برای چهار چیپِ اول تأخیر تعریف کرده. از پنجم به بعد همان
-    // آخرین پله را می‌گیریم تا چیپی دیرتر از خودِ کارت نیاید و ناگهان
-    // تنها در قاب ظاهر نشود.
-    final step = index <= 3 ? index : 3;
+    // وب: nth-child(2)→.07s، (3)→.14s، (4)→.21s و بقیه بدونِ تأخیر.
+    final step = (index >= 1 && index <= 3) ? index : 0;
     final start = (step * _step).clamp(0.0, 1.0);
     final curved = CurvedAnimation(
       parent: animation,
       curve: Interval(
         start,
         (start + _span).clamp(0.0, 1.0),
-        // همان `cubic-bezier(.2,1.3,.4,1)` وب: کمی از مقصد رد می‌شود و
-        // برمی‌گردد.
-        curve: const Cubic(0.2, 1.3, 0.4, 1),
+        curve: _kChipCurve,
       ),
     );
-    return FadeTransition(
-      opacity: curved,
-      child: SlideTransition(
-        position:
-            Tween<Offset>(begin: const Offset(0, 0.35), end: Offset.zero)
-                .animate(curved),
-        child: child,
-      ),
+    return AnimatedBuilder(
+      animation: curved,
+      builder: (_, child) {
+        // منحنی از ۱ رد می‌شود (y1=1.3) — دقیقاً مثلِ CSS که آن‌جا هم
+        // transform کمی از مقصد overshoot می‌کند؛ opacity ولی clamp می‌شود
+        // (همان کاری که مرورگر می‌کند).
+        final t = curved.value;
+        return Opacity(
+          opacity: t.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, 6 * (1 - t)),
+            child: Transform.scale(scale: 0.86 + 0.14 * t, child: child),
+          ),
+        );
+      },
+      child: child,
     );
   }
 }

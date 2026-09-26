@@ -23,7 +23,7 @@ Future<void> showPublicProfile(
       minChildSize: 0.45,
       maxChildSize: 0.94,
       expand: false,
-      builder: (_, controller) => Container(
+      builder: (bodyCtx, controller) => Container(
         decoration: BoxDecoration(
           color: const Color(0xFF0C1B30),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -36,7 +36,12 @@ Future<void> showPublicProfile(
             ),
           ],
         ),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        // لبه‌به‌لبه (رفعِ نوارِ ناوبری، ۴ مهر): لبهٔ پایینِ شیت همان لبهٔ
+        // فیزیکیِ صفحه است؛ padding پایین باید ناوبریِ سیستم را هم حساب
+        // کند وگرنه روی گوشیِ سه‌دکمه آخرین ردیف زیرِ نوارِ خودِ گوشی
+        // می‌ماند و لمسش را سیستم می‌خورد.
+        padding: EdgeInsets.fromLTRB(
+            16, 12, 16, 16 + MediaQuery.viewPaddingOf(bodyCtx).bottom),
         child: AsyncSection<dynamic>(
           future: api.get('/api/users/$userId/public').then((value) {
             unawaited(ImageDiskCache.instance.prewarmPayload(value));
@@ -80,284 +85,329 @@ class _PublicProfileBody extends StatelessWidget {
     final refRank = (refMap['rankAllTime'] as num?)?.toInt();
 
     return AnimatedProfileBackground(
-      slug: cos['profileBackground'] as String?,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: ListView(
-      controller: controller,
-      children: [
-        // Handle bar
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
-
-        // ── User Header ──
-        Row(
-          children: [
-            CosmeticAvatarFrame(
-              frame: cos['frame'] as String?,
-              child: AvatarImage(
-                keyName: data['profile_avatar_key'],
-                imageUrl: data['profile_image_url'],
-                radius: 30,
-                ring: true,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DisplayName(
-                    name: data['nickname'] ?? 'کاربر',
-                    cosmetics: cos,
-                    showTitle: true,
-                    level: (data['level'] is Map)
-                        ? ((data['level'] as Map)['level'] as num?)?.toInt()
-                        : null,
-                    avatarKey: data['profile_image_url'] == null
-                        ? data['profile_avatar_key']
-                        : null,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white),
+        slug: cos['profileBackground'] as String?,
+        child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: ListView(
+              controller: controller,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      if (clubSlug != null && clubSlug.isNotEmpty) ...[
-                        Image.asset(clubAsset(clubSlug), width: 16, height: 16, fit: BoxFit.contain, cacheWidth: 48,
-                            errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-                        const SizedBox(width: 4),
-                        Text(
-                          'هوادار باشگاه',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      if (hasPlus)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFD166).withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.45)),
+                ),
+
+                // ── User Header ──
+                Row(
+                  children: [
+                    CosmeticAvatarFrame(
+                      frame: cos['frame'] as String?,
+                      child: AvatarImage(
+                        keyName: data['profile_avatar_key'],
+                        imageUrl: data['profile_image_url'],
+                        radius: 30,
+                        ring: true,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          DisplayName(
+                            name: data['nickname'] ?? 'کاربر',
+                            cosmetics: cos,
+                            showTitle: true,
+                            level: (data['level'] is Map)
+                                ? ((data['level'] as Map)['level'] as num?)
+                                    ?.toInt()
+                                : null,
+                            avatarKey: data['profile_image_url'] == null
+                                ? data['profile_avatar_key']
+                                : null,
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white),
                           ),
-                          child: const Text('★ عضو قلقلی پلاس',
-                              style: TextStyle(color: Color(0xFFFFD166), fontSize: 9.5, fontWeight: FontWeight.w900)),
-                        ),
-                    ],
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              if (clubSlug != null && clubSlug.isNotEmpty) ...[
+                                Image.asset(clubAsset(clubSlug),
+                                    width: 16,
+                                    height: 16,
+                                    fit: BoxFit.contain,
+                                    cacheWidth: 48,
+                                    errorBuilder: (_, __, ___) =>
+                                        const SizedBox.shrink()),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'هوادار باشگاه',
+                                  style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.7),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              if (hasPlus)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFD166)
+                                        .withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                        color: const Color(0xFFFFD166)
+                                            .withValues(alpha: 0.45)),
+                                  ),
+                                  child: const Text('★ عضو قلقلی پلاس',
+                                      style: TextStyle(
+                                          color: Color(0xFFFFD166),
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w900)),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // ── 4-Grid Key Stats (Ultra Dense & Beautiful) ──
+                GridView.count(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 2.3,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _StatCard(
+                      icon: Icons.emoji_events_rounded,
+                      iconColor: const Color(0xFFFFD166),
+                      // رتبه با «سکه» تعیین می‌شود، نه امتیاز. بدون نمایشِ سکه،
+                      // کاربر رتبه‌اش را با مجموعِ امتیازش می‌سنجد و فکر می‌کند
+                      // جدول اشتباه است. عنوان به‌جای متنِ اضافه، خودِ عدد را
+                      // حمل می‌کند — قرار نیست متن‌ها زیاد شوند.
+                      title: 'رتبه لیگ این ماه',
+                      titleTrailing: CoinChip(value: data['coins'], size: 19),
+                      value: () {
+                        final r = data['currentLeagueRank'] ?? bestRank;
+                        return r != null ? 'رتبه ${faNum(r)}' : 'رتبه ۱';
+                      }(),
+                    ),
+                    _StatCard(
+                      icon: Icons.star_rounded,
+                      iconColor: const Color(0xFF38BDF8),
+                      title: 'مجموع امتیازات کل',
+                      value: '${faNum(data['lifetime_points'])} امتیاز',
+                    ),
+                    _StatCard(
+                      icon: Icons.account_balance_wallet_rounded,
+                      iconColor: const Color(0xFF34D399),
+                      title: 'جوایز نقدی کسب‌شده',
+                      value: totalPrize > 0
+                          ? '${faNum(totalPrize)} تومان'
+                          : '۰ تومان',
+                    ),
+                    _StatCard(
+                      icon: Icons.card_giftcard_rounded,
+                      iconColor: const Color(0xFFFF8A3D),
+                      title: 'تعداد کل جوایز و تندیس‌ها',
+                      value: '${faNum(trophies.length + rewards.length)} جایزه',
+                    ),
+
+                    // ── بردهای لیگ و کمیسیونِ دعوت (خواستهٔ مالک، ۴ مهر ۱۴۰۵) ──
+                    // «تمامی جوایز از جمله میزان برد در لیگ و میزان کمسیون از دعوت
+                    //  از دوستان باید برای کاربر های مختلف دیده بشه.»
+                    _StatCard(
+                      icon: Icons.military_tech_rounded,
+                      iconColor: const Color(0xFFFFD166),
+                      title: leagueSeasons > 0
+                          ? 'قهرمانی لیگ از ${faNum(leagueSeasons)} فصل'
+                          : 'قهرمانی لیگ',
+                      value: leagueWins > 0
+                          ? '${faNum(leagueWins)} برد'
+                          : 'بدون برد',
+                    ),
+                    _StatCard(
+                      icon: Icons.workspace_premium_rounded,
+                      iconColor: const Color(0xFFE39A5B),
+                      title: 'سکوی سه‌نما و جایزهٔ کلِ لیگ',
+                      value: leaguePodiums > 0 || lifetimePrizes > 0
+                          ? '${faNum(leaguePodiums)} سکو · ${faNum(lifetimePrizes)} تومان'
+                          : 'بدون سکو',
+                    ),
+                    _StatCard(
+                      icon: Icons.person_add_alt_1_rounded,
+                      iconColor: const Color(0xFF38BDF8),
+                      title: refRank != null
+                          ? 'دوستان دعوت‌شده · رتبه ${faNum(refRank)}'
+                          : 'دوستان دعوت‌شده',
+                      value: '${faNum(refInvited)} نفر',
+                    ),
+                    _StatCard(
+                      icon: Icons.handshake_rounded,
+                      iconColor: const Color(0xFF22E7A6),
+                      title: 'کمیسیون از دعوت دوستان',
+                      value: refPoints > 0 || refCash > 0
+                          ? '${faNum(refPoints)} امتیاز · ${faNum(refCash)} تومان'
+                          : 'بدون کمیسیون',
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                // ── Registered Cards Shelf ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('کلکسیون کارت‌های ثبت‌شده',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white)),
+                    Text('${faNum(cards.length)} مدل کارت',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF38BDF8),
+                            fontWeight: FontWeight.w800)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (cards.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Center(
+                      child: Text(
+                          'هنوز کارتی در کلکسیون این کاربر ثبت نشده است.',
+                          style:
+                              TextStyle(color: Colors.white54, fontSize: 11)),
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height: 98,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: cards.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) {
+                        final c = cards[i];
+                        return Container(
+                          width: 76,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.04),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08)),
+                          ),
+                          child: Column(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: SafeImage(
+                                  url: c['image_url'],
+                                  width: 68,
+                                  height: 60,
+                                  fallbackAsset:
+                                      'assets/games/memory/medal.webp',
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${c['name'] ?? 'کارت'} (${faNum(c['registered_count'])}×)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                const SizedBox(height: 14),
+
+                // ── Rewards Won Shelf ──
+                if (trophies.isNotEmpty || rewards.isNotEmpty) ...[
+                  const Text('جوایز و تندیس‌های کسب‌شده',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white)),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 90,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        for (final t in trophies)
+                          Container(
+                            width: 76,
+                            margin: const EdgeInsets.only(left: 8),
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.04),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.08)),
+                            ),
+                            child: Column(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: SafeImage(
+                                    url: t['image_url'],
+                                    width: 68,
+                                    height: 56,
+                                    fallbackAsset:
+                                        'assets/pass/reward_gift_icon.webp',
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${t['name'] ?? 'جایزه'}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white70),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 14),
-
-        // ── 4-Grid Key Stats (Ultra Dense & Beautiful) ──
-        GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 2.3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _StatCard(
-              icon: Icons.emoji_events_rounded,
-              iconColor: const Color(0xFFFFD166),
-              // رتبه با «سکه» تعیین می‌شود، نه امتیاز. بدون نمایشِ سکه،
-              // کاربر رتبه‌اش را با مجموعِ امتیازش می‌سنجد و فکر می‌کند
-              // جدول اشتباه است. عنوان به‌جای متنِ اضافه، خودِ عدد را
-              // حمل می‌کند — قرار نیست متن‌ها زیاد شوند.
-              title: 'رتبه لیگ این ماه',
-              titleTrailing: CoinChip(value: data['coins'], size: 19),
-              value: () {
-                final r = data['currentLeagueRank'] ?? bestRank;
-                return r != null ? 'رتبه ${faNum(r)}' : 'رتبه ۱';
-              }(),
-            ),
-            _StatCard(
-              icon: Icons.star_rounded,
-              iconColor: const Color(0xFF38BDF8),
-              title: 'مجموع امتیازات کل',
-              value: '${faNum(data['lifetime_points'])} امتیاز',
-            ),
-            _StatCard(
-              icon: Icons.account_balance_wallet_rounded,
-              iconColor: const Color(0xFF34D399),
-              title: 'جوایز نقدی کسب‌شده',
-              value: totalPrize > 0 ? '${faNum(totalPrize)} تومان' : '۰ تومان',
-            ),
-            _StatCard(
-              icon: Icons.card_giftcard_rounded,
-              iconColor: const Color(0xFFFF8A3D),
-              title: 'تعداد کل جوایز و تندیس‌ها',
-              value: '${faNum(trophies.length + rewards.length)} جایزه',
-            ),
-
-            // ── بردهای لیگ و کمیسیونِ دعوت (خواستهٔ مالک، ۴ مهر ۱۴۰۵) ──
-            // «تمامی جوایز از جمله میزان برد در لیگ و میزان کمسیون از دعوت
-            //  از دوستان باید برای کاربر های مختلف دیده بشه.»
-            _StatCard(
-              icon: Icons.military_tech_rounded,
-              iconColor: const Color(0xFFFFD166),
-              title: leagueSeasons > 0
-                  ? 'قهرمانی لیگ از ${faNum(leagueSeasons)} فصل'
-                  : 'قهرمانی لیگ',
-              value: leagueWins > 0 ? '${faNum(leagueWins)} برد' : 'بدون برد',
-            ),
-            _StatCard(
-              icon: Icons.workspace_premium_rounded,
-              iconColor: const Color(0xFFE39A5B),
-              title: 'سکوی سه‌نما و جایزهٔ کلِ لیگ',
-              value: leaguePodiums > 0 || lifetimePrizes > 0
-                  ? '${faNum(leaguePodiums)} سکو · ${faNum(lifetimePrizes)} تومان'
-                  : 'بدون سکو',
-            ),
-            _StatCard(
-              icon: Icons.person_add_alt_1_rounded,
-              iconColor: const Color(0xFF38BDF8),
-              title: refRank != null
-                  ? 'دوستان دعوت‌شده · رتبه ${faNum(refRank)}'
-                  : 'دوستان دعوت‌شده',
-              value: '${faNum(refInvited)} نفر',
-            ),
-            _StatCard(
-              icon: Icons.handshake_rounded,
-              iconColor: const Color(0xFF22E7A6),
-              title: 'کمیسیون از دعوت دوستان',
-              value: refPoints > 0 || refCash > 0
-                  ? '${faNum(refPoints)} امتیاز · ${faNum(refCash)} تومان'
-                  : 'بدون کمیسیون',
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 14),
-
-        // ── Registered Cards Shelf ──
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('کلکسیون کارت‌های ثبت‌شده',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.white)),
-            Text('${faNum(cards.length)} مدل کارت',
-                style: const TextStyle(fontSize: 11, color: Color(0xFF38BDF8), fontWeight: FontWeight.w800)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (cards.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.03),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Center(
-              child: Text('هنوز کارتی در کلکسیون این کاربر ثبت نشده است.',
-                  style: TextStyle(color: Colors.white54, fontSize: 11)),
-            ),
-          )
-        else
-          SizedBox(
-            height: 98,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: cards.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final c = cards[i];
-                return Container(
-                  width: 76,
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                  ),
-                  child: Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: SafeImage(
-                          url: c['image_url'],
-                          width: 68,
-                          height: 60,
-                          fallbackAsset: 'assets/games/memory/medal.webp',
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${c['name'] ?? 'کارت'} (${faNum(c['registered_count'])}×)',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-
-        const SizedBox(height: 14),
-
-        // ── Rewards Won Shelf ──
-        if (trophies.isNotEmpty || rewards.isNotEmpty) ...[
-          const Text('جوایز و تندیس‌های کسب‌شده',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Colors.white)),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 90,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (final t in trophies)
-                  Container(
-                    width: 76,
-                    margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.04),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                    ),
-                    child: Column(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: SafeImage(
-                            url: t['image_url'],
-                            width: 68,
-                            height: 56,
-                            fallbackAsset: 'assets/pass/reward_gift_icon.webp',
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${t['name'] ?? 'جایزه'}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
               ],
-            ),
-          ),
-        ],
-      ],
-    )));
+            )));
   }
 }
 
@@ -418,7 +468,10 @@ class _StatCard extends StatelessWidget {
                 Text(value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.white)),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white)),
               ],
             ),
           ),
