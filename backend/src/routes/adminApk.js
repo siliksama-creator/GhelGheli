@@ -338,6 +338,22 @@ module.exports = ({ pool, adminAuth, requireRole, asyncHandler, audit }) => {
         } catch {
           await fsp.copyFile(finalPath, latestPath);
         }
+        // ── هشِ «آخرین نسخه» هم باید به‌روز شود ──────────────────────────
+        //
+        // ⚠️ یافتهٔ مهر ۱۴۰۵: فقط sidecarِ فایلِ **نسخه‌دار** نوشته می‌شد و
+        //    `ghelgheli-latest.apk.sha256` برای همیشه همان هشِ نخستین نسخه‌ای
+        //    را نشان می‌داد که فایل را ساخته بود. nginx هر دو را از یک
+        //    پوشه سرو می‌کند (`deploy/ghelgheli-apk.conf`) و توضیحاتِ همین
+        //    route قولِ «هش در کنارِ هر فایل» را می‌دهد. پس هر کس که
+        //    `ghelgheli-latest.apk` را با sidecarِ خودش بسنجد، ناهماهنگی
+        //    می‌گیرد و به‌روزرسانی را رد می‌کند — در حالی که خودِ فایل
+        //    سالم است و اپ (که هش را از رکوردِ `/app/latest` می‌گیرد، نه از
+        //    این فایل) درست کار می‌کند. همین «تقریباً درست» بودن باعث شد
+        //    کسی متوجه نشود.
+        //
+        //    در حالتِ «فقط آرشیو» نامِ latest دست‌نخورده می‌ماند، پس
+        //    sidecarِ آن هم نباید عوض شود.
+        await fsp.writeFile(`${latestPath}.sha256`, `${sha256}  ${LATEST_NAME}\n`, 'utf8');
       }
       await fsp.writeFile(`${finalPath}.sha256`, `${sha256}  ${filename}\n`, 'utf8');
 
