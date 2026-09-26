@@ -24,6 +24,7 @@
 // چون slot/key در page-cache ثابت می‌ماند، search/sort/scroll کاربر در
 // InventoryPage حفظ می‌شود و فقط items نو می‌شود.
 import 'package:flutter/material.dart';
+import '../../tour/tour_anchors.dart';
 
 import '../../api_client.dart';
 import '../../core/app_config.dart';
@@ -73,7 +74,9 @@ class CardRegPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
+    return TourAnchor(
+      id: 'cardreg:top',
+      child: Column(
       children: [
         // ── بخش ثبت کارت‌های قلقلی (همان JSX… یعنی همان ویجتِ قبلیِ داشبورد،
         // بدونِ هیچ تغییرِ ظاهری) ──
@@ -204,7 +207,7 @@ class CardRegPage extends StatelessWidget {
           ),
         ),
       ],
-    );
+    ));
   }
 }
 

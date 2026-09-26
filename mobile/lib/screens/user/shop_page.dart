@@ -1,6 +1,7 @@
 // Compact category-based Shop. Web parity: monthly/annual Plus and every
 // deterministic cosmetic use the same server catalogue and wallet ledger.
 import 'dart:async';
+import '../../tour/tour_anchors.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -490,7 +491,9 @@ class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
+    return TourAnchor(
+      id: 'shop:top',
+      child: RefreshIndicator(
       onRefresh: _reload,
       child: AsyncSection<dynamic>(
         future: _future,
@@ -679,7 +682,7 @@ class _ShopPageState extends State<ShopPage> with WidgetsBindingObserver {
           );
         },
       ),
-    );
+    ));
   }
 }
 

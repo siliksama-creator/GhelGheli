@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../tour/tour_anchors.dart';
 import '../../core/money.dart';
 import '../../theme/colors.dart';
 import '../../theme/brand_theme.dart';
@@ -224,7 +225,9 @@ class _WalletPageState extends State<WalletPage>
     final w = _wallet!;
     final canWithdraw = w['canWithdraw'] == true;
 
-    return RefreshIndicator(
+    return TourAnchor(
+      id: 'wallet:top',
+      child: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
@@ -355,7 +358,7 @@ class _WalletPageState extends State<WalletPage>
           ),
         ],
       ),
-    );
+    ));
   }
 
   double _tabHeight() {

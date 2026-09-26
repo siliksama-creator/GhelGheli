@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../tour/tour_anchors.dart';
 import '../../core/app_config.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/app_card.dart';
@@ -207,7 +208,9 @@ class _SupportPageState extends State<SupportPage> {
     final maxAttachments = (_quota?['maxAttachments'] as num?)?.toInt()
         ?? liveRule('maxTicketAttachments', 5);
 
-    return RefreshIndicator(
+    return TourAnchor(
+      id: 'support:top',
+      child: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
@@ -385,7 +388,7 @@ class _SupportPageState extends State<SupportPage> {
             }),
         ],
       ),
-    );
+    ));
   }
 }
 

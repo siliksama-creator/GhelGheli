@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api_client.dart';
+import '../../tour/tour_anchors.dart';
 import '../../core/app_config.dart';
 import '../../core/share_invite.dart';
 import '../../theme/tokens.dart';
@@ -105,7 +106,9 @@ class _ReferralPageState extends State<ReferralPage> {
     final inviteBoard = (d['inviteLeague'] as Map?)?.cast<String, dynamic>()
         ?? const <String, dynamic>{};
 
-    return RefreshIndicator(
+    return TourAnchor(
+      id: 'invite:top',
+      child: RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, Gaps.xxl),
@@ -325,7 +328,7 @@ class _ReferralPageState extends State<ReferralPage> {
                 )),
         ],
       ),
-    );
+    ));
   }
 }
 

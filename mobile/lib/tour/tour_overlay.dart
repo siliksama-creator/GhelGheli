@@ -57,11 +57,18 @@ class TourPlan {
     'league': TourPlan('league', <String>['league:tabs', 'nav:league']),
     'club': TourPlan('club', <String>['club:subtabs'], sub: 'chat'),
     'invite': TourPlan('invite', <String>['invite:top', 'more:invite']),
-    'duel': TourPlan('club', <String>['games:grid'], sub: 'games'),
-    'cap': TourPlan('club', <String>['games:stakes', 'games:grid'], sub: 'games'),
-    'missions': TourPlan('club', <String>['club:tab:growth'], sub: 'growth'),
-    'pass': TourPlan('club', <String>['club:tab:pass'], sub: 'pass'),
-    'coins': TourPlan('league', <String>['league:tab:vault'], sub: 'vault'),
+    // هر بخش **باید** دستِ‌کم یک لنگرِ موجود داشته باشد؛ وگرنه تور به
+    // «کارتِ وسطِ قاب» می‌افتد و کاربر نمی‌بیند منظور کدام قسمت است.
+    // `nav:x` لنگرِ هندسی است (جای همان تب در نوار پایین).
+    'duel': TourPlan('club', <String>['games:grid', 'nav:club'], sub: 'games'),
+    'cap': TourPlan('club', <String>['games:stakes', 'games:grid', 'nav:club'],
+        sub: 'games'),
+    'missions': TourPlan('club', <String>['club:tab:growth', 'club:subtabs'],
+        sub: 'growth'),
+    'pass': TourPlan('club', <String>['club:tab:pass', 'club:subtabs'],
+        sub: 'pass'),
+    'coins': TourPlan('league', <String>['league:tab:vault', 'nav:league'],
+        sub: 'vault'),
     'shop': TourPlan('shop', <String>['shop:top', 'more:shop']),
     'wallet': TourPlan('wallet', <String>['wallet:top', 'more:wallet']),
     'profile': TourPlan('profile', <String>['profile:top', 'more:profile']),
@@ -143,6 +150,10 @@ class TourOverlayState extends State<TourOverlay> {
   AudioPlayer? _player;
   StreamSubscription<void>? _completed;
   Timer? _advanceTimer;
+
+  /// مستطیلِ جای هر تبِ نوار پایین (از راست). در `didChangeDependencies`
+  /// پر می‌شود — نگاه کنید به توضیحِ `_rebuildSlots`.
+  List<Rect>? _slots;
 
   int _run = 0; // شناسهٔ اجرا؛ کارهای کهنه با آن لغو می‌شوند
   bool _autoStarted = false;
@@ -269,7 +280,7 @@ class TourOverlayState extends State<TourOverlay> {
 
     // ── ۲) همان مسیری که کاربر می‌رفت ───────────────────────────────
     if (needTab) {
-      widget.goIndex(destIndex);
+      widget.goIndex(destIndex!);
       await Future<void>.delayed(_settleMs);
       if (!mounted || run != _run) return;
     }
@@ -303,7 +314,7 @@ class TourOverlayState extends State<TourOverlay> {
     while (DateTime.now().isBefore(deadline)) {
       if (!mounted || run != _run) return null;
       for (final id in anchors) {
-        final r = TourAnchors.rectOf(id);
+        final r = _rectOfId(id);
         if (r != null) return r;
       }
       await Future<void>.delayed(const Duration(milliseconds: 90));
@@ -384,19 +395,53 @@ class TourOverlayState extends State<TourOverlay> {
     return i == -1 ? null : i;
   }
 
-  /// کادرِ یک جای نوار پایین — با هندسه، نه با لنگر.
+  /// هندسهٔ جای تب‌های نوار پایین — یک بار در هر تغییرِ قاب کشیده می‌شود.
   ///
-  /// چرا هندسه: آیتم‌های `NavigationBar` ویجتِ خودشان را می‌سازند و گرفتنِ
-  /// `GlobalKey` از آن‌ها یعنی دست‌کاریِ داخلیِ متریال. عرضِ هر جای نوار
-  /// دقیقاً `۱/تعداد` است و چون اپ راست‌به‌چپ است، اولین تب سمت راست است.
-  Rect _slotRect(int slot) {
+  /// چرا این‌جا و نه سرِ نیاز: مسیرِ پخش بعد از چند `await` به این مستطیل‌ها
+  /// نیاز دارد و گرفتنِ `MediaQuery` از context بعد از await، لینتِ
+  /// `use_build_context_synchronously` را قرمز می‌کند و می‌تواند روی قابِ
+  /// عوض‌شده حساب کند.
+  void _rebuildSlots() {
     final mq = MediaQuery.of(context);
     final size = mq.size;
     final bottom = mq.padding.bottom;
     final slots = widget.slots < 1 ? 1 : widget.slots;
     final w = size.width / slots;
-    final left = size.width - (slot + 1) * w;
-    return Rect.fromLTWH(left, size.height - bottom - _barHeight, w, _barHeight);
+    _slots = <Rect>[
+      for (var i = 0; i < slots; i++)
+        Rect.fromLTWH(
+          size.width - (i + 1) * w,
+          size.height - bottom - _barHeight,
+          w,
+          _barHeight,
+        ),
+    ];
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _rebuildSlots();
+  }
+
+  /// کادرِ جای یک تبِ نوار پایین — با هندسه، نه با لنگر.
+  ///
+  /// چرا هندسه: آیتم‌های `NavigationBar` ویجتِ خودشان را می‌سازند و گرفتنِ
+  /// `GlobalKey` از آن‌ها یعنی دست‌کاریِ داخلیِ متریال. عرضِ هر جای نوار
+  /// دقیقاً `۱/تعداد` است و چون اپ راست‌به‌چپ است، اولین تب سمت راست است.
+  Rect? _slotRect(int slot) {
+    final slots = _slots;
+    if (slots == null || slot < 0 || slot >= slots.length) return null;
+    return slots[slot];
+  }
+
+  /// کادرِ یک id: لنگرِ ثبت‌شده، یا جای هندسیِ تب (`nav:x`).
+  Rect? _rectOfId(String id) {
+    if (id.startsWith('nav:')) {
+      final slot = _slotOf(id.substring(4));
+      return slot == null ? null : _slotRect(slot);
+    }
+    return TourAnchors.rectOf(id);
   }
 
   @override

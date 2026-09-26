@@ -268,17 +268,81 @@ const strip = (src) => {
   }
   return out;
 };
-const files = ['tour/tour_overlay.dart', 'tour/tour_service.dart', 'tour/tour_anchors.dart',
-  'screens/user/home_shell.dart', 'screens/user/social_page.dart', 'screens/user/profile_page.dart'];
-const unbalanced = files.filter((f) => {
-  const s = strip(read(path.join(MOB, f)));
+// همهٔ فایل‌های Dart، نه فقط آن‌هایی که دست زدیم: پیچشِ لنگر (TourAnchor)
+// دو لبه دارد و لبهٔ دوم اگر سرِ جای غلط بنشیند فایل ناتراز می‌شود.
+const walkDart = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+  const p = path.join(dir, e.name);
+  if (e.isDirectory()) return walkDart(p);
+  return e.name.endsWith('.dart') ? [p] : [];
+});
+const dartFiles = walkDart(MOB);
+const unbalanced = dartFiles.filter((f) => {
+  const s = strip(read(f));
   if (!s) return true;
   return (s.split('(').length !== s.split(')').length)
     || (s.split('{').length !== s.split('}').length)
     || (s.split('[').length !== s.split(']').length);
 });
-check('ترازِ پرانتزِ شش فایلِ دست‌خوردهٔ اندروید', unbalanced.length === 0,
-  unbalanced.join(', '));
+check(`ترازِ پرانتزِ همهٔ ${dartFiles.length} فایلِ Dart`, unbalanced.length === 0,
+  unbalanced.map((f) => path.relative(MOB, f)).join(', '));
+
+
+// ── ۹) هر بخش لنگرِ موجود دارد ────────────────────────────────────────────
+//
+// «کارتِ وسطِ قاب» راهِ افتِ محترمانه است، ولی اگر برای بخشی همیشه رخ بدهد
+// یعنی کاربر هیچ‌وقت نمی‌بیند منظور کدام قسمت است. پس هر بخش باید دستِ‌کم
+// یک لنگر داشته باشد که همین حالا در کد وجود دارد: یا لنگرِ ثبت‌شده
+// (`TourAnchor(id: …)`) یا لنگرِ هندسیِ `nav:…` (جای تب در نوار پایین).
+const wired = new Set();
+for (const f of dartFiles) {
+  // فقط idهایی که واقعاً داخلِ یک `TourAnchor(` هستند؛ وگرنه شناسه‌های
+  // بی‌ربطِ دیگر (مثلِ شناسهٔ پیام‌رسان‌ها در صفحهٔ پشتیبانی) هم شمرده
+  // می‌شدند و گاردِ «لنگرِ بی‌مصرف» الکی قرمز می‌شد.
+  for (const m of read(f).matchAll(/TourAnchor\([\s\S]{0,90}?id:\s*'([^']+)'/g)) wired.add(m[1]);
+}
+const plans = [...OV.matchAll(/'([a-z][a-z0-9_-]*)':\s*TourPlan\(([\s\S]*?)\),?\n/g)]
+  .map((m) => ({
+    id: m[1],
+    anchors: [...m[2].matchAll(/'((?:[a-z]+):[A-Za-z0-9:_-]+)'/g)].map((x) => x[1]),
+  }));
+check('۱۸ بخشِ نقشه با لنگرِ خالی خوانده شد', plans.length === 18, `یافت شد: ${plans.length}`);
+const noAnchor = plans.filter((p) => !p.anchors.some(
+  (a) => a.startsWith('nav:') || wired.has(a)));
+check('هر بخش دستِ‌کم یک لنگرِ موجود دارد', noAnchor.length === 0,
+  noAnchor.map((p) => `${p.id}(${p.anchors.join('|')})`).join(' , '));
+
+const moreIds = [...new Set(plans.flatMap((p) => p.anchors.filter((a) => a.startsWith('more:'))))];
+const missingMore = moreIds.filter((m) => !SHELL.includes(`return '${m.slice(5)}';`));
+check('هر `more:…` نقشه در نگاشتِ وارونِ پوسته هست', missingMore.length === 0,
+  missingMore.join(', '));
+
+const navUsed = [...new Set(plans.flatMap((p) => p.anchors.filter((a) => a.startsWith('nav:'))))];
+const missingNav2 = navUsed.filter((n) => !OV.includes(`'${n.slice(4)}'`));
+check('هر `nav:…` نقشه در ترتیبِ نوار پایین هست', missingNav2.length === 0,
+  missingNav2.join(', '));
+
+// الگوی خرابیِ ابزارِ پیچش: `return ColumnTourAnchor(` — پرانتزها تراز
+// می‌مانند، پس گاردِ تراز نمی‌گیرد؛ پس صریح چک می‌شود که هر `TourAnchor(`
+// انتهای خط باشد (سرِ نامِ ویجت درج شده، نه سرِ پرانتز).
+const badWrap = dartFiles.flatMap((f) => read(f).split('\n')
+  .map((l, i) => ({ f, l, i }))
+  .filter(({ l }) => l.includes('TourAnchor(') && !l.trim().endsWith('TourAnchor(')));
+check('پیچشِ لنگر سالم است (سرِ نامِ ویجت، نه سرِ پرانتز)', badWrap.length === 0,
+  badWrap.map(({ f, i }) => `${path.basename(f)}:${i + 1}`).join(', '));
+
+// لنگرهای ثبت‌شده‌ای که هیچ بخشی به آن‌ها اشاره نمی‌کند = کدِ مرده.
+const planAnchors = new Set(plans.flatMap((p) => p.anchors));
+// idهای الگویی (مثلِ `more:${...}` در شیت) لنگرِ واقعی نیستند.
+const orphan = [...wired].filter((w) => !w.includes('$') && !planAnchors.has(w));
+check('لنگرِ بی‌مصرف نمانده', orphan.length === 0, orphan.join(', '));
+
+// لنگرِ صفحه‌ها باید از راهِ خودِ ویجت پیچیده شده باشد، نه دستی در جای دیگر.
+const anchored = [...wired].filter((id) => id.includes(':') && !id.startsWith('nav:')
+  && !id.startsWith('more:'));
+const anchorCount = dartFiles.reduce((n, f) =>
+  n + (read(f).match(/TourAnchor\(/g) || []).length, 0);
+check('لنگرها با `TourAnchor(` پیچیده شده‌اند', anchorCount >= anchored.length,
+  `لنگر=${anchored.length} پیچش=${anchorCount}`);
 
 console.log(fail === 0
   ? '[onboarding] همهٔ بررسی‌ها ✓'

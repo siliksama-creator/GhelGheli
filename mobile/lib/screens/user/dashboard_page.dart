@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import '../../tour/tour_anchors.dart';
 
 import 'package:flutter/material.dart';
 
@@ -184,14 +185,16 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             Gaps.vSm,
           ],
-          HeroHeader(
+          TourAnchor(
+            id: 'home:hero',
+            child: HeroHeader(
             points: points,
             nickname: user?['nickname'] ?? 'قهرمان',
             user: user is Map ? Map<String, dynamic>.from(user) : null,
             cosmetics: _data?['cosmetics'] as Map<String, dynamic>?,
             onOpenProfile: widget.onOpenProfile,
             onOpenWallet: widget.onOpenWallet,
-          ),
+          )),
           Gaps.vSm,
           // ── کاشیِ تمام‌عرضِ ضربه‌زن (خواستهٔ مالک، ۳۱ شهریور ۱۴۰۵) ──
           // «جایگاهش را عوض کنم که خیلی تو چشم‌تر باشد» — خانه اولین
@@ -199,7 +202,9 @@ class _DashboardPageState extends State<DashboardPage> {
           // بصریِ سه کاشیِ پایین (شناور + درخشش) ولی تمام‌عرض و بالاتر
           // از همه نشسته و مستقیم خودِ بازی را باز می‌کند، نه فهرستِ
           // بازی‌ها را. دوقلوی وب: دکمهٔ hero در screens/Home.jsx.
-          _AnimatedQuickTile(
+          TourAnchor(
+            id: 'home:tapTile',
+            child: _AnimatedQuickTile(
             icon: Image.asset(
               'assets/games/tap/skin_1.webp',
               width: 44,
@@ -212,9 +217,11 @@ class _DashboardPageState extends State<DashboardPage> {
             glowColor: const Color(0xFFA3E635),
             animOffset: 0.5,
             onTap: widget.onOpenTap,
-          ),
+          )),
           Gaps.vSm,
-          LoginStreakCard(
+          TourAnchor(
+            id: 'home:streak',
+            child: LoginStreakCard(
             api: widget.api,
             compact: true,
             initialData: _data?['loginStreak'] is Map
@@ -224,7 +231,7 @@ class _DashboardPageState extends State<DashboardPage> {
               _load();
               widget.reloadProfile();
             },
-          ),
+          )),
           Gaps.vSm,
           // ── ۳ کاشی جذاب متحرک وسط داشبورد ──
           Row(
@@ -259,7 +266,9 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               Gaps.hXs,
               Expanded(
-                child: _AnimatedQuickTile(
+                child: TourAnchor(
+                  id: 'home:wheelTile',
+                  child: _AnimatedQuickTile(
                   icon: Image.asset(
                     'assets/games/card_duel_glow.webp',
                     width: 29,
@@ -272,7 +281,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   glowColor: const Color(0xFF60A5FA),
                   animOffset: 0.66,
                   onTap: widget.onOpenInventory,
-                ),
+                )),
               ),
             ],
           ),
