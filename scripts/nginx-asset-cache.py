@@ -97,29 +97,37 @@ def rewrite_ml(text: str) -> tuple[str, int]:
     return out, changed
 
 
+NAMED_BLOCK = (
+    "  location @ghelgheli_asset_miss {\n"
+    "    internal;\n"
+    "    default_type text/plain;\n"
+    "    add_header Cache-Control \"no-store\" always;\n"
+    "    add_header X-GG-Asset \"miss\" always;\n"
+    "    return 404;\n"
+    "  }"
+)
+
+
 def ensure_named(text: str) -> tuple[str, int]:
-    found = spans(text, SERVER_OPEN)
+    # بلوکِ قبلی را هم نو کن تا هدرِ تشخیصیِ X-GG-Asset جا بماند.
     out = text
+    replaced = 0
+    for start, end, _opener in reversed(spans(out, NAMED_OPEN)):
+        line = out.rfind('\n', 0, start) + 1
+        out = out[:line] + NAMED_BLOCK + out[end:]
+        replaced += 1
+    found = spans(out, SERVER_OPEN)
     inserted = 0
     for start, end, _opener in reversed(found):
-        # end is one past the closing brace; the brace itself is end - 1.
         body = out[start:end]
         if '@ghelgheli_asset_miss' not in body:
             continue
         if NAMED_OPEN.search(body):
             continue
-        named = (
-            "\n  location @ghelgheli_asset_miss {\n"
-            "    internal;\n"
-            "    default_type text/plain;\n"
-            "    add_header Cache-Control \"no-store\" always;\n"
-            "    return 404;\n"
-            "  }\n"
-        )
         brace = end - 1
-        out = out[:brace] + named + out[brace:]
+        out = out[:brace] + "\n" + NAMED_BLOCK + "\n" + out[brace:]
         inserted += 1
-    return out, inserted
+    return out, replaced + inserted
 
 
 def transform(text: str) -> str:

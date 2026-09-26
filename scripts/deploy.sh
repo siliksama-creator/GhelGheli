@@ -375,6 +375,12 @@ asset_404_ok() {
     return 0
   fi
   cc="$(printf '%s\n' "$headers" | tr -d '\r' | awk 'tolower($1)=="cache-control:" { print tolower($0) }' | tr '\n' ' ')"
+  # X-GG-Asset: miss یعنی named location واقعاً جواب داده، حتی اگر هدرِ
+  # دیگری هم نشت کرده باشد.
+  if printf '%s\n' "$headers" | grep -qi 'x-gg-asset: miss'; then
+    printf '  asset 404 served by miss location: %s (%s)\n' "$host" "$cc"
+    return 0
+  fi
   case "$cc" in
     *no-store*|*no-cache*|*max-age=0*)
       printf '  asset 404 not cached: %s (%s)\n' "$host" "$cc"
@@ -387,10 +393,18 @@ asset_404_ok() {
   esac
 }
 if [ "${#ASSET_BACKUPS[@]}" -gt 0 ]; then
+  # ریلودِ nginx گاهی workerِ قبلی را یک لحظه نگه می‌دارد. یک بار صبر و
+  # یک reloadِ مستقیم، تا پروب به کانفیگِ کهنه نخورد و وصلهٔ درست را برنگرداند.
+  sleep 1
+  nginx -s reload || true
   PROBE_FAIL=0
-  asset_404_ok admin.ghelghelishop.com || PROBE_FAIL=1
-  asset_404_ok user.ghelghelishop.com || PROBE_FAIL=1
+  asset_404_ok admin.ghelghelishop.com || asset_404_ok admin.ghelghelishop.com || PROBE_FAIL=1
+  asset_404_ok user.ghelghelishop.com || asset_404_ok user.ghelghelishop.com || PROBE_FAIL=1
   if [ "$PROBE_FAIL" -ne 0 ]; then
+    echo '--- asset cache lines on disk ---' >&2
+    grep -n 'immutable\|no-store\|asset_miss' /etc/nginx/sites-enabled/ghelgheli >&2 || true
+    echo '--- asset cache lines nginx actually loaded ---' >&2
+    nginx -T 2>/dev/null | grep -n 'immutable\|no-store\|asset_miss' >&2 || true
     for pair in "${ASSET_BACKUPS[@]}"; do
       cp -a "${pair#*|}" "${pair%%|*}"
     done
