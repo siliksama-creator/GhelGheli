@@ -226,6 +226,8 @@ const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
       read('backend/scripts/fixtures/live-tables.txt').includes('recommended_apps'));
     ok('و عکس‌هایش در فهرستِ «نگه‌دار»ی پاک‌سازِ عرضه هست',
       /SELECT image_url FROM recommended_apps/.test(read('tools/reset_for_launch.py')));
+    ok('جاروی شبانهٔ عکسِ یتیم هم برنامهٔ پیشنهادی را مرجع می‌داند',
+      /SELECT image_url AS p FROM recommended_apps/.test(read('backend/src/cron.js')));
     ok('در حالی که بخش خاموش است، هیچ صفحهٔ فعالی هم نمایش داده نمی‌شود (فهرست خالی)',
       /items: \[\]/.test(svcSrc0()));
   }

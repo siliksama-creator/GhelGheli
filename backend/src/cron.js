@@ -120,29 +120,52 @@ cron.schedule('41 4 * * *', () => {
 // ── پاک‌سازی عکس‌های رها شده (۳ روز) ───────────────────────────────────
 // عکس کاربر بعد از تأیید خودکار حذف می‌شود (serverReviewQueue)، ولی اگر
 // پنل ۳ روز پرونده را نبندد یا فایل orphan بماند، اینجا روزانه جارو می‌شود.
-// عکس طرح‌ها (designs) دست نمی‌خورد — فقط uploads/images که در هیچ جدولِ
-// مرجع نیست و قدیمی است.
+// فقط فایلی پاک می‌شود که در هیچ جدولِ تصویری ارجاع نداشته باشد.
+//
+// ⚠️ فهرست باید با KEEP_FILES در tools/reset_for_launch.py یکی باشد.
+// برنامهٔ پیشنهادی (۰۹۳) آنجا بود و اینجا نبود؛ جاروی ۳:۳۳ صبح فایلِ
+// `/uploads/images/…` را بعد از سه روز یتیم حساب کرد و پاک کرد، در حالی که
+// ردیفِ پنل هنوز همان آدرس را داشت. نتیجه: عکس در پنل و اپ ۴۰۴ می‌شد.
+const IMAGE_REF_QUERIES = [
+  `SELECT user_image_path AS p FROM photo_card_submissions WHERE user_image_path IS NOT NULL`,
+  `SELECT image_url AS p FROM photo_card_designs WHERE image_url IS NOT NULL`,
+  `SELECT attachments::text AS p FROM support_ticket_messages WHERE attachments IS NOT NULL`,
+  `SELECT image_url AS p FROM recommended_apps WHERE image_url IS NOT NULL`,
+  `SELECT image_url AS p FROM shop_items WHERE image_url IS NOT NULL`,
+  `SELECT image_url AS p FROM card_types WHERE image_url IS NOT NULL`,
+  `SELECT image_url AS p FROM reward_tiers WHERE image_url IS NOT NULL`,
+  `SELECT image_url AS p FROM reward_groups WHERE image_url IS NOT NULL`,
+  `SELECT image_url AS p FROM chat_stickers WHERE image_url IS NOT NULL`,
+  `SELECT profile_image_url AS p FROM users WHERE profile_image_url IS NOT NULL`,
+  `SELECT reward_image AS p FROM user_reward_claims WHERE reward_image IS NOT NULL`,
+];
+async function referencedUploadNames() {
+  const names = new Set();
+  for (const sql of IMAGE_REF_QUERIES) {
+    const { rows } = await pool.query(sql);
+    for (const row of rows) {
+      const text = String(row.p || '');
+      const found = text.match(/[A-Za-z0-9._-]+\.(?:png|jpe?g|webp|gif)/gi) || [];
+      for (const name of found) names.add(name);
+    }
+  }
+  return names;
+}
 cron.schedule('33 3 * * *', async () => {
   try {
+    // اگر حتی یک کوئریِ مرجع بشکند، هیچ فایلی پاک نمی‌شود. پاک‌کردن با
+    // فهرستِ ناقص همان باگی است که عکسِ برنامهٔ پیشنهادی را برد.
+    const referenced = await referencedUploadNames();
     const cutoff = Date.now() - 3 * 24 * 60 * 60 * 1000;
     let removed = 0;
     for (const name of fs.readdirSync(imageUploadDir)) {
       if (!IMAGE_EXT_RE.test(name)) continue;
+      if (referenced.has(name)) continue;
       const fp = path.join(imageUploadDir, name);
       try {
         const stat = fs.statSync(fp);
         if (stat.mtimeMs > cutoff) continue;
-        // آیا این فایل هنوز در photo_card_submissions یا designs ارجاع دارد؟
-        const rel = `/uploads/images/${name}`;
-        const { rows: s1 } = await pool.query(`SELECT 1 FROM photo_card_submissions WHERE user_image_path LIKE '%' || $1 LIMIT 1`, [name]);
-        if (s1[0]) continue;
-        const { rows: s2 } = await pool.query(`SELECT 1 FROM photo_card_designs WHERE image_url=$1 LIMIT 1`, [rel]);
-        if (s2[0]) continue;
-        // همچنین اگر در پشتیبانی پیوست شده باشد (attachments json)
-        const { rows: s3 } = await pool.query(`SELECT 1 FROM support_ticket_messages WHERE attachments::text LIKE '%' || $1 || '%' LIMIT 1`, [name]);
-        if (s3[0]) continue;
         fs.unlinkSync(fp);
-        // thumbnail‌ِ مربوطه را هم پاک کن
         for (const w of THUMB_WIDTHS) {
           const tp = path.join(thumbRoot, `${w}-${name}.webp`);
           try { if (fs.existsSync(tp)) fs.unlinkSync(tp); } catch {}
@@ -152,7 +175,7 @@ cron.schedule('33 3 * * *', async () => {
     }
     if (removed) logger.info(`[cleanup] ${removed} عکس قدیمی رها پاک شد`);
   } catch (e) {
-    logger.error('[cleanup] failed:', e.message);
+    logger.error('[cleanup] failed; no files deleted:', e.message);
   }
 }, { timezone: 'Asia/Tehran' });
 
