@@ -165,18 +165,37 @@ function clampBox(box, frame) {
 const centerOf = (r) => (r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null);
 
 /** مرکزِ هدف، دوخته‌شده به قاب — دستِ انگشت هم بیرون نمی‌زند. */
+const HAND_HALF_X = 26;   // نصفِ عرضِ دست (۳۸px) + حاشیه
+const HAND_HALF_Y = 34;   // نصفِ ارتفاعِ دست (۶۱px اندازه‌گیری‌شده) + حاشیه
 function clampPoint(p, frame) {
-  const MX = 22;  // نصفِ عرضِ دست (۳۸px) + حاشیه
-  const MY = 30;  // نصفِ ارتفاعِ دست (۵۳px) + حاشیه
   return {
-    x: Math.min(Math.max(p.x, MX), Math.max(MX, frame.width - MX)),
-    y: Math.min(Math.max(p.y, MY), Math.max(MY, frame.height - MY)),
+    x: Math.min(Math.max(p.x, HAND_HALF_X), Math.max(HAND_HALF_X, frame.width - HAND_HALF_X)),
+    y: Math.min(Math.max(p.y, HAND_HALF_Y), Math.max(HAND_HALF_Y, frame.height - HAND_HALF_Y)),
   };
 }
 
+/**
+ * بلندشدنِ انگشت پیش/پس از ضربه، **به اندازهٔ جایی که هست**.
+ *
+ * چرا لازم شد: انیمیشن اولیه همیشه ۴۰ پیکسل بالا می‌پرید؛ روی موبایلِ کوچک
+ * که «درِ ورودی» نزدیکِ لبهٔ بالایی بود (مثلاً تبِ بالای شیت)، دست از قاب
+ * بیرون می‌زد — دقیقاً همان «از کادر خارج می‌شه» که مالک گزارش کرد. حالا
+ * اندازهٔ بلندشدن از فضای بالای همان نقطه حساب می‌شود و اگر جایی نبود، صفر
+ * می‌شود (ضربه و موجِ طلایی سرِ جایشان می‌مانند).
+ */
+function safeLift(point, wanted) {
+  const room = Math.max(0, point.y - HAND_HALF_Y);
+  return -Math.min(Math.abs(wanted), room);
+}
+
 /** انگشتِ خودکار: از `from` به `to` می‌آید و آن‌جا تاچ می‌کند. */
-function Finger({ to, from, nonce }) {
-  const style = { left: `${to.x}px`, top: `${to.y}px` };
+function Finger({ to, from, nonce, lift = -40, endLift = -30 }) {
+  const style = {
+    left: `${to.x}px`,
+    top: `${to.y}px`,
+    '--lift': `${Math.round(lift)}px`,
+    '--endLift': `${Math.round(endLift)}px`,
+  };
   if (from) {
     style['--fx'] = `${Math.round(from.x - to.x)}px`;
     style['--fy'] = `${Math.round(from.y - to.y)}px`;
@@ -561,7 +580,11 @@ export default function Tour({ token, tab, goTab }) {
           style={{ left: ringBox.left, top: ringBox.top, width: ringBox.width, height: ringBox.height }}
           aria-hidden="true" />
       )}
-      {fingerTo && <Finger to={fingerTo} from={fingerFrom} nonce={`${stage}-${idx}-${tick}`} />}
+      {fingerTo && (
+        <Finger to={fingerTo} from={fingerFrom} nonce={`${stage}-${idx}-${tick}`}
+          lift={safeLift(fingerFrom || fingerTo, 40)}
+          endLift={safeLift(fingerTo, 30)} />
+      )}
 
       <div className="tourCard" ref={cardRef}
         style={{ left: pos.left, width: pos.width, maxWidth: frame.width - EDGE * 2, maxHeight: pos.maxH, top: pos.top, bottom: pos.bottom }}>

@@ -156,6 +156,12 @@ check('قابِ تور از ستونِ اپ خوانده می‌شود',
 check('هر کادر به قاب دوخته می‌شود',
   engine.includes('function clampBox') && engine.includes('clampPoint')
   && engine.includes('function rectInFrame'));
+// سرریزِ گذرا: انیمیشنِ انگشت بین دو فریم بالا می‌پرد و روی موبایلِ کوچک از
+// قاب بیرون می‌زد (یک نمونه‌برداریِ تک آن را رد کرده بود). حالا اندازهٔ
+// بلندشدن از فضای همان نقطه حساب می‌شود.
+check('بلندشدنِ انگشت به قاب دوخته می‌شود',
+  engine.includes('function safeLift') && tourCss.includes('var(--lift')
+  && tourCss.includes('var(--endLift'));
 check('تور به body پورتال می‌شود',
   engine.includes("createPortal") && engine.includes('document.body'));
 check('لایه‌های تور داخلِ قاب‌اند (نه چسبیده به نما)',

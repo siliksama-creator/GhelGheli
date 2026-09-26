@@ -87,18 +87,19 @@
 .tourFinger:not(.tourFinger--travel) .tourRipple { animation: tourRippleOne 2.4s ease-out infinite; }
 
 @keyframes tourTapInPlace {
-  0%   { transform: translate(-50%, -50%) translateY(-40px) scale(1); opacity: 0; }
+  /* `--lift` را موتور می‌دهد (اندازهٔ فضای بالای همان نقطه). */
+  0%   { transform: translate(-50%, -50%) translateY(var(--lift, -40px)) scale(1); opacity: 0; }
   14%  { opacity: 1; }
   34%  { transform: translate(-50%, -50%) translateY(-2px) scale(1); }
   44%  { transform: translate(-50%, -50%) translateY(0) scale(.84); }
   54%  { transform: translate(-50%, -50%) translateY(0) scale(1); }
   74%  { transform: translate(-50%, -50%) translateY(-6px) scale(1); }
-  100% { transform: translate(-50%, -50%) translateY(-40px) scale(1); opacity: 0; }
+  100% { transform: translate(-50%, -50%) translateY(var(--lift, -40px)) scale(1); opacity: 0; }
 }
 /* سفر: ۰–۸٪ نشستن روی «در»، ۸–۲۶٪ ضربهٔ در، ۲۶–۵۰٪ حرکت به سمتِ هدف،
    ۵۰–۶۲٪ ضربهٔ هدف، بعد آرام بلندشدن. */
 @keyframes tourTapTravel {
-  0%   { transform: translate(-50%, -50%) translate(0, -34px) translate(var(--fx, 0px), var(--fy, 0px)); opacity: 0; }
+  0%   { transform: translate(-50%, -50%) translate(var(--fx, 0px), calc(var(--fy, 0px) + var(--lift, -34px))); opacity: 0; }
   8%   { opacity: 1; }
   18%  { transform: translate(-50%, -50%) translate(var(--fx, 0px), var(--fy, 0px)); opacity: 1; }
   26%  { transform: translate(-50%, -50%) translate(var(--fx, 0px), var(--fy, 0px)) scale(.84); }
@@ -107,7 +108,7 @@
   60%  { transform: translate(-50%, -50%) translate(0px, 0px) scale(.84); }
   68%  { transform: translate(-50%, -50%) translate(0px, 0px) scale(1); }
   88%  { transform: translate(-50%, -50%) translate(0px, -6px) scale(1); opacity: 1; }
-  100% { transform: translate(-50%, -50%) translate(0px, -30px) scale(1); opacity: 0; }
+  100% { transform: translate(-50%, -50%) translate(0px, var(--endLift, -30px)) scale(1); opacity: 0; }
 }
 @keyframes tourRippleOne {
   0%, 30% { transform: scale(.6); opacity: 0; }
