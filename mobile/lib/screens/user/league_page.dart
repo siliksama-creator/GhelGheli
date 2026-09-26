@@ -21,6 +21,7 @@ import 'clubs_page.dart';
 import '../../widgets/coin_vault.dart';
 import '../../widgets/ui_icon.dart';
 import '../../core/app_config.dart';
+import '../../tour/tour_anchors.dart';
 
 /// Monthly league leaderboard: podium (top 3) + ranked list. The table is
 /// refreshed over Socket.IO (the server emits `leaderboard:update` only to
@@ -163,7 +164,9 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, 0),
-            child: SegmentedButton<int>(
+            child: SegmentedButton<int>TourAnchor(
+              id: 'league:tabs',
+              child: (
               segments: [
                 const ButtonSegment(value: 0, label: Text('جدول لیگ')),
                 const ButtonSegment(value: 1, label: Text('باشگاه‌ها')),
@@ -178,7 +181,7 @@ class _LeaguePageState extends State<LeaguePage> with WidgetsBindingObserver {
               selected: {_tab},
               showSelectedIcon: false,
               onSelectionChanged: (s) => setState(() => _tab = s.first),
-            ),
+            )),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(Gaps.md, Gaps.sm, Gaps.md, 0),

@@ -16,6 +16,7 @@ import '../../widgets/coin_quota_line.dart';
 import '../../widgets/point_quota_line.dart';
 import '../../widgets/coin_rate_strip.dart';
 import '../../widgets/level_badge.dart';
+import '../../tour/tour_anchors.dart';
 import 'games/game_session.dart' show netPotFor;
 import 'games/memory_board.dart';
 import 'games/penalty_board.dart';
@@ -584,7 +585,9 @@ class _GamesHubPageState extends State<GamesHubPage> {
         // مجبور بود متن را در کلِ صفحه بشمارد — و وقتی کاشی‌ها مربعی
         // شدند و نشانِ حالت را هم نشان دادند، شکست.
         // Wrap به‌جای side-scroll — همهٔ حالت‌ها در چند ردیف جا می‌گیرند
-        Wrap(
+        TourAnchor(
+          id: 'games:stakes',
+          child: Wrap(
           key: const Key('gameModeBar'),
           spacing: 6,
           runSpacing: 6,
@@ -623,7 +626,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
               ),
             ),
           ],
-        ),
+        )),
         Gaps.vSm,
         _StakeRulesBanner(mode: _selectedMode),
         CoinQuotaLine(mode: _selectedMode, quota: _coinQuota),
@@ -663,7 +666,9 @@ class _GamesHubPageState extends State<GamesHubPage> {
           //    چون این شبکه داخلِ یک `ListView` است. بدونِ آن‌ها یا
           //    خطای ارتفاعِ نامحدود می‌گیریم یا دو اسکرولِ تودرتو که
           //    روی گوشی حس می‌شود.
-          GridView.count(
+          TourAnchor(
+            id: 'games:grid',
+            child: GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -713,7 +718,7 @@ class _GamesHubPageState extends State<GamesHubPage> {
                   },
                 ),
             ],
-          ),
+          )),
         ],
 
         Gaps.vLg,

@@ -9,6 +9,7 @@ import '../../theme/brand_theme.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/reward_moment.dart';
+import '../../tour/tour_anchors.dart';
 
 const _freeColor = Color(0xFF38BDF8);
 const _plusGold = Color(0xFFFFD166);
@@ -226,7 +227,9 @@ class _PassPageState extends State<PassPage>
     final claimedCount = allTiers.where(isTierDone).length;
     final displayTiers = allTiers.where((r) => _showClaimed || !isTierDone(r)).toList();
 
-    return RefreshIndicator(
+    return TourAnchor(
+      id: 'club:tab:pass',
+      child: RefreshIndicator(
       onRefresh: () => _load(jump: false),
       child: ListView(
         controller: _scroll,
@@ -479,7 +482,7 @@ class _PassPageState extends State<PassPage>
           ],
         ],
       ),
-    );
+    ));
   }
 }
 

@@ -11,6 +11,7 @@ import '../../../core/share_invite.dart';
 import '../../../theme/tokens.dart';
 import '../../../widgets/reward_moment.dart';
 import '../../../widgets/ui_icon.dart';
+import '../../../tour/tour_anchors.dart';
 
 class GrowthPanel extends StatefulWidget {
   const GrowthPanel({super.key, required this.api, required this.onJoinGame});
@@ -256,7 +257,9 @@ class _GrowthPanelState extends State<GrowthPanel> {
           ];
     final friends = ((_data?['friends'] as List?) ?? const []).whereType<Map>().toList();
     final incoming = ((_data?['incoming'] as List?) ?? const []).whereType<Map>().toList();
-    return Container(
+    return TourAnchor(
+      id: 'club:tab:growth',
+      child: Container(
       padding: const EdgeInsets.all(Gaps.md),
       decoration: BoxDecoration(
         borderRadius: Corners.rXl,
@@ -398,7 +401,7 @@ class _GrowthPanelState extends State<GrowthPanel> {
         ],
         if (_notice != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_notice!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFFFD166), fontSize: 9.5))),
       ]),
-    );
+    ));
   }
 
   Widget _friendRow(Map friend, {bool incoming = false}) => Padding(

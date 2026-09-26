@@ -67,8 +67,12 @@ class TourPlan {
         sub: 'growth'),
     'pass': TourPlan('club', <String>['club:tab:pass', 'club:subtabs'],
         sub: 'pass'),
-    'coins': TourPlan('league', <String>['league:tab:vault', 'nav:league'],
-        sub: 'vault'),
+    // `#i/n` = قطعهٔ i از n قطعهٔ مساویِ همان لنگر. تب‌های `SegmentedButton`
+    // ویجتِ جدا ندارند که بتوان پیچیدشان دور، ولی عرضشان دقیقاً برابر است —
+    // پس هاله روی همان تب می‌نشیند. «صندوق سکه» تبِ سوم از چهار است
+    // (ترتیبِ `segments` در `league_page.dart`).
+    'coins': TourPlan('league',
+        <String>['league:tabs#2/4', 'league:tabs', 'nav:league']),
     'shop': TourPlan('shop', <String>['shop:top', 'more:shop']),
     'wallet': TourPlan('wallet', <String>['wallet:top', 'more:wallet']),
     'profile': TourPlan('profile', <String>['profile:top', 'more:profile']),
@@ -435,8 +439,26 @@ class TourOverlayState extends State<TourOverlay> {
     return slots[slot];
   }
 
-  /// کادرِ یک id: لنگرِ ثبت‌شده، یا جای هندسیِ تب (`nav:x`).
+  /// کادرِ یک id: لنگرِ ثبت‌شده، جای هندسیِ تب (`nav:x`)، یا برشی از یک
+  /// لنگر (`base#i/n`).
+  ///
+  /// برش برای تب‌های `SegmentedButton` لازم شد: آن‌ها ویجتِ جدا ندارند که
+  /// بتوان `TourAnchor` دورشان پیچید، ولی `SegmentedButton` به همهٔ
+  /// قطعه‌ها عرضِ **برابر** می‌دهد — پس تقسیمِ عرضِ خودِ نوار، همان تب را
+  /// می‌دهد. چون اپ راست‌به‌چپ است، قطعهٔ صفر سمتِ راست است.
   Rect? _rectOfId(String id) {
+    final hash = id.indexOf('#');
+    if (hash > 0) {
+      final base = _rectOfId(id.substring(0, hash));
+      final spec = id.substring(hash + 1).split('/');
+      if (base == null || spec.length != 2) return null;
+      final i = int.tryParse(spec[0]);
+      final n = int.tryParse(spec[1]);
+      if (i == null || n == null || n < 1 || i < 0 || i >= n) return null;
+      final w = base.width / n;
+      return Rect.fromLTWH(
+          base.right - (i + 1) * w, base.top, w, base.height);
+    }
     if (id.startsWith('nav:')) {
       final slot = _slotOf(id.substring(4));
       return slot == null ? null : _slotRect(slot);

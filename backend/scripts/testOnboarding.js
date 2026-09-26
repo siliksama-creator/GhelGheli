@@ -306,8 +306,10 @@ const plans = [...OV.matchAll(/'([a-z][a-z0-9_-]*)':\s*TourPlan\(([\s\S]*?)\),?\
     anchors: [...m[2].matchAll(/'((?:[a-z]+):[A-Za-z0-9:_-]+)'/g)].map((x) => x[1]),
   }));
 check('۱۸ بخشِ نقشه با لنگرِ خالی خوانده شد', plans.length === 18, `یافت شد: ${plans.length}`);
+// `base#i/n` برشی از لنگرِ `base` است — با پایه‌اش سنجیده می‌شود.
+const anchorBase = (a) => a.split('#')[0];
 const noAnchor = plans.filter((p) => !p.anchors.some(
-  (a) => a.startsWith('nav:') || wired.has(a)));
+  (a) => a.startsWith('nav:') || wired.has(anchorBase(a))));
 check('هر بخش دستِ‌کم یک لنگرِ موجود دارد', noAnchor.length === 0,
   noAnchor.map((p) => `${p.id}(${p.anchors.join('|')})`).join(' , '));
 
@@ -336,10 +338,19 @@ check('پیچشِ لنگر سالم است (سرِ نامِ ویجت، نه سر
 // لنگرهای ثبت‌شده‌ای که هیچ بخشی به آن‌ها اشاره نمی‌کند = کدِ مرده.
 const planAnchors = new Set(plans.flatMap((p) => p.anchors));
 // idهای الگویی (مثلِ `more:${...}` در شیت) لنگرِ واقعی نیستند.
-const orphan = [...wired].filter((w) => !w.includes('$') && !planAnchors.has(w));
+const planBases = new Set([...planAnchors].map((a) => a.split('#')[0]));
+const orphan = [...wired].filter((w) => !w.includes('$') && !planBases.has(w));
 check('لنگرِ بی‌مصرف نمانده', orphan.length === 0, orphan.join(', '));
 
 // لنگرِ صفحه‌ها باید از راهِ خودِ ویجت پیچیده شده باشد، نه دستی در جای دیگر.
+// برشِ `league:tabs#2/4`: هاله روی تبِ سومِ نوارِ چهارتایی می‌نشیند. اگر
+// کسی تب اضافه/کم کند، این عدد بی‌سدا غلط می‌شد — پس به ساختار گره می‌خورد.
+const league = read(path.join(MOB, 'screens', 'user', 'league_page.dart'));
+const segCount = (league.match(/ButtonSegment\(/g) || []).length;
+check('نوارِ تب‌های لیگ همان ۴ قطعه است که برشِ `#2/4` فرض می‌کند',
+  segCount === 4 && OV.includes("'league:tabs#2/4'"),
+  `ButtonSegment=${segCount}`);
+
 const anchored = [...wired].filter((id) => id.includes(':') && !id.startsWith('nav:')
   && !id.startsWith('more:'));
 const anchorCount = dartFiles.reduce((n, f) =>
