@@ -372,6 +372,14 @@ check('نوارِ تب‌های لیگ همان ۴ قطعه است که برشِ
   segCount === 4 && OV.includes("'league:tabs#2/4'"),
   `ButtonSegment=${segCount}`);
 
+// تستِ اجرای واقعیِ تور: ۱۸ id داخلِ تستِ ویجت باید همان idهای سرور باشد،
+// وگرنه تست چیزی را می‌سنجد که در دنیای واقعی رخ نمی‌دهد.
+const TOUR_TEST = read(path.join(ROOT, 'mobile', 'test', 'tour_overlay_test.dart'));
+const testIds = [...TOUR_TEST.matchAll(/'([a-z][a-z0-9_]*)',?\s*\n?/g)].map((m) => m[1]);
+const missingInTest = svcIds.filter((id) => !TOUR_TEST.includes(`'${id}'`));
+check('تستِ ویجتِ تور هر ۱۸ id سرور را پوشش می‌دهد', missingInTest.length === 0,
+  `گمشده: ${missingInTest.join(',')}`);
+
 const anchored = [...wired].filter((id) => id.includes(':') && !id.startsWith('nav:')
   && !id.startsWith('more:'));
 const anchorCount = dartFiles.reduce((n, f) =>

@@ -90,7 +90,11 @@ const Duration _advance = Duration(milliseconds: 700);
 const Duration _doorMs = Duration(milliseconds: 1500);
 const Duration _enterMs = Duration(milliseconds: 1700);
 const Duration _settleMs = Duration(milliseconds: 620);
-const Duration _waitAnchorMs = Duration(milliseconds: 3200);
+/// چند بار برای پیدا شدنِ لنگرِ یک بخش صبر کنیم و با چه فاصله‌ای —
+/// ۳۶ × ۹۰ms ≈ ۳٫۲ ثانیه (همان سقفِ قبلی، این بار بر حسبِ «تلاش» تا در
+/// تستِ ویجت هم قطعی باشد).
+const int _anchorTries = 36;
+const Duration _anchorPollMs = Duration(milliseconds: 90);
 
 /// پخشِ صدا با همان محافظِ `game_audio.dart`: صدا هرگز چیزی را نمی‌شکند.
 AudioPlayer? _safePlayer() {
@@ -345,18 +349,24 @@ class TourOverlayState extends State<TourOverlay> {
     await _play(step);
   }
 
-  /// اولین لنگرِ موجود را برمی‌گرداند (تا سقفِ زمانی).
+  /// اولین لنگرِ موجود را برمی‌گرداند.
+  ///
+  /// چرا «تعدادِ تلاش» و نه ساعتِ دیوار: نسخهٔ اول با `DateTime.now()` سقف
+  /// می‌گذاشت. در تستِ ویجت، زمانِ شبیه‌سازی‌شده جلو می‌رود ولی ساعتِ واقعی
+  /// نه — پس حلقه عملاً بی‌پایان می‌شد و تستِ تور قابلِ نوشتن نبود. سقفِ
+  /// تلاش در تست و روی گوشی یکسان رفتار می‌کند (۳۶ × ۹۰ms ≈ ۳٫۲ ثانیه).
   Future<Rect?> _waitForAnchor(List<String> anchors, int run) async {
     if (anchors.isEmpty) return null;
-    final deadline = DateTime.now().add(_waitAnchorMs);
-    while (DateTime.now().isBefore(deadline)) {
+    for (var i = 0; i < _anchorTries; i++) {
       if (!mounted || run != _run) return null;
       for (final id in anchors) {
         final r = _rectOfId(id);
         if (r != null) return r;
       }
-      await Future<void>.delayed(const Duration(milliseconds: 90));
+      await Future<void>.delayed(_anchorPollMs);
     }
+    // هیچ‌کدام از لنگرها روی صفحه نبود: افتِ محترمانه (کارتِ وسطِ قاب).
+    debugPrint('[tour] لنگرِ این بخش پیدا نشد: ${anchors.join(' | ')}');
     return null;
   }
 
